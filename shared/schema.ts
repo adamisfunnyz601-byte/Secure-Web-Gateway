@@ -23,6 +23,9 @@ export const users = pgTable("users", {
   nickname: text("nickname"),
   avatarUrl: text("avatar_url"),
   usernameFont: text("username_font"),
+  tagSymbol: text("tag_symbol"),
+  tagText: text("tag_text"),
+  tagColor: text("tag_color"),
   displayName: text("display_name"),
   pronouns: text("pronouns"),
   bannerUrl: text("banner_url"),
@@ -202,6 +205,9 @@ export type MessageWithUser = Message & {
   senderAvatarUrl?: string | null;
   senderNickname?: string | null;
   senderUsernameFont?: string | null;
+  senderTagSymbol?: string | null;
+  senderTagText?: string | null;
+  senderTagColor?: string | null;
   replyToContent?: string | null;
   replyToSenderName?: string | null;
 };

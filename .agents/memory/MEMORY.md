@@ -1,4 +1,4 @@
-- [Theme & DB tables](theme-db.md) — Discord-like dark theme (violet primary, teal accent); new tables: access_requests, custom_emojis added via raw SQL (not drizzle push, which warned of data loss on existing cols).
+- [Drizzle schema caution](theme-db.md) — inspect schema-push impact carefully; prior warnings favored narrow additive development changes and Publish-managed production updates.
 - [Chat performance](chat-performance.md) — chat history must be fetched per active channel with indexed queries and optimistic sends; never refetch all message history after sending.
 - [Profile image storage](profile-image-storage.md) — profile photos are saved as data URLs, so the database column must be unbounded text and checked for schema drift.
 - [Account cleanup safety](account-cleanup.md) — confirm the canonical owner and linked data before bulk deletion; role flags can identify multiple owner accounts.

@@ -6,6 +6,13 @@ import type { Express, Request } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import {
+  PROFILE_TAG_COLORS,
+  PROFILE_TAG_SYMBOLS,
+  isProfileTagColor,
+  isProfileTagSymbol,
+  normalizeProfileTagText,
+} from "@shared/profile-tag";
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -388,7 +395,19 @@ export async function registerRoutes(
 
   app.patch("/api/user/profile", requireAuth, async (req, res) => {
     try {
-      const { username, nickname, displayName, bio, pronouns, avatarUrl, bannerUrl, usernameFont } = req.body;
+      const {
+        username,
+        nickname,
+        displayName,
+        bio,
+        pronouns,
+        avatarUrl,
+        bannerUrl,
+        usernameFont,
+        tagSymbol,
+        tagText,
+        tagColor,
+      } = req.body;
       const update: any = {};
       if (typeof username === 'string' && username.trim().length > 0) update.username = username.trim().slice(0, 32);
       if (nickname !== undefined) update.nickname = nickname ? String(nickname).slice(0, 32) : null;
@@ -398,6 +417,52 @@ export async function registerRoutes(
       if (avatarUrl !== undefined) update.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.length > 0 ? avatarUrl : null;
       if (bannerUrl !== undefined) update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
       if (usernameFont !== undefined) update.usernameFont = usernameFont || null;
+      if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
+        if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
+          return res.status(400).json({ message: "Tag text must be a string" });
+        }
+
+        const [currentUser] = await db
+          .select({
+            tagSymbol: users.tagSymbol,
+            tagText: users.tagText,
+            tagColor: users.tagColor,
+          })
+          .from(users)
+          .where(eq(users.id, req.session.userId!));
+        const nextTagText =
+          tagText === null
+            ? ""
+            : typeof tagText === "string"
+              ? normalizeProfileTagText(tagText)
+              : currentUser?.tagText || "";
+
+        if (!nextTagText) {
+          update.tagSymbol = null;
+          update.tagText = null;
+          update.tagColor = null;
+        } else {
+          const nextTagSymbol =
+            tagSymbol === undefined || tagSymbol === null
+              ? currentUser?.tagSymbol || PROFILE_TAG_SYMBOLS[0]
+              : tagSymbol;
+          const nextTagColor =
+            tagColor === undefined || tagColor === null
+              ? currentUser?.tagColor || PROFILE_TAG_COLORS[0]
+              : tagColor;
+
+          if (!isProfileTagSymbol(nextTagSymbol)) {
+            return res.status(400).json({ message: "Choose a valid profile tag symbol" });
+          }
+          if (!isProfileTagColor(nextTagColor)) {
+            return res.status(400).json({ message: "Choose a valid profile tag color" });
+          }
+
+          update.tagSymbol = nextTagSymbol;
+          update.tagText = nextTagText;
+          update.tagColor = nextTagColor;
+        }
+      }
       // Always ensure at least one field
       if (Object.keys(update).length === 0) return res.json({ success: true });
       await db.update(users).set(update).where(eq(users.id, req.session.userId!));

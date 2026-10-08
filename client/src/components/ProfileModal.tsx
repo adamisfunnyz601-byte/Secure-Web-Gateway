@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { ProfileTagEditor } from "@/components/ProfileTagEditor";
+import { UserProfileTag } from "@/components/UserProfileTag";
+import {
+  PROFILE_TAG_COLORS,
+  PROFILE_TAG_SYMBOLS,
+} from "@shared/profile-tag";
 
 export const USERNAME_FONTS: {
   id: string;
@@ -178,6 +184,9 @@ export function ProfileModal({
         avatarUrl: profile.avatarUrl || "",
         bannerUrl: profile.bannerUrl || "",
         usernameFont: profile.usernameFont || "default",
+        tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
+        tagText: profile.tagText || "",
+        tagColor: profile.tagColor || PROFILE_TAG_COLORS[0],
       });
   }, [profile]);
 
@@ -247,7 +256,7 @@ export function ProfileModal({
       qc.invalidateQueries({ queryKey: ["/api/user/profile", userId] });
       qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
       qc.invalidateQueries({ queryKey: ["/api/chat/users"] });
-      qc.invalidateQueries({ queryKey: ["/api/chat/messages"] });
+      qc.invalidateQueries({ queryKey: ["/api/messages"] });
       setEditing(false);
     },
     onError: (error: any) => toast({
@@ -375,8 +384,16 @@ export function ProfileModal({
                       >
                         {displayName}
                       </div>
-                      <div className="text-[10px] text-primary/50 font-mono mt-1">
-                        @{profile.username}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <div className="text-[10px] text-primary/50 font-mono">
+                          @{profile.username}
+                        </div>
+                        <UserProfileTag
+                          tagSymbol={editing ? form.tagSymbol : profile.tagSymbol}
+                          tagText={editing ? form.tagText : profile.tagText}
+                          tagColor={editing ? form.tagColor : profile.tagColor}
+                          size="compact"
+                        />
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={cn(
@@ -485,6 +502,14 @@ export function ProfileModal({
                           data-testid="input-username"
                         />
                       </Field>
+                      <ProfileTagEditor
+                        value={{
+                          tagSymbol: form.tagSymbol || PROFILE_TAG_SYMBOLS[0],
+                          tagText: form.tagText || "",
+                          tagColor: form.tagColor || PROFILE_TAG_COLORS[0],
+                        }}
+                        onChange={(tag) => setForm((current: any) => ({ ...current, ...tag }))}
+                      />
                       <Field label="NICKNAME (optional display name)">
                         <input
                           value={form.nickname}
@@ -559,6 +584,9 @@ export function ProfileModal({
                             setForm({
                               ...profile,
                               usernameFont: profile.usernameFont || "default",
+                              tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
+                              tagText: profile.tagText || "",
+                              tagColor: profile.tagColor || PROFILE_TAG_COLORS[0],
                             });
                           }}
                           className="flex-1 text-[10px] font-mono text-white/60 border border-white/20 px-2 py-2 rounded hover:bg-white/5"

@@ -4,6 +4,7 @@ import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Setti
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ProfileModal";
+import { UserProfileTag } from "./UserProfileTag";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -89,7 +90,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className="shrink-0"
             />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-foreground truncate">{user?.username}</div>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <div className="text-sm font-semibold text-foreground truncate">{user?.username}</div>
+                <UserProfileTag
+                  tagSymbol={user?.tagSymbol}
+                  tagText={user?.tagText}
+                  tagColor={user?.tagColor}
+                  size="compact"
+                />
+              </div>
               <div className={cn(
                 "text-[10px]",
                 user?.role === "owner" ? "text-amber-400" : "text-green-400"

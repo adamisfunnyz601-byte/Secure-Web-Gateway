@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProfileModal, Avatar, getFontClass } from "@/components/ProfileModal";
+import { UserProfileTag } from "@/components/UserProfileTag";
 import { EmojiButton } from "@/components/EmojiPicker";
 
 // ============================================================
@@ -69,7 +70,7 @@ function MessageContent({ content }: { content: string }) {
 // ============================================================
 const CyberSidebarNode = ({
   label, isActive, onClick, status = "online"
-}: { label: string; isActive: boolean; onClick: () => void; status?: string }) => {
+}: { label: React.ReactNode; isActive: boolean; onClick: () => void; status?: string }) => {
   const statusClass =
     status === "online" ? "bg-green-400 shadow-[0_0_8px_#57f287]" :
     status === "idle" ? "bg-yellow-400 shadow-[0_0_8px_#fee75c]" :
@@ -87,9 +88,9 @@ const CyberSidebarNode = ({
         : "bg-transparent border-primary/20 opacity-70 hover:opacity-100 hover:bg-primary/5"
     )}
   >
-    <div className="flex items-center gap-3">
+    <div className="flex min-w-0 flex-1 items-center gap-3">
        <div className={cn("w-2 h-2 rounded-full", statusClass, isActive && status === "online" && "animate-pulse")} />
-      <span className={cn("font-mono text-[12px] tracking-[0.05em] uppercase", isActive ? "text-primary font-bold" : "text-primary/70")}>
+      <span className={cn("inline-flex min-w-0 flex-1 items-center gap-2 overflow-hidden font-mono text-[12px] tracking-[0.05em] uppercase", isActive ? "text-primary font-bold" : "text-primary/70")}>
         {label}
       </span>
     </div>
@@ -249,6 +250,12 @@ const TerminalMessage = ({
           >
             {isMe ? "YOU" : displayName}
           </button>
+          <UserProfileTag
+            tagSymbol={msg.senderTagSymbol}
+            tagText={msg.senderTagText}
+            tagColor={msg.senderTagColor}
+            size="compact"
+          />
           {msg.senderNickname && !isMe && <span className="text-[8px] text-white/20 font-mono">@{msg.senderName}</span>}
           <span className="text-[8px] font-mono text-white/20">
             {format(new Date(msg.createdAt || Date.now()), "HH:mm:ss")}
@@ -487,6 +494,9 @@ export default function Chat() {
         senderPronouns: u?.pronouns ?? null,
         senderPresenceStatus: u?.presenceStatus ?? "offline",
         senderUsernameFont: u?.usernameFont ?? null,
+        senderTagSymbol: u?.tagSymbol ?? null,
+        senderTagText: u?.tagText ?? null,
+        senderTagColor: u?.tagColor ?? null,
       };
     });
   }, [messages, selectedGroupId, selectedRecipientId, currentUser?.id, usersMap]);
@@ -1220,7 +1230,17 @@ export default function Chat() {
                 {filteredUsers?.map((u: any) => (
                   <CyberSidebarNode
                     key={u.id}
-                    label={u.displayName || u.nickname || u.username}
+                    label={
+                      <>
+                        <span className="truncate">{u.displayName || u.nickname || u.username}</span>
+                        <UserProfileTag
+                          tagSymbol={u.tagSymbol}
+                          tagText={u.tagText}
+                          tagColor={u.tagColor}
+                          size="compact"
+                        />
+                      </>
+                    }
                     status={u.presenceStatus || "offline"}
                     isActive={selectedRecipientId === u.id}
                     onClick={() => selectPrivateNode(u.id)}
@@ -1236,7 +1256,15 @@ export default function Chat() {
                   <Cpu className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10px] font-bold text-primary uppercase truncate">{currentUser?.username}</div>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <div className="text-[10px] font-bold text-primary uppercase truncate">{currentUser?.username}</div>
+                    <UserProfileTag
+                      tagSymbol={currentUser?.tagSymbol}
+                      tagText={currentUser?.tagText}
+                      tagColor={currentUser?.tagColor}
+                      size="compact"
+                    />
+                  </div>
                   <div className="text-[8px] text-primary/30 font-mono">ONLINE</div>
                 </div>
               </div>
@@ -1400,6 +1428,12 @@ export default function Chat() {
                       >
                         <Avatar url={u.avatarUrl} name={u.username} size={22} />
                         <span className="text-sm text-foreground">{u.displayName || u.nickname || u.username}</span>
+                        <UserProfileTag
+                          tagSymbol={u.tagSymbol}
+                          tagText={u.tagText}
+                          tagColor={u.tagColor}
+                          size="compact"
+                        />
                         <span className="text-xs text-muted-foreground">@{u.username}</span>
                       </button>
                     ))}

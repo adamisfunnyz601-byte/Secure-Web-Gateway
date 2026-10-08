@@ -153,6 +153,9 @@ export class DatabaseStorage implements IStorage {
       senderPronouns: users.pronouns,
       senderPresenceStatus: users.presenceStatus,
       senderUsernameFont: users.usernameFont,
+      senderTagSymbol: users.tagSymbol,
+      senderTagText: users.tagText,
+      senderTagColor: users.tagColor,
       replyToContent: sql<string>`(SELECT content FROM messages WHERE id = ${messages.replyToId})`,
       replyToSenderName: sql<string>`(SELECT u.username FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.id = ${messages.replyToId})`,
     } as any)
@@ -174,6 +177,9 @@ export class DatabaseStorage implements IStorage {
       mediaType: messages.mediaType,
       createdAt: messages.createdAt,
       senderName: users.username,
+      senderTagSymbol: users.tagSymbol,
+      senderTagText: users.tagText,
+      senderTagColor: users.tagColor,
     })
     .from(messages)
     .innerJoin(users, eq(messages.senderId, users.id))
@@ -197,6 +203,9 @@ export class DatabaseStorage implements IStorage {
       avatarUrl: users.avatarUrl,
       bannerUrl: users.bannerUrl,
       usernameFont: users.usernameFont,
+      tagSymbol: users.tagSymbol,
+      tagText: users.tagText,
+      tagColor: users.tagColor,
       role: users.role,
       presenceStatus: users.presenceStatus,
       lastSeen: users.lastSeen,
