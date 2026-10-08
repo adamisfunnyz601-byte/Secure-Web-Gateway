@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import Login from "@/pages/Login";
+import SignUp from "@/pages/SignUp";
 import Proxy from "@/pages/Proxy";
 import Chat from "@/pages/Chat";
 import History from "@/pages/History";
@@ -42,6 +43,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Login} />
+      <Route path="/signup" component={SignUp} />
       <Route path="/proxy">
         <ProtectedRoute component={Proxy} />
       </Route>

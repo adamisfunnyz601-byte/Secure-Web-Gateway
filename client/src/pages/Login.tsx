@@ -140,6 +140,12 @@ export default function Login() {
                 Request access
               </button>
             </p>
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              New here?{" "}
+              <button onClick={() => setLocation("/signup")} className="text-primary hover:underline">
+                Create an account
+              </button>
+            </p>
           </div>
         )}
 
