@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 const QUICK_EMOJIS = ["😀","😊","🙂","😎","🤔","👍","👋","❤️","🔥","✨","🎉","💪","🙏","😂","🥺","😅","🤝","💯","⭐","🚀"];
 
 export default function Login() {
-  const [tab, setTab] = useState<"login" | "request">("login");
+  const [tab, setTab] = useState<"login" | "request">(() =>
+    window.location.search.includes("request-access") ? "request" : "login",
+  );
 
   // Login state
   const [key, setKey] = useState("");
