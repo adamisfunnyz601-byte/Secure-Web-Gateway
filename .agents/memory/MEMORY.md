@@ -1,2 +1,3 @@
 - [Theme & DB tables](theme-db.md) — Discord-like dark theme (violet primary, teal accent); new tables: access_requests, custom_emojis added via raw SQL (not drizzle push, which warned of data loss on existing cols).
 - [Chat performance](chat-performance.md) — chat history must be fetched per active channel with indexed queries and optimistic sends; never refetch all message history after sending.
+- [Profile image storage](profile-image-storage.md) — profile photos are saved as data URLs, so the database column must be unbounded text and checked for schema drift.

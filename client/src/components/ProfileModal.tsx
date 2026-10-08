@@ -236,7 +236,10 @@ export function ProfileModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!r.ok) throw new Error("save failed");
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.message || `Profile save failed (${r.status})`);
+      }
       return r.json();
     },
     onSuccess: () => {
@@ -247,7 +250,11 @@ export function ProfileModal({
       qc.invalidateQueries({ queryKey: ["/api/chat/messages"] });
       setEditing(false);
     },
-    onError: () => toast({ title: "SAVE_FAILED", variant: "destructive" }),
+    onError: (error: any) => toast({
+      title: "SAVE_FAILED",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "avatarUrl" | "bannerUrl") => {
