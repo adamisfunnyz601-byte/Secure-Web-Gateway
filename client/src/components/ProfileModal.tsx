@@ -119,6 +119,8 @@ export function Avatar({
         <img
           src={validUrl}
           alt={name}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover"
           onError={e => {
             // If image fails to load, hide it and show initials

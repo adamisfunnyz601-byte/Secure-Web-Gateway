@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+
+let optimisticMessageSequence = 0;
 
 interface ChatChannel {
   recipientId?: number | null;
@@ -8,6 +12,8 @@ interface ChatChannel {
 
 export function useChat({ recipientId = null, groupId = null }: ChatChannel = {}) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const channelParams = new URLSearchParams();
   if (recipientId) channelParams.set("recipientId", String(recipientId));
   if (groupId) channelParams.set("groupId", String(groupId));
@@ -21,7 +27,16 @@ export function useChat({ recipientId = null, groupId = null }: ChatChannel = {}
     queryFn: async () => {
       const res = await fetch(messagesUrl);
       if (!res.ok) throw new Error("Failed to fetch messages");
-      return res.json();
+      const incoming = await res.json();
+      const cachedMessages = queryClient.getQueryData<any[]>(messagesKey);
+      if (!Array.isArray(incoming) || !cachedMessages?.length) return incoming;
+      const cachedById = new Map(cachedMessages.map((message) => [message.id, message]));
+      return incoming.map((message: any) => {
+        const cached = cachedById.get(message.id);
+        return cached?.mediaUrl && !message.mediaUrl
+          ? { ...message, mediaUrl: cached.mediaUrl }
+          : message;
+      });
     },
     refetchInterval: 4000,
     staleTime: 1500,
@@ -55,11 +70,64 @@ export function useChat({ recipientId = null, groupId = null }: ChatChannel = {}
       if (!res.ok) throw new Error("Failed to send message");
       return res.json();
     },
-    onSuccess: (message) => {
-      // Render our own message immediately without waiting for the next poll.
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: messagesKey });
+      const optimisticId = -(++optimisticMessageSequence);
+      const optimisticMessage = {
+        id: optimisticId,
+        senderId: user?.id,
+        recipientId: data.recipientId ?? null,
+        groupId: data.groupId ?? null,
+        content: data.content,
+        mediaUrl: data.mediaUrl ?? null,
+        mediaType: data.mediaType ?? null,
+        hasMedia: Boolean(data.mediaUrl),
+        replyToId: data.replyToId ?? null,
+        createdAt: new Date().toISOString(),
+        senderName: user?.username,
+        senderDisplayName: user?.displayName ?? null,
+        senderAvatarUrl: user?.avatarUrl ?? null,
+        senderNickname: user?.nickname ?? null,
+        senderPronouns: user?.pronouns ?? null,
+        senderPresenceStatus: user?.presenceStatus ?? "online",
+        senderUsernameFont: user?.usernameFont ?? null,
+        senderTagSymbol: user?.tagSymbol ?? null,
+        senderTagText: user?.tagText ?? null,
+        senderTagColor: user?.tagColor ?? null,
+      };
+      queryClient.setQueryData<any[]>(messagesKey, (current = []) => [
+        ...current,
+        optimisticMessage,
+      ]);
+      return { optimisticId };
+    },
+    onSuccess: (message, _data, context) => {
       queryClient.setQueryData<any[]>(messagesKey, (current = []) => {
-        if (current.some(existing => existing.id === message.id)) return current;
-        return [...current, message];
+        const optimistic = current.find((item) => item.id === context?.optimisticId);
+        const completed = {
+          ...optimistic,
+          ...message,
+          mediaUrl: message.mediaUrl ?? optimistic?.mediaUrl ?? null,
+          hasMedia: Boolean(message.hasMedia ?? optimistic?.hasMedia ?? message.mediaUrl),
+        };
+        const withoutOptimistic = current.filter((item) => item.id !== context?.optimisticId);
+        const existingIndex = withoutOptimistic.findIndex((item) => item.id === message.id);
+        if (existingIndex >= 0) {
+          return withoutOptimistic.map((item) => item.id === message.id
+            ? { ...completed, ...item, mediaUrl: item.mediaUrl ?? completed.mediaUrl }
+            : item);
+        }
+        return [...withoutOptimistic, completed];
+      });
+    },
+    onError: (error, _data, context) => {
+      queryClient.setQueryData<any[]>(messagesKey, (current = []) =>
+        current.filter((item) => item.id !== context?.optimisticId)
+      );
+      toast({
+        title: "MESSAGE_NOT_SENT",
+        description: error instanceof Error ? error.message : "Check your connection and try again.",
+        variant: "destructive",
       });
     },
   });

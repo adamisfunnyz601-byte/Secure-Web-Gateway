@@ -16,11 +16,26 @@ import {
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 
 const MemoryStore = createMemoryStore(session);
 const OWNER_KEY = "TSHSKDB163)#(";
 const PRESENCE_STATUSES = ["online", "idle", "dnd", "offline"] as const;
+type ProfileImageKind = "avatar" | "banner";
+const PROFILE_IMAGE_DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/]+={0,2})$/i;
+
+function profileImageUrl(userId: number, kind: ProfileImageKind, value: unknown): unknown {
+  if (typeof value !== "string") return value ?? null;
+  const match = PROFILE_IMAGE_DATA_URL.exec(value);
+  if (!match) return value;
+  const version = createHash("sha256").update(value).digest("hex").slice(0, 24);
+  return `/api/profile-images/${userId}/${kind}/${version}`;
+}
+
+function isProfileImageProxyUrl(value: unknown, userId: number, kind: ProfileImageKind): boolean {
+  return typeof value === "string"
+    && new RegExp(`^/api/profile-images/${userId}/${kind}/[a-f0-9]{24}$`).test(value);
+}
 
 // Extend session type
 declare module "express-session" {
@@ -75,8 +90,38 @@ export async function registerRoutes(
   const safeUser = (user: any) => {
     if (!user) return user;
     const { serialKey: _serialKey, ...safe } = user;
-    return safe;
+    return {
+      ...safe,
+      avatarUrl: profileImageUrl(safe.id, "avatar", safe.avatarUrl),
+      bannerUrl: profileImageUrl(safe.id, "banner", safe.bannerUrl),
+    };
   };
+
+  app.get("/api/profile-images/:id/:kind/:version", requireAuth, async (req, res) => {
+    const userId = Number(req.params.id);
+    const kind = req.params.kind;
+    if (!Number.isInteger(userId) || userId <= 0 || (kind !== "avatar" && kind !== "banner")) {
+      return res.status(400).json({ message: "Invalid profile image" });
+    }
+    const imageColumn = kind === "avatar" ? users.avatarUrl : users.bannerUrl;
+    const [row] = await db.select({ imageUrl: imageColumn }).from(users)
+      .where(eq(users.id, userId)).limit(1);
+    if (!row || typeof row.imageUrl !== "string" || row.imageUrl.length > 16 * 1024 * 1024) {
+      return res.status(404).end();
+    }
+    const image = PROFILE_IMAGE_DATA_URL.exec(row.imageUrl);
+    if (!image) return res.status(404).end();
+    const currentVersion = createHash("sha256").update(row.imageUrl).digest("hex").slice(0, 24);
+    if (req.params.version !== currentVersion) return res.status(404).end();
+
+    const imageBytes = Buffer.from(image[2], "base64");
+    if (imageBytes.length > 12 * 1024 * 1024) return res.status(413).end();
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Type", image[1]);
+    res.setHeader("Content-Length", imageBytes.length);
+    return res.send(imageBytes);
+  });
 
   // === AUTH ===
   app.post(api.auth.login.path, async (req, res) => {
@@ -272,7 +317,13 @@ export async function registerRoutes(
       mediaType: input.mediaType ?? null,
       replyToId: (req.body as any).replyToId ?? null,
     });
-    res.status(201).json(message);
+    // The optimistic client already has its attachment URL. Don't echo a large
+    // base64 data URL back over the network after an upload.
+    res.status(201).json({
+      ...message,
+      mediaUrl: null,
+      hasMedia: Boolean(message.mediaUrl),
+    });
   });
 
   app.get('/api/chat/messages/:id/media', requireAuth, async (req, res) => {
@@ -389,8 +440,7 @@ export async function registerRoutes(
       ? await db.select().from(groupChats).where(sql`${groupChats.id} IN (${sql.join(mutualIds.map(i => sql`${i}`), sql`, `)})`)
       : [];
 
-    const { serialKey, ...safe } = user;
-    res.json({ ...safe, mutualGroups });
+    res.json({ ...safeUser(user), mutualGroups });
   });
 
   app.patch("/api/user/profile", requireAuth, async (req, res) => {
@@ -414,8 +464,12 @@ export async function registerRoutes(
       if (displayName !== undefined) update.displayName = displayName ? String(displayName).slice(0, 32) : null;
       if (bio !== undefined) update.bio = bio ? String(bio).slice(0, 500) : null;
       if (pronouns !== undefined) update.pronouns = pronouns ? String(pronouns).slice(0, 32) : null;
-      if (avatarUrl !== undefined) update.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.length > 0 ? avatarUrl : null;
-      if (bannerUrl !== undefined) update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
+      if (avatarUrl !== undefined && !isProfileImageProxyUrl(avatarUrl, req.session.userId!, "avatar")) {
+        update.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.length > 0 ? avatarUrl : null;
+      }
+      if (bannerUrl !== undefined && !isProfileImageProxyUrl(bannerUrl, req.session.userId!, "banner")) {
+        update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
+      }
       if (usernameFont !== undefined) update.usernameFont = usernameFont || null;
       if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
         if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
@@ -467,8 +521,7 @@ export async function registerRoutes(
       if (Object.keys(update).length === 0) return res.json({ success: true });
       await db.update(users).set(update).where(eq(users.id, req.session.userId!));
       const [updated] = await db.select().from(users).where(eq(users.id, req.session.userId!));
-      const { serialKey: _sk, ...safe } = updated;
-      res.json(safe);
+      res.json(safeUser(updated));
     } catch (err: any) {
       console.error('Profile update error:', err);
       res.status(500).json({ message: err?.message || 'Update failed' });
@@ -477,7 +530,7 @@ export async function registerRoutes(
 
   app.get(api.chat.users.path, requireAuth, async (req, res) => {
     const usersList = await storage.getAllUsers();
-    res.json(usersList);
+    res.json(usersList.map(safeUser));
   });
 
   // === FRIENDS & BLOCKS ===
@@ -517,7 +570,7 @@ export async function registerRoutes(
           pronouns: users.pronouns,
         }).from(users).where(sql`${users.id} IN (${sql.join(friendIds.map(id => sql`${id}`), sql`, `)})`)
       : [];
-    res.json(friendUsers);
+     res.json(friendUsers.map(safeUser));
   });
 
   app.post("/api/social/friends/:id", requireAuth, async (req, res) => {
@@ -569,7 +622,7 @@ export async function registerRoutes(
       displayName: users.displayName, avatarUrl: users.avatarUrl,
     }).from(blocks).innerJoin(users, eq(blocks.blockedId, users.id))
       .where(eq(blocks.blockerId, req.session.userId!)).orderBy(desc(blocks.createdAt));
-    res.json(rows);
+    res.json(rows.map(safeUser));
   });
 
   app.post("/api/social/blocks/:id", requireAuth, async (req, res) => {
