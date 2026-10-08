@@ -36,7 +36,7 @@ export default function Login() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    login({ serialKey: key, username: username || "Anon" });
+    login({ serialKey: key, username: username.trim() });
   };
 
   const handleRequest = async (e: React.FormEvent) => {
@@ -118,10 +118,13 @@ export default function Login() {
           <div className="bg-secondary/40 border border-border rounded-xl p-6 shadow-2xl">
             <form onSubmit={handleLogin} className="space-y-4">
               <CyberInput
-                label="Username (optional)"
-                placeholder="Your name..."
+                label="Username"
+                placeholder="Enter your username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
+                maxLength={32}
+                autoComplete="username"
+                required
               />
               <CyberInput
                 label="Access Key"

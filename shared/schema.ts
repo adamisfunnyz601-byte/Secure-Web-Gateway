@@ -185,7 +185,7 @@ export type HistoryItem = typeof searchHistory.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 
 // Auth
-export type LoginRequest = { serialKey: string; username?: string };
+export type LoginRequest = { serialKey: string; username: string };
 export type LoginResponse = { user: User; token: string }; // Simple session/token response
 
 // Keys

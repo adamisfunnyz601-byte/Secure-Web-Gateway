@@ -135,6 +135,9 @@ export async function registerRoutes(
       
       res.json(safeUser({ ...user, presenceStatus: "online", lastSeen: new Date() }));
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.issues[0]?.message || "Invalid login details" });
+      }
       console.error(err);
       res.status(500).json({ message: "Login failed" });
     }
