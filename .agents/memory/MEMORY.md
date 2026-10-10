@@ -1,4 +1,4 @@
 - [Drizzle schema caution](theme-db.md) — inspect schema-push impact carefully; prior warnings favored narrow additive development changes and Publish-managed production updates.
-- [Chat performance](chat-performance.md) — chat history must be fetched per active channel with indexed queries and optimistic sends; never refetch all message history after sending.
-- [Profile image storage](profile-image-storage.md) — profile photos are saved as data URLs, so the database column must be unbounded text and checked for schema drift.
+- [Chat performance](chat-performance.md) — keep active-channel history bounded, sends optimistic, and avatars out of message payloads and body logs.
+- [Profile image storage](profile-image-storage.md) — preserve original photos, serve cached thumbnails by default, and send full quality only on demand.
 - [Account cleanup safety](account-cleanup.md) — confirm the canonical owner and linked data before bulk deletion; role flags can identify multiple owner accounts.

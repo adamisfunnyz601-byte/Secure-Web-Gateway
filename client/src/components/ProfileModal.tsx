@@ -91,6 +91,7 @@ export function Avatar({
   font,
   onClick,
   className,
+  title,
 }: {
   url?: string | null;
   name: string;
@@ -98,6 +99,7 @@ export function Avatar({
   font?: string | null;
   onClick?: () => void;
   className?: string;
+  title?: string;
 }) {
   const initials = (name || "?").slice(0, 2).toUpperCase();
   // Treat empty string same as null
@@ -106,6 +108,16 @@ export function Avatar({
   return (
     <div
       onClick={onClick}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      title={title}
+      aria-label={onClick ? title || `View ${name} profile` : undefined}
       className={cn(
         "flex items-center justify-center rounded-full overflow-hidden border border-primary/40 shrink-0 select-none",
         "bg-gradient-to-br from-primary/30 to-accent/20",
@@ -162,8 +174,14 @@ export function ProfileModal({
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
+
+  const showFullImage = (url?: string | null) => {
+    if (!url) return;
+    setFullImageUrl(url.replace("/thumbnail/", "/full/"));
+  };
 
   const { data: profile, isLoading } = useQuery<any>({
     queryKey: ["/api/user/profile", userId],
@@ -339,6 +357,18 @@ export function ProfileModal({
                   />
                 </>
               )}
+              {!editing && profile?.bannerUrl && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showFullImage(profile.bannerUrl);
+                  }}
+                  className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded border border-white/20 hover:border-primary"
+                >
+                  View full banner
+                </button>
+              )}
             </div>
 
             <div className="p-5 -mt-10">
@@ -355,6 +385,10 @@ export function ProfileModal({
                         name={profile.username}
                         size={80}
                         font={profile.usernameFont}
+                        onClick={(editing ? form.avatarUrl : profile.avatarUrl)
+                          ? () => showFullImage(editing ? form.avatarUrl : profile.avatarUrl)
+                          : undefined}
+                        title={`View full-size image for ${profile.username}`}
                         className="border-4 border-black ring-2 ring-primary/50"
                       />
                       {editing && (
@@ -612,6 +646,35 @@ export function ProfileModal({
               )}
             </div>
           </motion.div>
+          {fullImageUrl && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/95 p-4"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (event.target === event.currentTarget) setFullImageUrl(null);
+              }}
+              data-testid="full-profile-image-viewer"
+            >
+              <button
+                type="button"
+                onClick={() => setFullImageUrl(null)}
+                className="absolute top-4 right-4 z-10 rounded-full border border-white/30 bg-black/70 p-2 text-white hover:border-primary"
+                aria-label="Close full-size image"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <img
+                src={fullImageUrl}
+                alt={`${profile?.username || "Profile"} full-size image`}
+                loading="eager"
+                decoding="async"
+                className="max-h-[92vh] max-w-[96vw] object-contain"
+              />
+            </motion.div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

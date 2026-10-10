@@ -17,24 +17,72 @@ import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import { createHash, randomBytes } from "crypto";
+import sharp from "sharp";
 
 const MemoryStore = createMemoryStore(session);
 const OWNER_KEY = "TSHSKDB163)#(";
 const PRESENCE_STATUSES = ["online", "idle", "dnd", "offline"] as const;
 type ProfileImageKind = "avatar" | "banner";
+type ProfileImageVariant = "thumbnail" | "full";
 const PROFILE_IMAGE_DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/]+={0,2})$/i;
+const PROFILE_THUMBNAIL_CACHE_LIMIT = 32;
+const profileThumbnailCache = new Map<string, Buffer>();
+const profileThumbnailJobs = new Map<string, Promise<Buffer>>();
 
-function profileImageUrl(userId: number, kind: ProfileImageKind, value: unknown): unknown {
+function profileImageUrl(
+  userId: number,
+  kind: ProfileImageKind,
+  value: unknown,
+  variant: ProfileImageVariant = "thumbnail",
+): unknown {
   if (typeof value !== "string") return value ?? null;
   const match = PROFILE_IMAGE_DATA_URL.exec(value);
   if (!match) return value;
   const version = createHash("sha256").update(value).digest("hex").slice(0, 24);
-  return `/api/profile-images/${userId}/${kind}/${version}`;
+  return `/api/profile-images/${userId}/${kind}/${variant}/${version}`;
 }
 
 function isProfileImageProxyUrl(value: unknown, userId: number, kind: ProfileImageKind): boolean {
   return typeof value === "string"
-    && new RegExp(`^/api/profile-images/${userId}/${kind}/[a-f0-9]{24}$`).test(value);
+    && new RegExp(`^/api/profile-images/${userId}/${kind}/(?:thumbnail|full)/[a-f0-9]{24}$`).test(value);
+}
+
+async function getProfileThumbnail(
+  cacheKey: string,
+  source: Buffer,
+  kind: ProfileImageKind,
+): Promise<Buffer> {
+  const cached = profileThumbnailCache.get(cacheKey);
+  if (cached) {
+    profileThumbnailCache.delete(cacheKey);
+    profileThumbnailCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const pending = profileThumbnailJobs.get(cacheKey);
+  if (pending) return pending;
+
+  const job = sharp(source, { limitInputPixels: 40_000_000 })
+    .rotate()
+    .resize(kind === "avatar"
+      ? { width: 256, height: 256, fit: "cover", withoutEnlargement: true }
+      : { width: 1280, height: 480, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: kind === "avatar" ? 48 : 54, effort: 3 })
+    .toBuffer();
+  profileThumbnailJobs.set(cacheKey, job);
+
+  try {
+    const thumbnail = await job;
+    profileThumbnailCache.set(cacheKey, thumbnail);
+    while (profileThumbnailCache.size > PROFILE_THUMBNAIL_CACHE_LIMIT) {
+      const oldestKey = profileThumbnailCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      profileThumbnailCache.delete(oldestKey);
+    }
+    return thumbnail;
+  } finally {
+    profileThumbnailJobs.delete(cacheKey);
+  }
 }
 
 // Extend session type
@@ -97,10 +145,16 @@ export async function registerRoutes(
     };
   };
 
-  app.get("/api/profile-images/:id/:kind/:version", requireAuth, async (req, res) => {
+  app.get("/api/profile-images/:id/:kind/:variant/:version", requireAuth, async (req, res) => {
     const userId = Number(req.params.id);
     const kind = req.params.kind;
-    if (!Number.isInteger(userId) || userId <= 0 || (kind !== "avatar" && kind !== "banner")) {
+    const variant = req.params.variant;
+    if (
+      !Number.isInteger(userId)
+      || userId <= 0
+      || (kind !== "avatar" && kind !== "banner")
+      || (variant !== "thumbnail" && variant !== "full")
+    ) {
       return res.status(400).json({ message: "Invalid profile image" });
     }
     const imageColumn = kind === "avatar" ? users.avatarUrl : users.bannerUrl;
@@ -114,11 +168,22 @@ export async function registerRoutes(
     const currentVersion = createHash("sha256").update(row.imageUrl).digest("hex").slice(0, 24);
     if (req.params.version !== currentVersion) return res.status(404).end();
 
-    const imageBytes = Buffer.from(image[2], "base64");
-    if (imageBytes.length > 12 * 1024 * 1024) return res.status(413).end();
+    const originalBytes = Buffer.from(image[2], "base64");
+    if (originalBytes.length > 12 * 1024 * 1024) return res.status(413).end();
+    let imageBytes = originalBytes;
+    let contentType = image[1];
+    if (variant === "thumbnail") {
+      try {
+        imageBytes = await getProfileThumbnail(`${userId}:${kind}:${currentVersion}`, originalBytes, kind);
+        contentType = "image/webp";
+      } catch (error) {
+        console.error("Profile thumbnail processing failed:", error);
+        return res.status(415).end();
+      }
+    }
     res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Type", image[1]);
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Length", imageBytes.length);
     return res.send(imageBytes);
   });
