@@ -1,5 +1,5 @@
 
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -123,6 +123,18 @@ export const groupChatMembers = pgTable("group_chat_members", {
   userId: integer("user_id").notNull().references(() => users.id),
   joinedAt: timestamp("joined_at").defaultNow(),
 });
+
+// OAuth identities are kept separate from usernames and legacy access-key accounts.
+export const oauthAccounts = pgTable("oauth_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  providerSubject: text("provider_subject").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  providerSubjectUnique: uniqueIndex("oauth_accounts_provider_subject_unique")
+    .on(table.provider, table.providerSubject),
+}));
 
 // Update messages to support GCs and media
 export const messages = pgTable("messages", {

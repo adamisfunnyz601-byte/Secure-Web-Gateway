@@ -1,8 +1,8 @@
 
 import { db } from "./db";
-import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks } from "@shared/schema";
+import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts } from "@shared/schema";
 import { eq, desc, and, or, gt, sql } from "drizzle-orm";
-import type { Express, Request } from "express";
+import type { Express, Request, RequestHandler } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
@@ -18,6 +18,22 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { createHash, randomBytes } from "crypto";
 import sharp from "sharp";
+import { rateLimit } from "express-rate-limit";
+
+type OAuthProvider = "google" | "microsoft";
+
+declare module "express-session" {
+  interface SessionData {
+    oauthFlow?: {
+      provider: OAuthProvider;
+      state: string;
+      nonce: string;
+      codeVerifier: string;
+      redirectUri: string;
+      returnTo: string;
+    };
+  }
+}
 
 const MemoryStore = createMemoryStore(session);
 const OWNER_KEY = "TSHSKDB163)#(";
@@ -28,6 +44,140 @@ const PROFILE_IMAGE_DATA_URL = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/]+=
 const PROFILE_THUMBNAIL_CACHE_LIMIT = 32;
 const profileThumbnailCache = new Map<string, Buffer>();
 const profileThumbnailJobs = new Map<string, Promise<Buffer>>();
+const oauthConfigCache = new Map<OAuthProvider, Promise<import("openid-client").Configuration>>();
+
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 12,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many sign-in attempts. Try again in a few minutes." },
+});
+
+const oauthStartRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many sign-in attempts. Try again in a few minutes." },
+});
+
+const accessRequestRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many access requests. Try again later." },
+});
+
+function isOAuthProvider(value: string): value is OAuthProvider {
+  return value === "google" || value === "microsoft";
+}
+
+function isOAuthProviderConfigured(provider: OAuthProvider) {
+  const prefix = provider === "google" ? "GOOGLE" : "MICROSOFT";
+  return Boolean(process.env[`${prefix}_CLIENT_ID`] && process.env[`${prefix}_CLIENT_SECRET`]);
+}
+
+function getOAuthConfig(provider: OAuthProvider) {
+  const existing = oauthConfigCache.get(provider);
+  if (existing) return existing;
+
+  const prefix = provider === "google" ? "GOOGLE" : "MICROSOFT";
+  const clientId = process.env[`${prefix}_CLIENT_ID`];
+  const clientSecret = process.env[`${prefix}_CLIENT_SECRET`];
+  if (!clientId || !clientSecret) {
+    throw new Error(`${provider} sign-in is not configured`);
+  }
+
+  const issuer = provider === "google"
+    ? "https://accounts.google.com"
+    : "https://login.microsoftonline.com/common/v2.0";
+  const discovery = import("openid-client").then(({ discovery }) =>
+    discovery(new URL(issuer), clientId, clientSecret),
+  );
+  oauthConfigCache.set(provider, discovery);
+  discovery.catch(() => oauthConfigCache.delete(provider));
+  return discovery;
+}
+
+function getOAuthRedirectUri(provider: OAuthProvider) {
+  let baseUrl = process.env.OAUTH_REDIRECT_BASE_URL;
+  if (!baseUrl && process.env.NODE_ENV !== "production") {
+    const devDomain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(",")[0];
+    if (devDomain) baseUrl = devDomain.startsWith("http") ? devDomain : `https://${devDomain}`;
+  }
+  if (!baseUrl && process.env.NODE_ENV !== "production") {
+    baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+  }
+  if (!baseUrl) {
+    throw new Error("OAUTH_REDIRECT_BASE_URL must be set for production sign-in");
+  }
+
+  const parsed = new URL(baseUrl);
+  if (parsed.protocol !== "https:" && process.env.NODE_ENV === "production") {
+    throw new Error("Production OAuth redirect URL must use HTTPS");
+  }
+  return new URL(`/api/auth/oauth/${provider}/callback`, parsed.origin).toString();
+}
+
+function saveSession(req: Request) {
+  return new Promise<void>((resolve, reject) => {
+    req.session.save((error) => error ? reject(error) : resolve());
+  });
+}
+
+function regenerateSession(req: Request) {
+  return new Promise<void>((resolve, reject) => {
+    req.session.regenerate((error) => error ? reject(error) : resolve());
+  });
+}
+
+function turnstileGuard(requiredWhenUnconfigured = false): RequestHandler {
+  return async (req, res, next) => {
+    const secret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
+    const siteKey = process.env.CLOUDFLARE_TURNSTILE_SITE_KEY;
+
+    if (!secret && !siteKey) {
+      if (requiredWhenUnconfigured && process.env.NODE_ENV === "production") {
+        return res.status(503).json({ message: "Cloudflare verification is not configured yet." });
+      }
+      return next();
+    }
+    if (!secret || !siteKey) {
+      return res.status(503).json({ message: "Cloudflare verification is not fully configured." });
+    }
+
+    const token = req.body?.turnstileToken;
+    if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
+      return res.status(400).json({ message: "Complete the Cloudflare verification first." });
+    }
+
+    try {
+      const form = new URLSearchParams({ secret, response: token });
+      if (req.ip) form.set("remoteip", req.ip);
+      const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form,
+      });
+      if (!response.ok) {
+        return res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
+      }
+      const result = await response.json() as { success?: boolean; hostname?: string };
+      const requestHost = req.hostname.toLowerCase();
+      if (
+        result.success !== true ||
+        (result.hostname && result.hostname.toLowerCase() !== requestHost)
+      ) {
+        return res.status(403).json({ message: "Cloudflare verification failed. Please try again." });
+      }
+      next();
+    } catch {
+      res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
+    }
+  };
+}
 
 function profileImageUrl(
   userId: number,
