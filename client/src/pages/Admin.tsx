@@ -347,10 +347,7 @@ export default function Admin() {
           <TabsContent value="requests" className="space-y-4">
             <div className="discord-card overflow-hidden">
               <div className="p-4 border-b border-border flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-foreground text-sm">Access Requests</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Approving creates an account. Submitted passwords are never shown.</p>
-                </div>
+                <h3 className="font-semibold text-foreground text-sm">Access Requests</h3>
                 <span className="text-xs text-muted-foreground">{accessRequests.length} total</span>
               </div>
               {accessRequests.length === 0 ? (
@@ -379,16 +376,12 @@ export default function Admin() {
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{req.message}</p>
-                          {!req.hasPassword && req.status === "pending" && (
-                            <p className="mt-2 text-xs text-amber-400">Older request: ask this person to submit the new username and password form.</p>
-                          )}
                         </div>
                         {req.status === "pending" && (
                           <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() => updateRequestMut.mutate({ id: req.id, status: "approved" })}
-                              disabled={!req.hasPassword || updateRequestMut.isPending}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-green-500/15 text-green-400 hover:bg-green-500/25 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-green-500/15 text-green-400 hover:bg-green-500/25 text-xs font-medium transition-colors"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                             </button>

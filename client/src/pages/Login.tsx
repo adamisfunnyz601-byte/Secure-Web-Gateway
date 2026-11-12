@@ -5,7 +5,6 @@ import { CyberButton } from "@/components/CyberButton";
 import { Lock, Send, Smile, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { AuthProviders } from "@/components/AuthProviders";
 
 // Simple inline emoji picker for the request form
 const QUICK_EMOJIS = ["😀","😊","🙂","😎","🤔","👍","👋","❤️","🔥","✨","🎉","💪","🙏","😂","🥺","😅","🤝","💯","⭐","🚀"];
@@ -18,14 +17,11 @@ export default function Login() {
   // Login state
   const [key, setKey] = useState("");
   const [username, setUsername] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const { login, isLoggingIn, user } = useAuth();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   // Request state
-  const [reqUsername, setReqUsername] = useState("");
-  const [reqPassword, setReqPassword] = useState("");
+  const [reqName, setReqName] = useState("");
   const [reqMessage, setReqMessage] = useState("");
   const [showEmojiBar, setShowEmojiBar] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
@@ -33,58 +29,36 @@ export default function Login() {
   const [isSendingRequest, setIsSendingRequest] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const joinPath = location.match(/^\/join\/[A-Za-z0-9_-]{1,100}$/);
-    setLocation(joinPath ? location : location === "/chat" ? "/chat" : "/proxy");
-  }, [user, location, setLocation]);
+    if (user) setLocation("/proxy");
+  }, [user]);
 
   if (user) return null;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const token = turnstileToken;
-    setTurnstileToken(null);
-    setCaptchaResetKey((value) => value + 1);
-    login({ password: key, username: username.trim(), turnstileToken: token ?? undefined });
+    login({ serialKey: key, username: username.trim() });
   };
 
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setRequestError("");
-    if (!/^[\p{L}\p{N}_.-]{3,32}$/u.test(reqUsername.trim())) {
-      setRequestError("Use 3–32 letters, numbers, periods, underscores, or hyphens for your username.");
-      return;
-    }
-    if (reqPassword.length < 12 || reqPassword.length > 128) {
-      setRequestError("Choose a password between 12 and 128 characters.");
-      return;
-    }
     if (!reqMessage.trim() || reqMessage.trim().length < 5) {
-      setRequestError("Please give a reason of at least 5 characters.");
+      setRequestError("Please write at least 5 characters in your message.");
       return;
     }
     setIsSendingRequest(true);
     try {
-      const token = turnstileToken;
-      setTurnstileToken(null);
-      setCaptchaResetKey((value) => value + 1);
       const res = await fetch("/api/access-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: reqUsername.trim(),
-          password: reqPassword,
-          reason: reqMessage.trim(),
-          turnstileToken: token ?? undefined,
-        }),
+        body: JSON.stringify({ name: reqName || "Anonymous", message: reqMessage }),
       });
       if (!res.ok) {
         const data = await res.json();
         setRequestError(data.message || "Failed to send request.");
       } else {
         setRequestSent(true);
-        setReqUsername("");
-        setReqPassword("");
+        setReqName("");
         setReqMessage("");
       }
     } catch {
@@ -153,18 +127,12 @@ export default function Login() {
                 required
               />
               <CyberInput
-                label="Password"
+                label="Access Key"
                 type="password"
-                placeholder="Enter your password or access key"
+                placeholder="XXXX-XXXX-XXXX"
                 value={key}
                 onChange={e => setKey(e.target.value)}
                 required
-              />
-              <AuthProviders
-                token={turnstileToken}
-                onToken={setTurnstileToken}
-                resetKey={captchaResetKey}
-                returnTo={location.startsWith("/join/") ? location : location === "/chat" ? "/chat" : "/proxy"}
               />
               <CyberButton type="submit" className="w-full mt-2" isLoading={isLoggingIn}>
                 <Lock className="w-4 h-4" />
@@ -172,9 +140,9 @@ export default function Login() {
               </CyberButton>
             </form>
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              Need an account?{" "}
+              Don't have an access key?{" "}
               <button onClick={() => setTab("request")} className="text-primary hover:underline">
-                Request to join
+                Request access
               </button>
             </p>
             <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -207,40 +175,27 @@ export default function Login() {
             ) : (
               <form onSubmit={handleRequest} className="space-y-4">
                 <div>
-                  <h3 className="text-base font-semibold text-foreground mb-1">Request to join</h3>
+                  <h3 className="text-base font-semibold text-foreground mb-1">Request Access</h3>
                   <p className="text-xs text-muted-foreground">
-                    Choose a username and password and explain why you want to join. The owner reviews every request.
+                    Fill out the form below and the owner will review your request.
                   </p>
                 </div>
 
                 <CyberInput
-                  label="Username"
-                  placeholder="Choose a username"
-                  value={reqUsername}
-                  onChange={e => setReqUsername(e.target.value)}
-                  maxLength={32}
-                  autoComplete="username"
-                  required
-                />
-
-                <CyberInput
-                  label="Password"
-                  type="password"
-                  placeholder="At least 12 characters"
-                  value={reqPassword}
-                  onChange={e => setReqPassword(e.target.value)}
-                  autoComplete="new-password"
-                  required
+                  label="Your Name"
+                  placeholder="Enter your name..."
+                  value={reqName}
+                  onChange={e => setReqName(e.target.value)}
                 />
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Reason for joining <span className="text-rose-400">*</span>
+                    Why do you want access? <span className="text-rose-400">*</span>
                   </label>
                   <textarea
                     value={reqMessage}
                     onChange={e => setReqMessage(e.target.value)}
-                    placeholder="Why would you like to join? (required)"
+                    placeholder="Tell us why you'd like access... (required)"
                     rows={4}
                     required
                     minLength={5}
@@ -286,14 +241,6 @@ export default function Login() {
                   </div>
                 </div>
 
-                <AuthProviders
-                  token={turnstileToken}
-                  onToken={setTurnstileToken}
-                  resetKey={captchaResetKey}
-                  returnTo={location.startsWith("/join/") ? location : "/proxy"}
-                  showProviders={false}
-                />
-
                 {requestError && (
                   <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded border border-destructive/30">
                     {requestError}
@@ -301,7 +248,7 @@ export default function Login() {
                 )}
 
                 <CyberButton type="submit" className="w-full" isLoading={isSendingRequest}
-                  disabled={!reqUsername.trim() || reqPassword.length < 12 || reqMessage.trim().length < 5}>
+                  disabled={reqMessage.trim().length < 5}>
                   <Send className="w-4 h-4" />
                   Submit Request
                 </CyberButton>
