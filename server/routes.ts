@@ -1,6 +1,6 @@
 
 import { db } from "./db";
-import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts } from "@shared/schema";
+import { users, accessKeys, accessRequests, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts } from "@shared/schema";
 import { eq, desc, and, or, gt, sql } from "drizzle-orm";
 import type { Express, Request, RequestHandler } from "express";
 import type { Server } from "http";
@@ -16,7 +16,7 @@ import {
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, scrypt, timingSafeEqual } from "crypto";
 import sharp from "sharp";
 import { rateLimit } from "express-rate-limit";
 
@@ -133,6 +133,35 @@ function regenerateSession(req: Request) {
   });
 }
 
+function derivePasswordKey(password: string, salt: Buffer) {
+  return new Promise<Buffer>((resolve, reject) => {
+    scrypt(password, salt, 64, (error, key) => {
+      if (error) reject(error);
+      else resolve(key as Buffer);
+    });
+  });
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const key = await derivePasswordKey(password, salt);
+  return `scrypt$${salt.toString("hex")}$${key.toString("hex")}`;
+}
+
+async function verifyPassword(password: string, encodedHash: string) {
+  const [algorithm, saltHex, keyHex] = encodedHash.split("$");
+  if (
+    algorithm !== "scrypt" ||
+    !/^[a-f0-9]{32}$/i.test(saltHex || "") ||
+    !/^[a-f0-9]{128}$/i.test(keyHex || "")
+  ) return false;
+
+  const salt = Buffer.from(saltHex, "hex");
+  const expected = Buffer.from(keyHex, "hex");
+  const actual = await derivePasswordKey(password, salt);
+  return timingSafeEqual(actual, expected);
+}
+
 function turnstileGuard(requiredWhenUnconfigured = false): RequestHandler {
   return async (req, res, next) => {
     const secret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
@@ -164,10 +193,11 @@ function turnstileGuard(requiredWhenUnconfigured = false): RequestHandler {
       if (!response.ok) {
         return res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
       }
-      const result = await response.json() as { success?: boolean; hostname?: string };
+      const result = await response.json() as { success?: boolean; hostname?: string; action?: string };
       const requestHost = req.hostname.toLowerCase();
       if (
         result.success !== true ||
+        result.action !== "auth" ||
         (result.hostname && result.hostname.toLowerCase() !== requestHost)
       ) {
         return res.status(403).json({ message: "Cloudflare verification failed. Please try again." });
@@ -177,6 +207,45 @@ function turnstileGuard(requiredWhenUnconfigured = false): RequestHandler {
       res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
     }
   };
+}
+
+async function getOrCreateOAuthUser(provider: OAuthProvider, providerSubject: string, displayName: string) {
+  return db.transaction(async (tx) => {
+    const findLinkedAccount = () => tx.select({ userId: oauthAccounts.userId })
+      .from(oauthAccounts)
+      .where(and(
+        eq(oauthAccounts.provider, provider),
+        eq(oauthAccounts.providerSubject, providerSubject),
+      ))
+      .limit(1);
+
+    const [linkedAccount] = await findLinkedAccount();
+    if (linkedAccount) return linkedAccount.userId;
+
+    const visibleName = displayName.trim().slice(0, 80) || "New member";
+    const username = visibleName
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}_.-]/gu, "")
+      .slice(0, 32) || `member-${randomBytes(3).toString("hex")}`;
+    const [createdUser] = await tx.insert(users).values({
+      username,
+      displayName: visibleName,
+      serialKey: `OAUTH-${randomBytes(32).toString("hex")}`,
+      role: "user",
+      presenceStatus: "offline",
+    }).returning({ id: users.id });
+
+    const [createdAccount] = await tx.insert(oauthAccounts)
+      .values({ userId: createdUser.id, provider, providerSubject })
+      .onConflictDoNothing()
+      .returning({ userId: oauthAccounts.userId });
+    if (createdAccount) return createdAccount.userId;
+
+    // A simultaneous callback may have created the same provider identity.
+    await tx.delete(users).where(eq(users.id, createdUser.id));
+    const [racedAccount] = await findLinkedAccount();
+    return racedAccount?.userId;
+  });
 }
 
 function profileImageUrl(
@@ -250,7 +319,12 @@ export async function registerRoutes(
   // Session middleware
   app.use(
     session({
-      cookie: { maxAge: 86400000 },
+      cookie: {
+        maxAge: 86400000,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      },
       store: new MemoryStore({
         checkPeriod: 86400000,
       }),
@@ -287,7 +361,7 @@ export async function registerRoutes(
 
   const safeUser = (user: any) => {
     if (!user) return user;
-    const { serialKey: _serialKey, ...safe } = user;
+    const { serialKey: _serialKey, passwordHash: _passwordHash, ...safe } = user;
     return {
       ...safe,
       avatarUrl: profileImageUrl(safe.id, "avatar", safe.avatarUrl),
@@ -339,60 +413,162 @@ export async function registerRoutes(
   });
 
   // === AUTH ===
-  app.post(api.auth.login.path, async (req, res) => {
+  app.get("/api/auth/config", (_req, res) => {
+    res.json({
+      providers: {
+        google: isOAuthProviderConfigured("google"),
+        microsoft: isOAuthProviderConfigured("microsoft"),
+      },
+      turnstileSiteKey: process.env.CLOUDFLARE_TURNSTILE_SITE_KEY || null,
+    });
+  });
+
+  app.post("/api/auth/oauth/:provider/start", oauthStartRateLimit, turnstileGuard(true), async (req, res) => {
+    const providerParam = String(req.params.provider);
+    if (!isOAuthProvider(providerParam)) {
+      return res.status(404).json({ message: "Sign-in provider not found." });
+    }
+    const provider = providerParam;
+    if (!isOAuthProviderConfigured(provider)) {
+      return res.status(503).json({ message: `${provider} sign-in is not configured yet.` });
+    }
+
     try {
-      const { serialKey, username } = api.auth.login.input.parse(req.body);
-      
-      let user = await storage.getUserBySerial(serialKey);
-      
-      // Check if it's the owner key
-      if (serialKey === OWNER_KEY) {
-        if (!user) {
-          user = await storage.createUser({
-            username: username || "Owner",
-            serialKey,
-            role: "owner",
-          });
+      const input = z.object({
+        turnstileToken: z.string().max(2048).optional(),
+        returnTo: z.string().max(300).optional(),
+      }).parse(req.body ?? {});
+      const returnTo = input.returnTo && (
+        input.returnTo === "/chat" ||
+        input.returnTo === "/proxy" ||
+        /^\/join\/[A-Za-z0-9_-]{1,100}$/.test(input.returnTo)
+      ) ? input.returnTo : "/proxy";
+
+      const oidc = await import("openid-client");
+      const configuration = await getOAuthConfig(provider);
+      const state = oidc.randomState();
+      const nonce = oidc.randomNonce();
+      const codeVerifier = oidc.randomPKCECodeVerifier();
+      const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
+      const redirectUri = getOAuthRedirectUri(provider);
+      const authorizationUrl = oidc.buildAuthorizationUrl(configuration, {
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "openid profile",
+        state,
+        nonce,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        prompt: "select_account",
+      });
+
+      req.session.oauthFlow = { provider, state, nonce, codeVerifier, redirectUri, returnTo };
+      await saveSession(req);
+      res.json({ authorizationUrl: authorizationUrl.toString() });
+    } catch {
+      console.error(`OAuth start failed for ${provider}`);
+      res.status(503).json({ message: "Could not start sign-in. Check the provider configuration." });
+    }
+  });
+
+  app.get("/api/auth/oauth/:provider/callback", authRateLimit, async (req, res) => {
+    const providerParam = String(req.params.provider);
+    if (!isOAuthProvider(providerParam)) {
+      return res.redirect("/?oauthError=provider");
+    }
+    const provider = providerParam;
+    const flow = req.session.oauthFlow;
+    if (!flow || flow.provider !== provider || !isOAuthProviderConfigured(provider)) {
+      return res.redirect("/?oauthError=state");
+    }
+
+    try {
+      const oidc = await import("openid-client");
+      const configuration = await getOAuthConfig(provider);
+      const callbackUrl = new URL(req.originalUrl, flow.redirectUri);
+      const tokens = await oidc.authorizationCodeGrant(configuration, callbackUrl, {
+        pkceCodeVerifier: flow.codeVerifier,
+        expectedState: flow.state,
+        expectedNonce: flow.nonce,
+        idTokenExpected: true,
+      });
+      const claims = tokens.claims();
+      const subject = claims?.sub;
+      if (typeof subject !== "string" || subject.length === 0) {
+        throw new Error("Provider response did not include a subject");
+      }
+
+      const accountName = typeof claims.name === "string" ? claims.name : "New member";
+      const userId = await getOrCreateOAuthUser(provider, subject, accountName);
+      if (!userId) throw new Error("Could not resolve the provider account");
+      const user = await storage.getUser(userId);
+      if (!user) throw new Error("Provider account no longer exists");
+
+      await regenerateSession(req);
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      await db.update(users).set({
+        presenceStatus: "online",
+        lastSeen: new Date(),
+      }).where(eq(users.id, user.id));
+      await saveSession(req);
+      res.redirect(flow.returnTo);
+    } catch {
+      console.error(`OAuth callback failed for ${provider}`);
+      res.redirect(`/?oauthError=${provider}`);
+    }
+  });
+
+  app.post(api.auth.login.path, authRateLimit, turnstileGuard(), async (req, res) => {
+    try {
+      const { serialKey, password, username } = api.auth.login.input.parse(req.body);
+      const credential = password ?? serialKey ?? "";
+      const accountByName = await storage.getUserByUsername(username);
+      let user = accountByName?.passwordHash ? accountByName : undefined;
+
+      if (user?.passwordHash) {
+        if (!password || !await verifyPassword(password, user.passwordHash)) {
+          return res.status(401).json({ message: "Invalid username or password." });
         }
       } else {
-        // Standard user login via Access Key
-        if (!user) {
-          // Check if it's a valid access key
-          const accessKey = await storage.getAccessKey(serialKey);
+        user = await storage.getUserBySerial(credential);
+        if (user && user.username.toLowerCase() !== username.toLowerCase()) {
+          return res.status(401).json({ message: "Invalid username or password." });
+        }
+
+        if (credential === OWNER_KEY) {
+          if (!user) {
+            user = await storage.createUser({ username, serialKey: credential, role: "owner" });
+          }
+        } else if (!user) {
+          // Do not let an OAuth-only account be bypassed by entering another access key.
+          if (accountByName) {
+            return res.status(401).json({ message: "Invalid username or password." });
+          }
+          const accessKey = await storage.getAccessKey(credential);
           if (!accessKey) {
-            return res.status(401).json({ message: "Invalid serial key" });
-          }
-          if (accessKey.isUsed && accessKey.type !== 'permanent') {
-             // If key is single-use and used (NOTE: Schema implies keys create accounts, 
-             // we might want to allow re-login if account exists. 
-             // But let's assume keys are "invites" to create an account OR purely reusable keys.
-             // For simplicity: keys map to Users. If User exists for key, they log in.
-             // If not, we create user.)
-          }
-          
-          // Create the user
-          let expiresAt: Date | undefined;
-          if (accessKey.type === 'limited' && accessKey.durationMinutes) {
-            expiresAt = new Date(Date.now() + accessKey.durationMinutes * 60000);
+            return res.status(401).json({ message: "Invalid username or password." });
           }
 
-          user = await storage.createUser({
-            username: username || `User-${randomBytes(2).toString('hex')}`,
-            serialKey,
-            role: "user",
-            expiresAt
-          });
-          
+          let expiresAt: Date | undefined;
+          if (accessKey.type === "limited" && accessKey.durationMinutes) {
+            expiresAt = new Date(Date.now() + accessKey.durationMinutes * 60000);
+          }
+          user = await storage.createUser({ username, serialKey: credential, role: "user", expiresAt });
           await storage.markKeyAsUsed(accessKey.id);
         }
       }
-      
+
+      if (!user) {
+        return res.status(401).json({ message: "Invalid username or password." });
+      }
       // Check expiration
       if (user.expiresAt && new Date() > user.expiresAt) {
         return res.status(401).json({ message: "Account expired" });
       }
 
-      // Set session
+      // Rotate the session identifier after authentication to prevent fixation.
+      await regenerateSession(req);
       req.session.userId = user.id;
       req.session.role = user.role;
       await db.update(users).set({
@@ -594,7 +770,7 @@ export async function registerRoutes(
 
   app.post(api.chat.createGroup.path, requireAuth, async (req, res) => {
     const { name } = api.chat.createGroup.input.parse(req.body);
-    const inviteCode = `GC-${randomBytes(3).toString('hex').toUpperCase()}`;
+    const inviteCode = randomBytes(16).toString("base64url");
     const group = await storage.createGroup({
       name,
       inviteCode,
@@ -1024,19 +1200,41 @@ export async function registerRoutes(
   });
 
   // === ACCESS REQUESTS (public - no auth required) ===
-  app.post('/api/access-requests', async (req, res) => {
+  app.post('/api/access-requests', accessRequestRateLimit, turnstileGuard(true), async (req, res) => {
     try {
-      const { name, message } = req.body;
-      if (!name || typeof name !== 'string' || name.trim().length < 1) {
-        return res.status(400).json({ message: 'Name is required' });
+      const input = z.object({
+        username: z.string().trim().min(3).max(32).regex(/^[\p{L}\p{N}_.-]+$/u),
+        password: z.string().min(12).max(128),
+        reason: z.string().trim().min(5).max(1000),
+        turnstileToken: z.string().max(2048).optional(),
+      }).parse(req.body ?? {});
+
+      if (await storage.getUserByUsername(input.username)) {
+        return res.status(409).json({ message: "That username is already in use." });
       }
-      if (!message || typeof message !== 'string' || message.trim().length < 5) {
-        return res.status(400).json({ message: 'Message is required (min 5 characters)' });
+      const [pendingRequest] = await db.select({ id: accessRequests.id })
+        .from(accessRequests)
+        .where(and(
+          eq(accessRequests.status, "pending"),
+          sql`LOWER(${accessRequests.name}) = LOWER(${input.username})`,
+        ))
+        .limit(1);
+      if (pendingRequest) {
+        return res.status(409).json({ message: "A request for that username is already pending." });
       }
-      const request = await storage.createAccessRequest({ name: name.trim(), message: message.trim() });
-      res.status(201).json(request);
+
+      const passwordHash = await hashPassword(input.password);
+      const request = await storage.createAccessRequest({
+        name: input.username,
+        message: input.reason,
+        passwordHash,
+      });
+      res.status(201).json({ id: request.id, status: request.status });
     } catch (err: any) {
-      res.status(500).json({ message: err?.message || 'Failed' });
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.issues[0]?.message || "Check the request details." });
+      }
+      res.status(500).json({ message: "Failed to submit access request." });
     }
   });
 
@@ -1050,8 +1248,61 @@ export async function registerRoutes(
     if (!['pending', 'approved', 'rejected'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
-    await storage.updateAccessRequestStatus(Number(req.params.id), status);
-    res.json({ success: true });
+    const requestId = Number(req.params.id);
+    if (!Number.isInteger(requestId) || requestId <= 0) {
+      return res.status(400).json({ message: "Invalid request." });
+    }
+
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const [request] = await tx.select().from(accessRequests)
+          .where(eq(accessRequests.id, requestId))
+          .limit(1);
+        if (!request) {
+          return { statusCode: 404, error: "Access request not found." };
+        }
+        if (request.status !== "pending") {
+          return { statusCode: 409, error: "This request has already been reviewed." };
+        }
+
+        if (status === "rejected") {
+          await tx.update(accessRequests).set({ status, passwordHash: null })
+            .where(eq(accessRequests.id, requestId));
+          return { success: true as const };
+        }
+        if (status === "pending") {
+          return { statusCode: 400, error: "A request cannot be moved back to pending." };
+        }
+        if (!request.passwordHash) {
+          return { statusCode: 409, error: "This older request has no password. Ask them to submit a new request." };
+        }
+
+        const [existingUser] = await tx.select({ id: users.id }).from(users)
+          .where(sql`LOWER(${users.username}) = LOWER(${request.name})`)
+          .limit(1);
+        if (existingUser) {
+          return { statusCode: 409, error: "That username is already in use. Ask them to submit a new request." };
+        }
+
+        await tx.insert(users).values({
+          username: request.name,
+          serialKey: `REQUEST-${randomBytes(32).toString("hex")}`,
+          passwordHash: request.passwordHash,
+          role: "user",
+          presenceStatus: "offline",
+        });
+        await tx.update(accessRequests).set({ status: "approved", passwordHash: null })
+          .where(eq(accessRequests.id, requestId));
+        return { success: true as const };
+      });
+
+      if ("error" in outcome) {
+        return res.status(outcome.statusCode).json({ message: outcome.error });
+      }
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Could not update the access request." });
+    }
   });
 
   // === CUSTOM EMOJIS ===

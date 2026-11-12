@@ -15,6 +15,7 @@ import Admin from "@/pages/Admin";
 import Shop from "@/pages/Shop";
 import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/Settings";
+import JoinServer from "@/pages/JoinServer";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -44,6 +45,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Login} />
       <Route path="/signup" component={SignUp} />
+      <Route path="/join/:inviteCode" component={JoinServer} />
       <Route path="/proxy">
         <ProtectedRoute component={Proxy} />
       </Route>

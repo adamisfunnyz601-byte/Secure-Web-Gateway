@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull(), // User can set a display name
   serialKey: text("serial_key").notNull().unique(), // The key they used to login
+  passwordHash: text("password_hash"),
   role: text("role").notNull().default("user"), // 'owner' or 'user'
   expiresAt: timestamp("expires_at"), // Null for permanent, set for limited time
   createdAt: timestamp("created_at").defaultNow(),
@@ -85,6 +86,7 @@ export const accessRequests = pgTable("access_requests", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   message: text("message").notNull(),
+  passwordHash: text("password_hash"),
   status: text("status").notNull().default("pending"), // 'pending' | 'approved' | 'rejected'
   createdAt: timestamp("created_at").defaultNow(),
 });

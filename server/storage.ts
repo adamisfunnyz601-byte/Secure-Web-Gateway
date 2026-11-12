@@ -10,6 +10,7 @@ export interface IStorage {
   // User & Auth
   getUser(id: number): Promise<User | undefined>;
   getUserBySerial(serialKey: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: { username: string; serialKey: string; role: string; expiresAt?: Date }): Promise<User>;
   
   // Keys
@@ -53,6 +54,13 @@ export class DatabaseStorage implements IStorage {
 
   async getUserBySerial(serialKey: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.serialKey, serialKey));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users)
+      .where(sql`LOWER(${users.username}) = LOWER(${username})`)
+      .limit(1);
     return user;
   }
 
@@ -253,13 +261,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Access Requests
-  async createAccessRequest(data: { name: string; message: string }): Promise<any> {
+  async createAccessRequest(data: { name: string; message: string; passwordHash: string }): Promise<any> {
     const [req] = await db.insert(accessRequests).values(data).returning();
     return req;
   }
 
   async listAccessRequests(): Promise<any[]> {
-    return await db.select().from(accessRequests).orderBy(desc(accessRequests.createdAt));
+    return await db.select({
+      id: accessRequests.id,
+      name: accessRequests.name,
+      message: accessRequests.message,
+      status: accessRequests.status,
+      createdAt: accessRequests.createdAt,
+      hasPassword: sql<boolean>`${accessRequests.passwordHash} IS NOT NULL`,
+    }).from(accessRequests).orderBy(desc(accessRequests.createdAt));
   }
 
   async updateAccessRequestStatus(id: number, status: string): Promise<void> {

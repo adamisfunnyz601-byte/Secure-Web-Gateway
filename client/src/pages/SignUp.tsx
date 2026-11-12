@@ -4,22 +4,34 @@ import { LockKeyhole, UserRoundPlus } from "lucide-react";
 import { CyberButton } from "@/components/CyberButton";
 import { CyberInput } from "@/components/CyberInput";
 import { useAuth } from "@/hooks/use-auth";
+import { AuthProviders } from "@/components/AuthProviders";
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
   const [accessKey, setAccessKey] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const { login, isLoggingIn, user } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (user) setLocation("/proxy");
-  }, [user, setLocation]);
+    if (!user) return;
+    const joinPath = location.match(/^\/join\/[A-Za-z0-9_-]{1,100}$/);
+    setLocation(joinPath ? location : location === "/chat" ? "/chat" : "/proxy");
+  }, [user, location, setLocation]);
 
   if (user) return null;
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    login({ username: username.trim(), serialKey: accessKey.trim() });
+    const token = turnstileToken;
+    setTurnstileToken(null);
+    setCaptchaResetKey((value) => value + 1);
+    login({
+      username: username.trim(),
+      serialKey: accessKey.trim(),
+      turnstileToken: token ?? undefined,
+    });
   };
 
   return (
@@ -37,11 +49,17 @@ export default function SignUp() {
           </div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Create your account</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Sign up with an access key from the server owner.
+            Sign up with Google or Microsoft, or use an access key.
           </p>
         </header>
 
         <div className="bg-secondary/40 border border-border rounded-xl p-6 shadow-2xl">
+          <AuthProviders
+            token={turnstileToken}
+            onToken={setTurnstileToken}
+            resetKey={captchaResetKey}
+            returnTo={location.startsWith("/join/") ? location : "/proxy"}
+          />
           <form onSubmit={handleSubmit} className="space-y-4">
             <CyberInput
               label="Username"
@@ -54,9 +72,9 @@ export default function SignUp() {
               required
             />
             <CyberInput
-              label="Access key"
+              label="Password or access key"
               type="password"
-              placeholder="Enter your access key"
+              placeholder="Enter your password or access key"
               value={accessKey}
               onChange={(event) => setAccessKey(event.target.value)}
               autoComplete="off"

@@ -28,6 +28,18 @@ import { EmojiButton } from "@/components/EmojiPicker";
 // ============================================================
 const SESSION_CRYPT = "X-256-CHA-CHA-POLY";
 
+function normalizeServerInvite(value: string) {
+  const trimmed = value.trim();
+  try {
+    const url = new URL(trimmed);
+    const match = url.pathname.match(/^\/join\/([^/]+)\/?$/);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  } catch {
+    // The user may have pasted a plain invite code rather than a URL.
+  }
+  return trimmed;
+}
+
 const DEFAULT_SOUNDS = [
   { id: 'S1', name: 'NEURAL_PING', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
   { id: 'S2', name: 'GLITCH_PULSE', url: 'https://www.soundjay.com/buttons/sounds/button-3.mp3' },
@@ -78,14 +90,14 @@ const CyberSidebarNode = ({
     "bg-gray-500";
   return (
   <motion.button
-    whileHover={{ x: 4 }}
+    whileHover={{ x: 2 }}
     whileTap={{ scale: 0.98 }}
     onClick={onClick}
     className={cn(
-      "w-full text-left px-4 py-3 border transition-all duration-200 flex items-center justify-between group mb-1.5",
+      "mb-0.5 flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm transition-all duration-150 group",
       isActive
-        ? "bg-primary/20 border-primary shadow-[0_0_12px_rgba(0,255,0,0.15)]"
-        : "bg-transparent border-primary/20 opacity-70 hover:opacity-100 hover:bg-primary/5"
+        ? "bg-[#404249] text-white"
+        : "text-[#b5bac1] hover:bg-[#35373c] hover:text-white"
     )}
   >
     <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -435,13 +447,13 @@ export default function Chat() {
       setShowCreateGroupModal(false);
       setNewGroupName("");
       selectGroupNode(g.id);
-      toast({ title: "CLUSTER_ONLINE", description: `${g.name} initialized.` });
+      toast({ title: "Server created", description: `${g.name} is ready.` });
     }
   });
 
   const joinGroupMutation = useMutation({
     mutationFn: async (code: string) => {
-      const res = await fetch('/api/chat/groups/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteCode: code }) });
+      const res = await fetch('/api/chat/groups/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteCode: normalizeServerInvite(code) }) });
       if (!res.ok) throw new Error("Invalid code");
       return res.json();
     },
@@ -450,7 +462,7 @@ export default function Chat() {
       setShowJoinGroupModal(false);
       setJoinGroupCode("");
       selectGroupNode(g.id);
-      toast({ title: "CLUSTER_ACCESSED", description: `Joined ${g.name}` });
+      toast({ title: "Server joined", description: `You joined ${g.name}.` });
     },
     onError: () => toast({ title: "INVALID_CODE", variant: "destructive" })
   });
@@ -932,7 +944,7 @@ export default function Chat() {
       const user = users?.find((u: any) => u.id === selectedRecipientId);
       return user?.displayName || user?.nickname || user?.username || "PRIVATE";
     }
-    return "general";
+    return "# general";
   }, [selectedGroupId, selectedRecipientId, groups, users]);
 
   const filteredUsers = users?.filter((u: any) => {
@@ -957,7 +969,7 @@ export default function Chat() {
   // ============================================================
   return (
     <Layout>
-      <div className="flex h-[calc(100vh-140px)] gap-4 overflow-hidden">
+      <div className="relative flex h-[calc(100vh-140px)] gap-0 overflow-hidden rounded-xl border border-[#1e1f22] bg-[#313338]">
 
         {/* ======================================================
             INCOMING CALL OVERLAY
@@ -1200,32 +1212,107 @@ export default function Chat() {
         {/* ======================================================
             SIDEBAR
             ====================================================== */}
+        <aside className="z-40 flex w-[68px] flex-shrink-0 flex-col items-center gap-2 bg-[#1e1f22] py-3">
+          <button
+            type="button"
+            title="Everyone server"
+            aria-label="Open Everyone server"
+            onClick={() => { selectBroadcast(); setIsSidebarOpen(true); }}
+            className={cn(
+              "flex h-12 w-12 items-center justify-center rounded-[18px] text-lg font-bold text-white transition-all hover:rounded-2xl",
+              !selectedGroupId && !selectedRecipientId ? "rounded-2xl bg-[#5865f2]" : "bg-[#313338] hover:bg-[#5865f2]",
+            )}
+          >
+            <Hash className="h-6 w-6" />
+          </button>
+          <div className="mx-auto h-px w-8 bg-[#3f4147]" />
+          <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto">
+            {(groups as any[]).map((group: any) => (
+              <button
+                key={group.id}
+                type="button"
+                title={group.name}
+                aria-label={`Open ${group.name} server`}
+                onClick={() => { selectGroupNode(group.id); setIsSidebarOpen(true); }}
+                className={cn(
+                  "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[18px] bg-[#313338] text-sm font-semibold text-white transition-all hover:rounded-2xl hover:bg-[#5865f2]",
+                  selectedGroupId === group.id && "rounded-2xl bg-[#5865f2]",
+                )}
+              >
+                {(group.name || "S").trim().slice(0, 2).toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            title="Create a server"
+            aria-label="Create a server"
+            onClick={() => setShowCreateGroupModal(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#313338] text-[#23a559] transition-all hover:rounded-2xl hover:bg-[#23a559] hover:text-white"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            title="Join a server"
+            aria-label="Join a server"
+            onClick={() => setShowJoinGroupModal(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#313338] text-[#23a559] transition-all hover:rounded-2xl hover:bg-[#23a559] hover:text-white"
+          >
+            <UserPlus className="h-5 w-5" />
+          </button>
+        </aside>
+
         <AnimatePresence>
           {isSidebarOpen && (
             <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
-              className="w-72 flex-shrink-0 flex flex-col bg-black border border-primary/20 overflow-hidden">
-              <div className="p-4 border-b border-primary/20 bg-primary/5">
+              className="absolute left-[68px] z-30 flex h-full w-[250px] flex-shrink-0 flex-col overflow-hidden border-r border-[#1e1f22] bg-[#2b2d31] md:relative md:left-auto md:z-auto md:w-[260px]">
+              <div className="p-4 border-b border-[#1e1f22] bg-[#2b2d31]">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-display text-[11px] tracking-[0.4em] uppercase text-primary">NEXUS SERVER</h2>
+                  <h2 className="truncate text-sm font-semibold text-white">
+                    {selectedGroupId
+                      ? (groups as any[]).find((group: any) => group.id === selectedGroupId)?.name || "Server"
+                      : selectedRecipientId
+                        ? "Direct Messages"
+                        : "Everyone"}
+                  </h2>
                   <div className="flex gap-1">
-                    <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:text-white text-primary/20 transition-colors"><X className="w-4 h-4" /></button>
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-1 text-[#b5bac1] transition-colors hover:text-white" aria-label="Close sidebar"><X className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
 
               <div className="p-3 border-b border-primary/10">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-primary/30" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-[#949ba4]" />
                   <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-black border border-primary/10 pl-8 pr-3 py-1.5 text-[10px] font-mono text-primary outline-none focus:border-primary/40"
-                    placeholder="Find a conversation or person..." />
+                    className="w-full rounded bg-[#1e1f22] pl-8 pr-3 py-2 text-xs text-[#dbdee1] outline-none placeholder:text-[#949ba4] focus:ring-1 focus:ring-[#5865f2]"
+                    placeholder="Find a conversation" />
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                <CyberSidebarNode label="# general" isActive={!selectedRecipientId && !selectedGroupId} onClick={selectBroadcast} status="online" />
-                <div className="pt-2 pb-1 px-3 text-[8px] font-bold text-primary/30 uppercase tracking-widest flex items-center gap-2">
-                  <span className="w-2 h-px bg-primary/20 flex-1" /> DIRECT MESSAGES <span className="w-2 h-px bg-primary/20 flex-1" />
+              <div className="flex-1 overflow-y-auto p-2">
+                <div className="flex items-center justify-between px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[#949ba4]">
+                  <span>Text channels</span>
+                  {selectedGroupId && (
+                    <button
+                      type="button"
+                      title="Copy server invite link"
+                      onClick={() => {
+                        const group = (groups as any[]).find((item: any) => item.id === selectedGroupId);
+                        if (!group?.inviteCode) return;
+                        navigator.clipboard.writeText(`${window.location.origin}/join/${encodeURIComponent(group.inviteCode)}`);
+                        toast({ title: "Invite link copied" });
+                      }}
+                      className="rounded p-1 hover:bg-[#35373c] hover:text-white"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <CyberSidebarNode label={<><Hash className="mr-1 inline h-4 w-4" />general</>} isActive={!selectedRecipientId} onClick={() => selectedGroupId ? selectGroupNode(selectedGroupId) : selectBroadcast()} />
+                <div className="pt-4 pb-1 px-2 text-[10px] font-semibold text-[#949ba4] uppercase tracking-wide">
+                  Direct messages
                 </div>
                 {filteredUsers?.map((u: any) => (
                   <CyberSidebarNode
@@ -1247,17 +1334,17 @@ export default function Chat() {
                   />
                 ))}
                 {filteredUsers?.length === 0 && (
-                  <div className="px-4 py-3 text-[9px] font-mono text-primary/30 italic">No people found.</div>
+                  <div className="px-3 py-2 text-xs text-[#949ba4]">No people found.</div>
                 )}
               </div>
 
-              <div className="p-3 border-t border-primary/20 bg-black flex items-center gap-3">
-                <div className="w-8 h-8 border border-primary/20 flex items-center justify-center bg-primary/5">
-                  <Cpu className="w-4 h-4 text-primary" />
+              <div className="p-3 border-t border-[#1e1f22] bg-[#232428] flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5865f2] text-xs font-semibold text-white">
+                  {(currentUser?.username || "U").slice(0, 1).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <div className="text-[10px] font-bold text-primary uppercase truncate">{currentUser?.username}</div>
+                    <div className="truncate text-xs font-semibold text-white">{currentUser?.username}</div>
                     <UserProfileTag
                       tagSymbol={currentUser?.tagSymbol}
                       tagText={currentUser?.tagText}
@@ -1265,7 +1352,7 @@ export default function Chat() {
                       size="compact"
                     />
                   </div>
-                  <div className="text-[8px] text-primary/30 font-mono">ONLINE</div>
+                  <div className="text-[10px] text-[#949ba4]">Online</div>
                 </div>
               </div>
             </motion.div>

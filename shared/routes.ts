@@ -30,9 +30,13 @@ export const api = {
       method: 'POST' as const,
       path: '/api/auth/login',
       input: z.object({
-        serialKey: z.string(),
+        serialKey: z.string().optional(),
+        password: z.string().optional(),
         username: z.string().trim().min(1, "Username is required").max(32, "Username must be 32 characters or fewer"),
         turnstileToken: z.string().max(2048).optional(),
+      }).refine((input) => Boolean(input.password || input.serialKey), {
+        message: "Password is required",
+        path: ["password"],
       }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
