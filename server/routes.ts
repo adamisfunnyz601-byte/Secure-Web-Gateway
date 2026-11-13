@@ -682,15 +682,15 @@ export async function registerRoutes(
   });
   app.get("/api/dihhro/me", requireAuth, async (req,res) => { const u=await storage.getUser(req.session.userId!); res.json({active:Boolean(u?.dihhroUntil&&u.dihhroUntil>new Date()),expiresAt:u?.dihhroUntil||null}); });
   app.get("/api/blockblast/leaderboard", requireAuth, async (req,res) => {
-    const month = typeof req.query.month === "string" && /^\\d{4}-\\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
+    const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
     const now = new Date(); const previousDate = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-1,1)); const previousMonth = monthKeyFor(previousDate);
     if (monthKeyFor() !== previousMonth) {
-      const [alreadyAwarded] = await db.select().from(dihhroAwards).where(eq(dihhroAwards.monthKey,month)).limit(1);
+      const [alreadyAwarded] = await db.select().from(dihhroAwards).where(eq(dihhroAwards.monthKey,previousMonth)).limit(1);
       if (!alreadyAwarded) {
-        const previousRows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score}).from(blockBlastScores).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
+        const previousRows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score}).from(blockBlastScores).where(eq(blockBlastScores.monthKey,previousMonth)).orderBy(desc(blockBlastScores.score)).limit(100);
         const monthlyBest = new Map<number,number>(); previousRows.forEach(row=>monthlyBest.set(row.userId,Math.max(monthlyBest.get(row.userId)||0,row.score)));
         const winner = Array.from(monthlyBest.entries()).sort((a,b)=>b[1]-a[1])[0];
-        if (winner) { const winnerUser=await storage.getUser(winner[0]); const base=winnerUser?.dihhroUntil&&winnerUser.dihhroUntil>new Date()?winnerUser.dihhroUntil:new Date(); const expiry=new Date(base.getTime()+30*86400000); await db.update(users).set({dihhroUntil:expiry}).where(eq(users.id,winner[0])); await db.insert(dihhroAwards).values({userId:winner[0],monthKey:month,score:winner[1],expiresAt:expiry}); }
+        if (winner) { const winnerUser=await storage.getUser(winner[0]); const base=winnerUser?.dihhroUntil&&winnerUser.dihhroUntil>new Date()?winnerUser.dihhroUntil:new Date(); const expiry=new Date(base.getTime()+30*86400000); await db.update(users).set({dihhroUntil:expiry}).where(eq(users.id,winner[0])); await db.insert(dihhroAwards).values({userId:winner[0],monthKey:previousMonth,score:winner[1],expiresAt:expiry}); }
       }
     }
     const rows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score,username:users.username,displayName:users.displayName}).from(blockBlastScores).innerJoin(users,eq(users.id,blockBlastScores.userId)).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
