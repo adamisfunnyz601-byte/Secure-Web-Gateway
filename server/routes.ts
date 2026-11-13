@@ -471,7 +471,10 @@ export async function registerRoutes(
       // Group-chat links use GC-XXXXXX codes, not access-key records.
       if (/^GC-/i.test(key)) {
         const group = await storage.getGroupByCode(key.toUpperCase());
-        if (!group) return res.status(404).json({ valid: false, message: "This group invitation is invalid or the group no longer exists." });
+        if (!group) {
+          console.warn("[group-invite] code lookup returned no group; check that the running server and group list use the same DATABASE_URL/database.");
+          return res.status(404).json({ valid: false, message: "This group invitation was not found in the database used by this server. Restart the app and check its database connection." });
+        }
         return res.json({ valid: true, type: "group", groupName: group.name });
       }
       const invite = await storage.getAccessKey(key);
