@@ -223,6 +223,11 @@ export function ProfileModal({
       });
   }, [profile]);
 
+  const { data: profileShopItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/shop/items"],
+    queryFn: async () => { const response = await fetch("/api/shop/items", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
+    staleTime: 30000,
+  });
   const { data: viewer } = useQuery<any>({ queryKey: ["/api/auth/me"], queryFn: async () => { const r = await fetch("/api/auth/me", { credentials: "same-origin" }); if (!r.ok) return null; return r.json(); } });
   const { data: relationship, refetch: refetchRelationship } = useQuery<any>({
     queryKey: ["/api/social/relationship", userId],
@@ -346,6 +351,11 @@ export function ProfileModal({
   };
   const displayName = profile?.username || ""; 
   const uploadedFontSource = getUploadedFontSource(editing ? form.usernameFont : profile?.usernameFont);
+  const profileDecoration = profileShopItems.find((item:any) => item.type === "decoration" && String(item.id) === String(profile?.decorationId));
+  let profileDecorationSettings:any = {};
+  try { profileDecorationSettings = typeof profileDecoration?.cssStyles === "string" ? JSON.parse(profileDecoration.cssStyles) : (profileDecoration?.cssStyles || {}); } catch { profileDecorationSettings = {}; }
+  const decorationAnimationName = "profileDecorationSpin" + String(profileDecoration?.id || "none").replace(/[^a-z0-9]/gi, "");
+
 
   return (
     <AnimatePresence>
@@ -432,7 +442,7 @@ export function ProfileModal({
               ) : (
                 <>
                   <div className="flex items-end gap-3 mb-4">
-                    <div className="relative">
+                    <div className="relative h-20 w-20 shrink-0">
                       <Avatar
                         url={editing ? form.avatarUrl : profile.avatarUrl}
                         name={profile.username}
@@ -444,6 +454,7 @@ export function ProfileModal({
                         title={`View full-size image for ${profile.username}`}
                         className="border-4 border-black ring-2 ring-primary/50"
                       />
+                      {profileDecoration?.imageUrl && <><style>{`@keyframes ${decorationAnimationName}{from{transform:rotate(0deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}to{transform:rotate(${Math.max(-360,Math.min(360,Number(profileDecorationSettings.rotation)||360))}deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}}`}</style><img src={profileDecoration.imageUrl} alt={profileDecoration.name || "Profile decoration"} className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain" style={{animation: `${decorationAnimationName} ${Math.max(1,Math.min(30,Number(profileDecorationSettings.duration)||5))}s linear infinite`}} /></>}
                       {editing && (
                         <>
                           <button
