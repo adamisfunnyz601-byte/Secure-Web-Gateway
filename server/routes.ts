@@ -1414,6 +1414,21 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.post('/api/chat/voice/emote', requireAuth, async (req, res) => {
+    const userId = Number(req.session.userId!);
+    const peer = getCallPeer(req.body?.callId, userId);
+    if (!peer) return res.status(403).json({ message: "You must be in an active call to send an emote." });
+    const emoteId = Number(req.body?.emoteId);
+    const inventory = await storage.getUserInventory(userId);
+    const item = inventory.find((entry:any) => entry.id === emoteId && entry.type === "emote");
+    if (!item) return res.status(403).json({ message: "You do not own that emote." });
+    let styles:any = {};
+    try { styles = typeof item.cssStyles === "string" ? JSON.parse(item.cssStyles) : (item.cssStyles || {}); } catch {}
+    if (!styles.audioUrl || !item.imageUrl) return res.status(400).json({ message: "This emote is incomplete." });
+    pushVoiceSignal(peer.peerId, { type: "emote", callId: req.body.callId, from: userId, emote: { name: item.name, gifUrl: item.imageUrl, audioUrl: styles.audioUrl, duration: Math.min(20, Number(styles.duration) || 3) } });
+    res.json({ success: true });
+  });
+
   app.post('/api/chat/voice/decline', requireAuth, (req, res) => {
     const callId = req.body?.callId;
     const call = typeof callId === 'string' ? callSessions.get(callId) : null;
