@@ -114,18 +114,28 @@ type CallState = 'idle' | 'requesting' | 'incoming' | 'connected';
 interface LogEntry { id: string; time: string; type: 'info' | 'warn' | 'crit'; msg: string; }
 
 function MessageContent({ content }: { content: string }) {
+  const { data: customEmojis = [] } = useQuery<any[]>({
+    queryKey: ["/api/emojis"],
+    queryFn: async () => { const response = await fetch("/api/emojis", { credentials: "same-origin" }); if (!response.ok) return []; return response.json(); },
+    staleTime: 60000,
+  });
+  const emojiMap = new Map(customEmojis.map((emoji: any) => [emoji.name, emoji.url]));
+  const trimmed = content.trim();
+  const unicodeCount = (trimmed.match(/\\p{Extended_Pictographic}/gu) || []).length;
+  const customTokens = trimmed.match(/:[a-z0-9_+-]+:/gi) || [];
+  const plainText = trimmed.replace(/:[a-z0-9_+-]+:/gi, "").replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D\\u{1F3FB}-\\u{1F3FF}\\s]/gu, "");
+  const largeEmoji = !plainText && (unicodeCount + customTokens.length) >= 1 && (unicodeCount + customTokens.length) <= 5;
+  const parts = content.split(/(:[a-z0-9_+-]+:|@[a-zA-Z0-9_.-]+)/gi);
   return (
-    <>
-      {content.split(/(@[a-zA-Z0-9_.-]+)/g).map((part, index) =>
-        part.startsWith("@") ? (
-          <span key={index} className="text-violet-200 font-semibold bg-violet-500/10 rounded px-0.5">
-            {part}
-          </span>
-        ) : (
-          <span key={index}>{part}</span>
-        )
-      )}
-    </>
+    <span className={largeEmoji ? "inline-flex flex-wrap items-center gap-1 text-[2.5rem] leading-tight" : "inline"}>
+      {parts.map((part, index) => {
+        const emojiName = part.startsWith(":") && part.endsWith(":") ? part.slice(1,-1) : "";
+        const emojiUrl = emojiName ? emojiMap.get(emojiName) : null;
+        if (emojiUrl) return <img key={index} src={emojiUrl} alt={emojiName} title={part} className={largeEmoji ? "h-10 w-10 object-contain" : "inline-block h-5 w-5 align-[-4px] object-contain"} />;
+        if (part.startsWith("@")) return <span key={index} className="rounded bg-violet-500/10 px-0.5 font-semibold text-violet-200">{part}</span>;
+        return <span key={index}>{part}</span>;
+      })}
+    </span>
   );
 }
 
