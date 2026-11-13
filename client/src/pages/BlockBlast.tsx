@@ -174,7 +174,7 @@ function BlockBlastGame() {
  },[voiceJoined,stream,user?.id]);
  const sendMessage=()=>{if(!message.trim())return;sendRoomMessage.mutate({content:message.trim().slice(0,300)});setMessage("");setRoomStatus("Connected to the shared public chat feed");};
  const maxScore=Math.max(best,score);
- return <Layout><style>{`@keyframes bb-place-pop{0%{transform:scale(.45);filter:brightness(2.2)}65%{transform:scale(1.13);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}@keyframes bb-combo-pop{0%{opacity:0;transform:translate(-50%,-35%) scale(.55)}55%{opacity:1;transform:translate(-50%,-55%) scale(1.12)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}.bb-place-pop{animation:bb-place-pop .38s cubic-bezier(.2,.8,.2,1);z-index:1}.bb-combo-pop{animation:bb-combo-pop .55s cubic-bezier(.2,.8,.2,1)}`}</style>
+ return <Layout>{overlay}<style>{`@keyframes bb-place-pop{0%{transform:scale(.45);filter:brightness(2.2)}65%{transform:scale(1.13);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}@keyframes bb-combo-pop{0%{opacity:0;transform:translate(-50%,-35%) scale(.55)}55%{opacity:1;transform:translate(-50%,-55%) scale(1.12)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}.bb-place-pop{animation:bb-place-pop .38s cubic-bezier(.2,.8,.2,1);z-index:1}.bb-combo-pop{animation:bb-combo-pop .55s cubic-bezier(.2,.8,.2,1)}`}</style>
   {overlay}
   <div className="mx-auto max-w-[1500px] space-y-5">
    <div className="flex flex-wrap items-end justify-between gap-4">
