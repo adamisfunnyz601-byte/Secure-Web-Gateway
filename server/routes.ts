@@ -548,10 +548,12 @@ export async function registerRoutes(
   ];
   const parseDurationMs = (value: string) => {
     if (value === "null") return null;
-    const match = value.match(/^([1-9]\d*)(m|h|d|w|mo|y)$/i);
+    const match = value.match(/^([1-9]\d*)(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks|mo|y)$/i);
     if (!match) return undefined;
     const n = Number(match[1]);
-    const unit = match[2].toLowerCase();
+    const rawUnit = match[2].toLowerCase();
+    const unit = rawUnit.startsWith("min") ? "m" : rawUnit.startsWith("hr") ? "h" : rawUnit.startsWith("day") ? "d" : rawUnit.startsWith("wk") ? "w" : rawUnit;
+    return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
     return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
   };
 
