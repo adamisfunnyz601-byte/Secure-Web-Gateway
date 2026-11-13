@@ -57,7 +57,7 @@ const ADMIN_COMMANDS_CONFIG = {
   ownerRoles: ['owner', 'OWNER'],
   endpoint: '/api/chat/command',
   moderationDurations: [
-    { value: '1m', label: '1 minute' },
+    { value: '1m', label: '1 minute' },\n    { value: '1h', label: '1 hour' },
     { value: '1d', label: '1 day' },
     { value: '1mo', label: '1 month' },
     { value: '1y', label: '1 year' },
@@ -805,7 +805,7 @@ export default function Chat() {
       const durationCommands = ['ban','tempban','permban','softban','mute','timeout','jail','restrict','shadowban'];
       const roleCommand = commandName === 'role' || commandName === 'promote' || commandName === 'demote';
       if (!targetToken || (durationCommands.includes(commandName) && (!pieces[1] || !isValidModerationDuration(duration))) || (roleCommand && !pieces[1])) {
-        toast({ title: 'Missing or invalid arguments', description: roleCommand ? 'Usage: /role @username admin|trial-admin|moderator|trial-moderator|helper|trial-helper|user' : durationCommands.includes(commandName) ? `Usage: /${commandName} @username 5m|5h|5d|2w|5mo|1y|null [reason]` : `Usage: /${commandName} @username [reason]`, variant: 'destructive' });
+        toast({ title: 'Missing or invalid arguments', description: roleCommand ? 'Usage: /role @username admin|trial-admin|moderator|trial-moderator|helper|trial-helper|user' : durationCommands.includes(commandName) ? `Usage: /${commandName} @username 5m|1hrs|5d|2w|5mo|1y|null [reason]` : `Usage: /${commandName} @username [reason]`, variant: 'destructive' });
         return;
       }
       if (!targetUser) {
