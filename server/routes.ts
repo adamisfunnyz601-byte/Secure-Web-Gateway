@@ -548,7 +548,7 @@ export async function registerRoutes(
   ];
   const parseDurationMs = (value: string) => {
     if (value === "null") return null;
-    const match = value.match(/^([1-9]\\d*)(m|h|d|w|mo|y)$/i);
+    const match = value.match(/^([1-9]\d*)(m|h|d|w|mo|y)$/i);
     if (!match) return undefined;
     const n = Number(match[1]);
     const unit = match[2].toLowerCase();
@@ -583,7 +583,7 @@ export async function registerRoutes(
     const actorId = req.session.userId!;
     const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
     if (!text.startsWith("/") || text.length > 500) return res.status(400).json({ message: "Invalid command." });
-    const [rawName, ...args] = text.slice(1).split(/\\s+/);
+    const [rawName, ...args] = text.slice(1).split(/\s+/);
     const name = (rawName || "").toLowerCase();
     const actor = await storage.getUser(actorId);
     if (!actor) return res.status(401).json({ message: "Session user not found." });
