@@ -540,7 +540,7 @@ export async function registerRoutes(
     "freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown",
     "purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes",
     "strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote",
-    "nickreset","restrict","unrestrict"
+    "nickreset","restrict","unrestrict","unkick"
   ];
   const memberCommandNames = [
     "help","me","shrug","roll","flip","avatar","profile","serverinfo","userinfo","ping",
