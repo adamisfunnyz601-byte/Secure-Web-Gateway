@@ -255,13 +255,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Access Requests
-  async createAccessRequest(data: { name: string; message: string }): Promise<any> {
+  async createAccessRequest(data: { name: string; passwordHash?: string; message: string }): Promise<any> {
     const [req] = await db.insert(accessRequests).values(data).returning();
     return req;
   }
 
   async listAccessRequests(): Promise<any[]> {
-    return await db.select().from(accessRequests).orderBy(desc(accessRequests.createdAt));
+    return await db.select({ id: accessRequests.id, name: accessRequests.name, message: accessRequests.message, status: accessRequests.status, createdAt: accessRequests.createdAt, createdUserId: accessRequests.createdUserId }).from(accessRequests).orderBy(desc(accessRequests.createdAt));
   }
 
   async updateAccessRequestStatus(id: number, status: string): Promise<void> {
