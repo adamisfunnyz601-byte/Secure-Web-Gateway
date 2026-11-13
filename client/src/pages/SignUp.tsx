@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
-  const [accessKey, setAccessKey] = useState("");
+  const [accessKey, setAccessKey] = useState(() => new URLSearchParams(window.location.search).get("key") || "");
   const { login, isLoggingIn, user } = useAuth();
   const [, setLocation] = useLocation();
 
