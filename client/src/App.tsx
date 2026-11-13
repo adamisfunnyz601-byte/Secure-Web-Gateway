@@ -18,6 +18,7 @@ import SettingsPage from "@/pages/Settings";
 import BlockBlast from "@/pages/BlockBlast";
 import Invite from "@/pages/Invite";
 import DihhroGift from "@/pages/DihhroGift";
+import MyProfile from "@/pages/MyProfile";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/shop">
         <ProtectedRoute component={Shop} />
       </Route>
+      <Route path="/profile"><ProtectedRoute component={MyProfile} /></Route>
       <Route path="/settings">
         <ProtectedRoute component={SettingsPage} />
       </Route>
