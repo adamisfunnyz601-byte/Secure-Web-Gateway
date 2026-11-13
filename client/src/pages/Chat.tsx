@@ -802,8 +802,10 @@ export default function Chat() {
       const targetToken = pieces[0] || '';
       const duration = (pieces[1] || '').toLowerCase();
       const targetUser = findModerationTarget(targetToken);
-      if (!targetToken || !pieces[1] || !isValidModerationDuration(duration)) {
-        toast({ title: 'Who should be moderated?', description: `Usage: /${commandName} @username 5m|5h|5d|2w|5mo|1y|null [reason]`, variant: 'destructive' });
+      const durationCommands = ['ban','tempban','permban','softban','mute','timeout','jail','restrict','shadowban'];
+      const roleCommand = commandName === 'role' || commandName === 'promote' || commandName === 'demote';
+      if (!targetToken || (durationCommands.includes(commandName) && (!pieces[1] || !isValidModerationDuration(duration))) || (roleCommand && !pieces[1])) {
+        toast({ title: 'Missing or invalid arguments', description: roleCommand ? 'Usage: /role @username admin|trial-admin|moderator|trial-moderator|helper|trial-helper|user' : durationCommands.includes(commandName) ? `Usage: /${commandName} @username 5m|5h|5d|2w|5mo|1y|null [reason]` : `Usage: /${commandName} @username [reason]`, variant: 'destructive' });
         return;
       }
       if (!targetUser) {
