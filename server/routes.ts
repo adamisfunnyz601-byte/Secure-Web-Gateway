@@ -554,7 +554,6 @@ export async function registerRoutes(
     const rawUnit = match[2].toLowerCase();
     const unit = rawUnit.startsWith("min") ? "m" : rawUnit.startsWith("hr") ? "h" : rawUnit.startsWith("day") ? "d" : rawUnit.startsWith("wk") ? "w" : rawUnit;
     return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
-    return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
   };
 
   app.get("/api/chat/commands", requireAuth, (_req, res) => {
@@ -654,6 +653,7 @@ export async function registerRoutes(
       expiresAt: durationMs ? new Date(Date.now()+durationMs) : null,
       metadata: { command: name, actorRole: aRole },
     });
+    if (name === "unkick") return res.json({ message: "Kicks are immediate, not timed restrictions. The member can rejoin with a valid invite; there is no kick ban to reverse." });
     if (name === "purge" || name === "clear") {
       const count = Math.min(100, Math.max(1, Number(args[0]) || 10));
       const deleted = await db.delete(messages).where(sql`${messages.id} IN (SELECT id FROM messages WHERE group_id IS NULL AND recipient_id IS NULL ORDER BY created_at DESC LIMIT ${count})`).returning({id:messages.id});
