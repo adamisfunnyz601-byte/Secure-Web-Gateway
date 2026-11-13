@@ -257,6 +257,17 @@ const TerminalMessage = ({
 }) => {
   const [showActions, setShowActions] = useState(false);
   const displayName = msg.senderDisplayName || msg.senderNickname || msg.senderName;
+  const roleName = String(msg.senderRole || "").toLowerCase().replace(/_/g,"-");
+  const roleBadge: Record<string,{label:string;style:string}> = {
+    owner:{label:"OWNER",style:"border-amber-300/50 bg-amber-300/10 text-amber-200"},
+    admin:{label:"ADMIN",style:"border-red-400/50 bg-red-400/10 text-red-300"},
+    "trial-admin":{label:"TRIAL ADMIN",style:"border-orange-300/50 bg-orange-300/10 text-orange-200"},
+    moderator:{label:"MOD",style:"border-violet-400/50 bg-violet-400/10 text-violet-200"},
+    "trial-moderator":{label:"TRIAL MOD",style:"border-indigo-400/50 bg-indigo-400/10 text-indigo-200"},
+    helper:{label:"HELPER",style:"border-sky-400/50 bg-sky-400/10 text-sky-200"},
+    "trial-helper":{label:"TRIAL HELPER",style:"border-cyan-400/50 bg-cyan-400/10 text-cyan-200"},
+  };
+  const staffBadge = roleBadge[roleName];
 
   if (msg.mediaType === 'sfx') {
     return (
@@ -356,16 +367,13 @@ const TerminalMessage = ({
         )}
         {/* Reply quote */}
         {msg.replyToContent && (
-          <div className={cn(
-            "border-l-2 pl-2 mb-2 py-0.5 cursor-pointer opacity-70 hover:opacity-100 transition-opacity",
-            isMe ? "border-violet-500/50" : "border-fuchsia-400/50"
-          )}>
-            <div className="flex items-center gap-1 text-[9px] font-mono mb-0.5 text-violet-200/60">
-              <Reply className="w-3 h-3" />
-              <span className="text-violet-200/80 font-bold">{msg.replyToSenderName}</span>
-            </div>
-            <div className="text-[10px] text-white/35 font-mono line-clamp-1 truncate">
-              {msg.replyToContent.startsWith('[RELAY] ') ? msg.replyToContent.slice(8) : msg.replyToContent}
+          <div className={cn("mb-2 overflow-hidden rounded-lg border bg-black/25 shadow-inner",isMe?"border-violet-400/25":"border-fuchsia-400/25")}>
+            <div className={cn("flex items-center gap-2 border-l-[3px] px-3 py-2",isMe?"border-violet-400 bg-violet-400/10":"border-fuchsia-400 bg-fuchsia-400/10")}>
+              <Reply className="h-3.5 w-3.5 shrink-0 text-violet-200"/>
+              <div className="min-w-0">
+                <div className="text-[9px] font-bold uppercase tracking-wider text-violet-200">{msg.replyToSenderName || "Reply"}</div>
+                <div className="truncate text-[11px] text-white/65">{String(msg.replyToContent).startsWith("[RELAY] ")?String(msg.replyToContent).slice(8):msg.replyToContent}</div>
+              </div>
             </div>
           </div>
         )}
