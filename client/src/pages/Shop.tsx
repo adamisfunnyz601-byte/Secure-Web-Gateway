@@ -92,7 +92,7 @@ export default function Shop() {
                   <CyberButton
                     onClick={() => equipMutation.mutate(item.type === 'decoration' ? { decorationId: item.id } : { nameStyleId: item.id })}
                     className="w-full"
-                    variant={(user?.decorationId === item.id || user?.nameStyleId === item.id) ? "primary" : "secondary"}
+                    variant={(Number(user?.decorationId) === item.id || Number(user?.nameStyleId) === item.id) ? "primary" : "secondary"}
                   >
                     {(user?.decorationId === item.id || user?.nameStyleId === item.id) ? (
                       <><Check className="w-4 h-4 mr-2" /> EQUIPPED</>
