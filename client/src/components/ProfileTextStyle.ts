@@ -64,11 +64,7 @@ export function getFontClass(id?: string | null) {
 
 
 
-export function getFontClass(id?: string | null) {
-  if (id?.startsWith("custom-gradient|")) id = id.split("|")[1] || "default";
-  if (id?.startsWith("custom-font|")) return USERNAME_FONTS[0].className;
-  return USERNAME_FONTS.find((f) => f.id === id)?.className || USERNAME_FONTS[0].className;
-}
+
 
 export function getUsernameGradientStyle(value?: string | null): CSSProperties {
   if (!value?.startsWith("custom-gradient|") && !value?.startsWith("custom-font|")) return {};
