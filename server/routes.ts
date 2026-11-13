@@ -1024,8 +1024,8 @@ export async function registerRoutes(
       if (usernameFont !== undefined) {
         const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"];
         const rawFont = String(usernameFont);
-        const customText = /^custom-gradient\\|(default|neon|matrix|cyber|glitch|fire|ice|rainbow|ghost|elite|comic-sans)\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}(?:\\|#[0-9a-f]{6})?$/i.test(rawFont);
-        const customFont = /^custom-font\\|data:(?:font\\/(?:woff2?|ttf|otf)|application\\/octet-stream);base64,[A-Za-z0-9+/=]+\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}$/i.test(rawFont);
+        const customText = /^custom-gradient\|(default|neon|matrix|cyber|glitch|fire|ice|rainbow|ghost|elite|comic-sans)\|#[0-9a-f]{6}\|#[0-9a-f]{6}(?:\|#[0-9a-f]{6})?$/i.test(rawFont);
+        const customFont = /^custom-font\|data:(?:font\/(?:woff2?|ttf|otf)|application\/octet-stream);base64,[A-Za-z0-9+/=]+\|#[0-9a-f]{6}\|#[0-9a-f]{6}\|#[0-9a-f]{6}$/i.test(rawFont);
         if (customFont && rawFont.length > 400000) return res.status(413).json({ message: "Uploaded fonts must be 256 KB or smaller." });
         if (!fonts.includes(rawFont) && !customText && !customFont) return res.status(400).json({message:"Unsupported font or text gradient."});
         const current = await storage.getUser(req.session.userId!);
