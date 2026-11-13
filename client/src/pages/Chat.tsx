@@ -59,7 +59,7 @@ const ADMIN_COMMANDS_CONFIG = {
   moderationDurations: [
     { value: '1m', label: '1 minute' },
     { value: '1h', label: '1 hour' },
-    { value: '1hrs', label: '1 hour (hrs)' },
+    { value: '1hrs', label: '1 hour (1hrs)' },
     { value: '1d', label: '1 day' },
     { value: '1mo', label: '1 month' },
     { value: '1y', label: '1 year' },
@@ -73,6 +73,7 @@ const ADMIN_COMMANDS_CONFIG = {
 } as const;
 
 const MODERATION_DURATIONS = ADMIN_COMMANDS_CONFIG.moderationDurations.map(option => option.value);
+const TIMED_MODERATION_COMMANDS = new Set(["ban","tempban","softban","mute","timeout","jail","restrict","shadowban"]);
 // Accept custom positive durations: 5m, 12h, 5d, 2w, 5mo, 1y. `null` is permanent.
 // `m` means minutes; use `mo` for months to avoid ambiguity.
 const isValidModerationDuration = (value: string) =>
@@ -1447,9 +1448,7 @@ export default function Chat() {
         .slice(0, 7)
     : [];
   const lastCommandToken = commandArgument && /\s$/.test(commandArgument) ? '' : (commandArgument?.match(/\S+$/)?.[0] || '');
-  const shouldSuggestDuration = !isModerationCommand ||
-    (commandTokens.length === 1 && targetTokenComplete) ||
-    (commandTokens.length === 2 && !targetTokenComplete);
+  const shouldSuggestDuration = Boolean(activeCommand && TIMED_MODERATION_COMMANDS.has(activeCommand.name) && ((commandTokens.length === 1 && targetTokenComplete) || (commandTokens.length === 2 && !targetTokenComplete)));
   const parameterOptions = activeCommand && commandArgument !== null && shouldSuggestDuration && 'options' in activeCommand
     ? activeCommand.options.filter(option => option.toLowerCase().includes(lastCommandToken.toLowerCase()))
     : [];
