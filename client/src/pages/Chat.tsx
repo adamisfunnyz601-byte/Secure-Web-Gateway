@@ -78,7 +78,7 @@ const isValidModerationDuration = (value: string) =>
 
 // Slash-command help and autocomplete. The server still validates and executes commands.
 const MEMBER_COMMAND_NAMES = ["help","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
-const MODERATION_COMMAND_NAMES = ["ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings","softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen","freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset","restrict","unrestrict"] as const;
+const MODERATION_COMMAND_NAMES = ["ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings","softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen","freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset","restrict","unrestrict","unkick"] as const;
 const CHAT_COMMANDS = [
   ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: `/${name}`, description: "Member utility command." })),
   ...MODERATION_COMMAND_NAMES.map(name => ({ name, usage: `/${name} <@user> [duration] [reason]`, description: "Staff moderation command.", ownerOnly: true, options: MODERATION_DURATIONS })),
