@@ -383,7 +383,7 @@ export function ProfileModal({
               style={{
                 backgroundImage: (editing ? form.bannerUrl : profile?.bannerUrl)
                   ? `linear-gradient(rgba(20,20,30,.2), rgba(20,20,30,.55)), url(${editing ? form.bannerUrl : profile?.bannerUrl})`
-                  : (getProfileGradientStyle(editing ? form.profileGradient : profile?.profileGradient).backgroundImage as string | undefined),
+                  : undefined,
               }}
             >
               <button
@@ -424,7 +424,13 @@ export function ProfileModal({
               )}
             </div>
 
-            <div className="p-5 -mt-10">
+            <div
+              className="p-5 -mt-10 min-h-[calc(100%-6rem)]"
+              style={{
+                backgroundColor: "#050505",
+                ...getProfileGradientStyle(editing ? form.profileGradient : profile?.profileGradient),
+              }}
+            >
               {isLoading || !profile ? (
                 <div className="text-primary/60 font-mono text-xs text-center py-10">
                   LOADING_PROFILE...
