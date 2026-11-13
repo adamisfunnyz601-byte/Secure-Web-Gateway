@@ -63,6 +63,9 @@ function Router() {
       <Route path="/settings">
         <ProtectedRoute component={SettingsPage} />
       </Route>
+      <Route path="/block-blast">
+        <ProtectedRoute component={BlockBlast} />
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
