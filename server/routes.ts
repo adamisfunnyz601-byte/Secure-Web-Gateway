@@ -1289,8 +1289,8 @@ export async function registerRoutes(
 
       // Accept the data URLs emitted by FileReader, including harmless whitespace
       // inserted by clients, while still rejecting remote URLs and other formats.
-      const rawImage = String(body.imageUrl ?? "").replace(/\\s/g, "");
-      const imageMatch = rawImage.match(/^data:(image\\/(?:png|gif));base64,([A-Za-z0-9+/]*={0,2})$/i);
+      const rawImage = String(body.imageUrl ?? "").replace(/\s/g, "");
+      const imageMatch = rawImage.match(/^data:(image\/(?:png|gif));base64,([A-Za-z0-9+/]*={0,2})$/i);
       const imageMime = imageMatch?.[1]?.toLowerCase();
       const imageBytes = imageMatch ? Math.floor(imageMatch[2].length * 3 / 4) : 0;
       if (!imageMatch || (type === "emote" && imageMime !== "image/gif") ||
@@ -1328,8 +1328,8 @@ export async function registerRoutes(
         const offsetY = clamp(numberOr(suppliedStyles.offsetY, 0), -100, 100);
         styles = { kind: "decoration", scale, scaleX, scaleY, rotationAngle, offsetX, offsetY };
       } else {
-        const audioUrl = String(suppliedStyles.audioUrl ?? "").replace(/\\s/g, "");
-        const audioMatch = audioUrl.match(/^data:audio\\/(?:mpeg|mp3);base64,([A-Za-z0-9+/]*={0,2})$/i);
+        const audioUrl = String(suppliedStyles.audioUrl ?? "").replace(/\s/g, "");
+        const audioMatch = audioUrl.match(/^data:audio\/(?:mpeg|mp3);base64,([A-Za-z0-9+/]*={0,2})$/i);
         const audioBytes = audioMatch ? Math.floor(audioMatch[1].length * 3 / 4) : 0;
         if (!audioMatch || audioBytes <= 0 || audioBytes > 1.4 * 1024 * 1024) {
           return res.status(400).json({ message: "Emotes need an MP3 smaller than 1.4 MB." });
