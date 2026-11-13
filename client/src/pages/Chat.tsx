@@ -304,9 +304,9 @@ function LazyMediaAttachment({
 // TERMINAL MESSAGE
 // ============================================================
 const TerminalMessage = ({
-  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem
+  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem, shouldAutoplayEmote
 }: {
-  msg: any; isMe: boolean; emoteItem?: any;
+  msg: any; isMe: boolean; emoteItem?: any; shouldAutoplayEmote?: boolean;
   onReply: (m: any) => void;
   onForward: (m: any) => void;
   onPurge: (id: number) => void;
@@ -380,7 +380,7 @@ const TerminalMessage = ({
   try { chatEmoteStyles = typeof emoteItem?.cssStyles === "string" ? JSON.parse(emoteItem.cssStyles) : (emoteItem?.cssStyles || {}); } catch {}
   const playedChatEmoteRef = useRef(false);
   useEffect(() => {
-    if (!chatEmoteMatch || !chatEmoteStyles.audioUrl || playedChatEmoteRef.current) return;
+    if (!shouldAutoplayEmote || !chatEmoteMatch || !chatEmoteStyles.audioUrl || playedChatEmoteRef.current) return;
     playedChatEmoteRef.current = true;
     const audio = new Audio(chatEmoteStyles.audioUrl);
     audio.volume = 1;
@@ -388,7 +388,7 @@ const TerminalMessage = ({
       // Browsers may block sound until the recipient has interacted with the page.
     });
     return () => { audio.pause(); audio.currentTime = 0; };
-  }, [msg.id, chatEmoteMatch?.[1], chatEmoteStyles.audioUrl]);
+  }, [msg.id, chatEmoteMatch?.[1], chatEmoteStyles.audioUrl, shouldAutoplayEmote]);
   const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
@@ -500,7 +500,7 @@ export default function Chat() {
   // --- CHANNEL STATE ---
   const [selectedRecipientId, setSelectedRecipientId] = useState<number | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const { messages, users, sendMessage } = useChat({
+  const { messages, users, sendMessage, isLoadingMessages } = useChat({
     recipientId: selectedRecipientId,
     groupId: selectedGroupId,
   });
@@ -836,6 +836,17 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     if (users) (users as any[]).forEach((u: any) => m.set(u.id, u));
     return m;
   }, [users]);
+
+  // Suppress emote sounds for messages that already existed when a channel is opened.
+  // Only messages arriving after the initial channel history has loaded should autoplay.
+  const chatEmoteBaselineRef = useRef<{ channelKey: string; maxId: number } | null>(null);
+  const activeChatChannelKey = selectedGroupId ? `group:${selectedGroupId}` : selectedRecipientId ? `dm:${selectedRecipientId}` : "broadcast";
+  if (!isLoadingMessages && messages && chatEmoteBaselineRef.current?.channelKey !== activeChatChannelKey) {
+    chatEmoteBaselineRef.current = {
+      channelKey: activeChatChannelKey,
+      maxId: (messages as any[]).reduce((max, message) => Math.max(max, Number(message.id) || 0), 0),
+    };
+  }
 
   // ============================================================
   // MESSAGE FILTERING
@@ -2264,6 +2275,10 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 onMediaPreview={setMediaPreview}
                 onProfileClick={setProfileUserId}
                 emoteItem={chatEmoteItems.find((item:any) => item.type === "emote" && Number(item.id) === Number(String(msg.content || "").match(/^\[CHAT_EMOTE:(\d+)\]$/)?.[1]))}
+                shouldAutoplayEmote={!isLoadingMessages && (
+                  Number(msg.id) < 0 ||
+                  (chatEmoteBaselineRef.current?.channelKey === activeChatChannelKey && Number(msg.id) > chatEmoteBaselineRef.current.maxId)
+                )}
               />
             ))}
             <div ref={chatBottomRef} className="h-2" />
