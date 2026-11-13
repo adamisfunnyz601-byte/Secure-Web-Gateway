@@ -55,6 +55,7 @@ function Router() {
       <Route path="/proxy">
         <ProtectedRoute component={Proxy} />
       </Route>
+      <Route path="/chat" component={() => null} />
       <Route path="/history">
         <ProtectedRoute component={History} />
       </Route>
