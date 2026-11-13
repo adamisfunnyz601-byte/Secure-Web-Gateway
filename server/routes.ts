@@ -443,6 +443,24 @@ export async function registerRoutes(
     }
   });
 
+  // Public invite-link validation. The key itself remains the credential used at signup.
+  app.get("/api/invites/:key", async (req, res) => {
+    try {
+      const key = String(req.params.key || "").trim();
+      if (!key || key.length > 128) return res.status(400).json({ valid: false, message: "Invalid invitation link." });
+      const invite = await storage.getAccessKey(key);
+      if (!invite) return res.status(404).json({ valid: false, message: "This invitation link is invalid or has been revoked." });
+      return res.json({
+        valid: true,
+        type: invite.type,
+        durationMinutes: invite.durationMinutes ?? null,
+      });
+    } catch (error) {
+      console.error("Invite validation failed:", error);
+      return res.status(500).json({ valid: false, message: "Could not verify this invitation right now." });
+    }
+  });
+
   app.get(api.auth.me.path, requireAuth, async (req, res) => {
     const user = await storage.getUser(req.session.userId!);
     if (user) {
