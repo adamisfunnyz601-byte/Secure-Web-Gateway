@@ -341,7 +341,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGroupByCode(code: string): Promise<any> {
-    const [group] = await db.select().from(groupChats).where(eq(groupChats.inviteCode, code));
+    // Invite codes are user-shared URLs, so tolerate casing and accidental whitespace.
+    // Comparing normalised values in SQL also handles older rows created before
+    // invite-code normalisation was enforced.
+    const normalizedCode = String(code ?? "").trim().toUpperCase();
+    if (!normalizedCode) return undefined;
+    const [group] = await db.select().from(groupChats)
+      .where(sql`upper(trim(${groupChats.inviteCode})) = ${normalizedCode}`)
+      .limit(1);
     return group;
   }
 
