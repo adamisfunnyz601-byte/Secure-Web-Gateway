@@ -79,6 +79,16 @@ export default function Hub() {
   }, [tasks, notes, points, streak, diceBest, lastVisit]);
 
   useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (lastVisit !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      setStreak(lastVisit === yesterday ? value => value + 1 : 1);
+      setPoints(value => value + 10);
+      setLastVisit(today);
+    }
+  }, [lastVisit]);
+
+  useEffect(() => {
     if (!focusRunning) return;
     const timer = window.setInterval(() => setFocusSeconds(value => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
