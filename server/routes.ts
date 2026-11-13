@@ -834,6 +834,13 @@ export async function registerRoutes(
 
   app.post(api.chat.send.path, requireAuth, async (req, res) => {
     const input = api.chat.send.input.parse(req.body);
+    const chatEmoteMatch = typeof input.content === "string" ? input.content.match(/^\[CHAT_EMOTE:(\d+)\]$/) : null;
+    if (typeof input.content === "string" && input.content.startsWith("[CHAT_EMOTE:") && !chatEmoteMatch) return res.status(400).json({ message: "Invalid chat emote." });
+    if (chatEmoteMatch) {
+      const emoteId = Number(chatEmoteMatch[1]);
+      const inventory = await storage.getUserInventory(Number(req.session.userId!));
+      if (!Number.isSafeInteger(emoteId) || !inventory.some((item:any) => Number(item.id) === emoteId && item.type === "emote")) return res.status(403).json({ message: "You must own that emote before sending it in chat." });
+    }
     const [activeMute] = await db.select().from(moderationLogs)
       .where(and(eq(moderationLogs.targetId, req.session.userId!), sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict','unmute','untimeout','unjail','unrestrict')`))
       .orderBy(desc(moderationLogs.createdAt)).limit(1);
