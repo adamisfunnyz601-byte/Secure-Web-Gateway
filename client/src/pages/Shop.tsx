@@ -40,7 +40,8 @@ export default function Shop() {
   };
   const handleAudio = async (file?:File) => {
     if(!file)return; if(file.type!=="audio/mpeg"&&!file.name.toLowerCase().endsWith(".mp3")){toast({title:"MP3 required",variant:"destructive"});return;}
-    if(file.size>1.4*1024*1024){toast({title:"MP3 too large",description:"Maximum image size is 1.4 MB.",variant:"destructive"});return;}
+    if(file.size>1.4*1024*1024){toast({title:"MP3 too large",description:"Maximum MP3 size is 1.4 MB.",variant:"destructive"});return;}
+    setAudioUrl("");setAudioDuration(0);
     try{
       const data=await readFile(file);const url=URL.createObjectURL(file);const audio=new Audio();audio.preload="metadata";
       audio.onloadedmetadata=()=>{URL.revokeObjectURL(url);const duration=audio.duration;if(!Number.isFinite(duration)||duration<=0||duration>20){setAudioUrl("");setAudioDuration(0);toast({title:"MP3 must be 20 seconds or shorter",description:"The emote bubble stays visible for the full MP3 playback.",variant:"destructive"});return;}setAudioDuration(duration);setAudioUrl(data);};
