@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks } from "lucide-react";
+import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ProfileModal";
@@ -108,13 +108,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => logout()}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/profile"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn("flex-1 flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors", location === "/profile" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-primary/10 hover:text-primary")}
+              aria-label="Open my profile"
+            >
+              <UserRound className="w-4 h-4" />
+              My Profile
+            </Link>
+            <button
+              onClick={() => logout()}
+              className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
