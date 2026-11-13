@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,6 +20,7 @@ import Invite from "@/pages/Invite";
 import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
 import ModerationPanel from "@/pages/ModerationPanel";
+import Chat from "@/pages/Chat";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -54,9 +55,6 @@ function Router() {
       <Route path="/proxy">
         <ProtectedRoute component={Proxy} />
       </Route>
-      <Route path="/chat">
-        <ProtectedRoute component={Chat} />
-      </Route>
       <Route path="/history">
         <ProtectedRoute component={History} />
       </Route>
@@ -76,6 +74,22 @@ function Router() {
       </Route>
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+
+function GlobalChatHost() {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+  if (isLoading || !user) return null;
+  const isChatPage = location === "/chat";
+  return (
+    <div
+      aria-hidden={!isChatPage}
+      style={{ visibility: isChatPage ? "visible" : "hidden", pointerEvents: isChatPage ? "auto" : "none" }}
+    >
+      <Chat />
+    </div>
   );
 }
 
