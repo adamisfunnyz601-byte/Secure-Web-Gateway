@@ -18,7 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/settings", label: "Settings",     icon: Settings },\n    { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
   ];
 
-  if (user?.role === "owner") {
+  if (["owner", "admin", "trial-admin"].includes(String(user?.role || "").toLowerCase())) {
     navItems.push({ href: "/admin", label: "Admin", icon: ShieldAlert });
   }
 
@@ -101,9 +101,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <div className={cn(
                 "text-[10px]",
-                user?.role === "owner" ? "text-amber-400" : "text-green-400"
+                ["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(String(user?.role || "").toLowerCase()) ? "text-amber-400" : "text-green-400"
               )}>
-                {user?.role === "owner" ? "Owner" : "Member"} • {user?.presenceStatus || "offline"}
+                {String(user?.role || "user").replace(/-/g, " ").replace(/\\b\\w/g, c => c.toUpperCase())} • {user?.presenceStatus || "offline"}
               </div>
             </div>
           </div>
