@@ -248,7 +248,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserDecoration(userId: number, decorationId: number | null, nameStyleId: number | null): Promise<void> {
     await db.update(users)
-      .set({ decorationId, nameStyleId })
+      .set({ decorationId: decorationId == null ? null : String(decorationId), nameStyleId: nameStyleId == null ? null : String(nameStyleId) })
       .where(eq(users.id, userId));
   }
 
