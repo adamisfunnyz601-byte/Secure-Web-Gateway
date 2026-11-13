@@ -15,6 +15,7 @@ import Shop from "@/pages/Shop";
 import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/Settings";
 import BlockBlast from "@/pages/BlockBlast";
+import Hub from "@/pages/Hub";
 import Invite from "@/pages/Invite";
 import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
@@ -71,6 +72,9 @@ function Router() {
       </Route>
       <Route path="/block-blast">
         <ProtectedRoute component={BlockBlast} />
+      </Route>
+      <Route path="/hub">
+        <ProtectedRoute component={Hub} />
       </Route>
       <Route component={NotFound} />
     </Switch>
