@@ -264,8 +264,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select({ id: accessRequests.id, name: accessRequests.name, message: accessRequests.message, status: accessRequests.status, createdAt: accessRequests.createdAt, createdUserId: accessRequests.createdUserId }).from(accessRequests).orderBy(desc(accessRequests.createdAt));
   }
 
-  async updateAccessRequestStatus(id: number, status: string): Promise<void> {
-    await db.update(accessRequests).set({ status }).where(eq(accessRequests.id, id));
+  async getAccessRequest(id: number): Promise<any | undefined> {
+    const [request] = await db.select().from(accessRequests).where(eq(accessRequests.id, id)).limit(1);
+    return request;
+  }
+
+  async updateAccessRequestStatus(id: number, status: string, createdUserId?: number): Promise<void> {
+    await db.update(accessRequests)
+      .set({ status, passwordHash: null, ...(createdUserId ? { createdUserId } : {}) })
+      .where(eq(accessRequests.id, id));
   }
 
   // Custom Emojis
