@@ -1517,6 +1517,19 @@ export default function Chat() {
     setInputContent(prev => prev.replace(/(?:^|\s)@([^\s@]*)$/, match => `${match.slice(0, match.lastIndexOf("@"))}@${username} `));
   };
 
+  const createDihhroGift = async () => {
+    try {
+      const response = await fetch("/api/dihhro/gift-links", { method:"POST", credentials:"same-origin" });
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.message || "Could not create gift link");
+      const url = `${window.location.origin}${data.url}`;
+      sendMessage.mutate({ content: `🎁 Claim Dihhro for 1 month! ${url}`, recipientId: selectedRecipientId ?? undefined, groupId: selectedGroupId ?? undefined } as any);
+      toast({ title:"Dihhro gift link created", description:"A single-use gift embed has been sent to this chat." });
+    } catch (error:any) {
+      toast({ title:"Gift link failed", description:error.message || "Could not create gift link", variant:"destructive" });
+    }
+  };
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -2019,19 +2032,6 @@ export default function Chat() {
               </motion.div>
             )}
           </AnimatePresence>
-
-  const createDihhroGift = async () => {
-    try {
-      const response = await fetch("/api/dihhro/gift-links", { method:"POST", credentials:"same-origin" });
-      const data = await response.json().catch(()=>({}));
-      if (!response.ok) throw new Error(data.message || "Could not create gift link");
-      const url = `${window.location.origin}${data.url}`;
-      sendMessage.mutate({ content: `🎁 Claim Dihhro for 1 month! ${url}`, recipientId: selectedRecipientId ?? undefined, groupId: selectedGroupId ?? undefined } as any);
-      toast({ title:"Dihhro gift link created", description:"A single-use gift embed has been sent to this chat." });
-    } catch (error:any) {
-      toast({ title:"Gift link failed", description:error.message || "Could not create gift link", variant:"destructive" });
-    }
-  };
 
           {/* Input */}
           <div className="border-t border-border/60 p-3 flex-shrink-0" style={{ background: "hsl(228 7% 20%)" }}>
