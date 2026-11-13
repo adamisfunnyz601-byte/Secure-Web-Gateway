@@ -50,7 +50,10 @@ function BlockBlastGame() {
  const [gameOver,setGameOver]=useState(false);
  const [sound,setSound]=useState(false);
  const [clearing,setClearing]=useState<number[]>([]);
- const [flash,setFlash]=useState(false);\n const [placementCells,setPlacementCells]=useState<string[]>([]);\n const [comboBanner,setComboBanner]=useState("");\n const [comboPulse,setComboPulse]=useState(false);
+ const [flash,setFlash]=useState(false);
+ const [placementCells,setPlacementCells]=useState<string[]>([]);
+ const [comboBanner,setComboBanner]=useState("");
+ const [comboPulse,setComboPulse]=useState(false);
 
  const [message,setMessage]=useState("");
  const [roomStatus,setRoomStatus]=useState("Shared public chat feed");
@@ -73,12 +76,14 @@ function BlockBlastGame() {
  const place=(row:number,col:number)=>{
   if(gameOver||!pieces[selected])return;
   const piece=pieces[selected];if(!canPlace(board,piece,row,col)){playTone(110);return;}
-  const next=board.map(line=>[...line]);piece.cells.forEach(([y,x])=>next[row+y][col+x]=piece.color);\n  setPlacementCells(piece.cells.map(([y,x])=>`${row+y}-${col+x}`));window.setTimeout(()=>setPlacementCells([]),420);
+  const next=board.map(line=>[...line]);piece.cells.forEach(([y,x])=>next[row+y][col+x]=piece.color);
+  setPlacementCells(piece.cells.map(([y,x])=>`${row+y}-${col+x}`));window.setTimeout(()=>setPlacementCells([]),420);
   let rows:number[]=[];let cols:number[]=[];
   for(let r=0;r<SIZE;r++)if(next[r].every(Boolean))rows.push(r);
   for(let c=0;c<SIZE;c++)if(next.every(line=>Boolean(line[c])))cols.push(c);
   const lines=rows.length+cols.length;
-  if(lines){setClearing([...rows.map(r=>r),...cols.map(c=>c+SIZE)]);setFlash(true);playTone(660);setComboBanner(lines>=3?`🔥 MEGA CLEAR ×${lines}`:lines===2?"⚡ DOUBLE CLEAR":"✨ LINE CLEAR");}else{setComboBanner("＋ BLOCK PLACED");}\n  setComboPulse(true);window.setTimeout(()=>setComboPulse(false),620);window.setTimeout(()=>setComboBanner(""),1050);
+  if(lines){setClearing([...rows.map(r=>r),...cols.map(c=>c+SIZE)]);setFlash(true);playTone(660);setComboBanner(lines>=3?`🔥 MEGA CLEAR ×${lines}`:lines===2?"⚡ DOUBLE CLEAR":"✨ LINE CLEAR");}else{setComboBanner("＋ BLOCK PLACED");}
+  setComboPulse(true);window.setTimeout(()=>setComboPulse(false),620);window.setTimeout(()=>setComboBanner(""),1050);
   rows.forEach(r=>next[r].fill(""));
   cols.forEach(c=>{for(let r=0;r<SIZE;r++)next[r][c]="";});
   const nextStreak=lines?streak+1:0;const nextCombo=lines?Math.min(5,1+Math.floor(streak/2)):1;
@@ -158,7 +163,8 @@ function BlockBlastGame() {
    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
     <section className="rounded-3xl border border-cyan-300/15 bg-gradient-to-br from-[#111d33] to-[#0b1220] p-3 shadow-2xl shadow-black/25 sm:p-5">
      <div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-[.2em] text-slate-400">Puzzle grid</div><div className="mt-1 text-sm text-slate-500">10 × 10 • Fill a row or column to clear it</div></div><div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-300">● LIVE RUN</div></div>
-     <div className="relative mx-auto w-full max-w-[620px]">\n      {comboBanner&&<div key={comboBanner+score} className={`pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-2xl border border-cyan-200/40 bg-slate-950/90 px-6 py-3 text-lg font-black tracking-wider text-cyan-200 shadow-[0_0_45px_#22d3ee55] ${comboPulse?"bb-combo-pop":""}`}>{comboBanner}{combo>1?` ×${combo}`:""}</div>}
+     <div className="relative mx-auto w-full max-w-[620px]">
+      {comboBanner&&<div key={comboBanner+score} className={`pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-2xl border border-cyan-200/40 bg-slate-950/90 px-6 py-3 text-lg font-black tracking-wider text-cyan-200 shadow-[0_0_45px_#22d3ee55] ${comboPulse?"bb-combo-pop":""}`}>{comboBanner}{combo>1?` ×${combo}`:""}</div>}
       <div className="grid aspect-square grid-cols-10 gap-[3px] rounded-2xl border border-white/10 bg-[#080e1b] p-2 sm:gap-1 sm:p-3" role="grid" aria-label="Block Blast 10 by 10 game board" onDragOver={e=>e.preventDefault()}>
        {board.map((line,r)=>line.map((cell,c)=><button key={r+"-"+c} onClick={()=>place(r,c)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const idx=Number(e.dataTransfer.getData("text/blockblast-index"));if(Number.isInteger(idx)&&pieces[idx]){setSelected(idx);place(r,c,idx);}}} aria-label={`Place at row ${r+1}, column ${c+1}`} className={`relative min-w-0 rounded-[3px] border transition-all duration-150 ${cell?"border-white/10 shadow-[inset_0_2px_0_#ffffff44,0_2px_4px_#0008]":"border-white/[.035] bg-[#1a2740] hover:bg-[#263b5b]"} ${flash&&clearing.includes(r)||flash&&clearing.includes(c+SIZE)?"animate-pulse":""} ${placementCells.includes(r+"-"+c)?"bb-place-pop":""}`} style={cell?{background:cell}:undefined}/>))}
       </div>
