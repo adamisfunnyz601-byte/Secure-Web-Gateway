@@ -103,7 +103,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 "text-[10px]",
                 ["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(String(user?.role || "").toLowerCase()) ? "text-amber-400" : "text-green-400"
               )}>
-                {String(user?.role || "user").replace(/-/g, " ").replace(/\\b\\w/g, c => c.toUpperCase())} • {user?.presenceStatus || "offline"}
+                {String(user?.role || "user").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} • {user?.presenceStatus || "offline"}
               </div>
             </div>
           </div>
