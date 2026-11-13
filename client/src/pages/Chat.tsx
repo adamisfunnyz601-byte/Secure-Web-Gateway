@@ -122,9 +122,9 @@ function MessageContent({ content }: { content: string }) {
   });
   const emojiMap = new Map(customEmojis.map((emoji: any) => [emoji.name, emoji.url]));
   const trimmed = content.trim();
-  const unicodeCount = (trimmed.match(/\\p{Extended_Pictographic}/gu) || []).length;
+  const unicodeCount = (trimmed.match(/\p{Extended_Pictographic}/gu) || []).length;
   const customTokens = trimmed.match(/:[a-z0-9_+-]+:/gi) || [];
-  const plainText = trimmed.replace(/:[a-z0-9_+-]+:/gi, "").replace(/[\\p{Extended_Pictographic}\\uFE0F\\u200D\\u{1F3FB}-\\u{1F3FF}\\s]/gu, "");
+  const plainText = trimmed.replace(/:[a-z0-9_+-]+:/gi, "").replace(/[\p{Extended_Pictographic}\uFE0F\u200D\u{1F3FB}-\u{1F3FF}\s]/gu, "");
   const largeEmoji = !plainText && (unicodeCount + customTokens.length) >= 1 && (unicodeCount + customTokens.length) <= 5;
   const parts = content.split(/(:[a-z0-9_+-]+:|@[a-zA-Z0-9_.-]+)/gi);
   return (
