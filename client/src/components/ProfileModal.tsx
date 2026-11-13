@@ -306,6 +306,14 @@ export function ProfileModal({
   };
 
   const isOwn = profile?.id === currentUserId;
+    try {
+      const response = await fetch("/api/admin/dihhro/grant", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, months: 1 }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not gift Dihhro");
+      toast({ title: "DIHHRO_GIFTED", description: "One month has been added." });
+      qc.invalidateQueries({ queryKey: ["/api/user/profile", userId] });
+    } catch (error: any) { toast({ title: "GIFT_FAILED", description: error.message, variant: "destructive" }); }
+  };
   const displayName = profile?.displayName || profile?.nickname || profile?.username;
 
   return (
