@@ -15,7 +15,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/proxy",   label: "Net Proxy",    icon: Globe },
     { href: "/chat",    label: "Messages",      icon: MessageSquare },
     { href: "/history", label: "History",       icon: History },
-    { href: "/settings", label: "Settings",     icon: Settings },\n    { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
+    { href: "/settings", label: "Settings",     icon: Settings },
+    { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
   ];
 
   if (["owner", "admin", "trial-admin"].includes(String(user?.role || "").toLowerCase())) {
