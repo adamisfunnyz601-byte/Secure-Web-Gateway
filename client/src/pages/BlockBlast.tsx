@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
-import { useToast } from "@/hooks/use-toast";
-import { Trophy, Volume2, VolumeX, RotateCcw, Sparkles, MessageCircle, Mic, MicOff, Users, Send, Crown, Zap, Medal } from "lucide-react";
+import { Trophy, Volume2, VolumeX, RotateCcw, Sparkles, MessageCircle, Mic, MicOff, Users, Send, Zap, Medal } from "lucide-react";
 
 type Cell = [number, number];
 type Piece = { cells: Cell[]; color: string; id: string };
@@ -38,7 +37,6 @@ function PiecePreview({piece,selected,onClick}:{piece:Piece|null;selected:boolea
 
 function BlockBlastGame() {
  const { user } = useAuth();
- const { toast } = useToast();
  const { messages: sharedMessages, sendMessage: sendRoomMessage } = useChat();
  const [globalScores,setGlobalScores]=useState<any[]>([]);
  const [board,setBoard]=useState<string[][]>(emptyBoard);
@@ -94,7 +92,6 @@ function BlockBlastGame() {
   if(!nextSet.some(p=>fitExists(next,p)))finishGame(finalScore);
  };
  const reset=()=>{setBoard(emptyBoard());setPieces(newPieces());setSelected(0);setScore(0);setStreak(0);setCombo(1);setGameOver(false);setClearing([]);};
- const leaderboard=useMemo(()=>[...history].sort((a,b)=>b.score-a.score).slice(0,5),[history]);
  const sendVoiceSignal=async(to:number,signal:any)=>{await fetch("/api/blockblast/voice/signal",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({to,signal})});};
  const joinVoice=async()=>{
   if(!navigator.mediaDevices?.getUserMedia||!window.RTCPeerConnection){setVoiceStatus("This browser does not support WebRTC microphone rooms.");return;}
