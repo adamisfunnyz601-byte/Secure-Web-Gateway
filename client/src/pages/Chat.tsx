@@ -304,9 +304,9 @@ function LazyMediaAttachment({
 // TERMINAL MESSAGE
 // ============================================================
 const TerminalMessage = ({
-  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick
+  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem
 }: {
-  msg: any; isMe: boolean;
+  msg: any; isMe: boolean; emoteItem?: any;
   onReply: (m: any) => void;
   onForward: (m: any) => void;
   onPurge: (id: number) => void;
@@ -375,6 +375,9 @@ const TerminalMessage = ({
 
   const isForwarded = msg.content?.startsWith('[RELAY] ');
   const displayContent = isForwarded ? msg.content.slice('[RELAY] '.length) : msg.content;
+  const chatEmoteMatch = typeof displayContent === "string" ? displayContent.match(/^\[CHAT_EMOTE:(\d+)\]$/) : null;
+  let chatEmoteStyles:any = {};
+  try { chatEmoteStyles = typeof emoteItem?.cssStyles === "string" ? JSON.parse(emoteItem.cssStyles) : (emoteItem?.cssStyles || {}); } catch {}
   const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
@@ -437,7 +440,7 @@ const TerminalMessage = ({
             </div>
           </div>
         )}
-        {displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
+        {chatEmoteMatch ? <div className="mt-1 flex max-w-[240px] flex-col items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-500/10 p-3">{emoteItem?.imageUrl ? <img src={emoteItem.imageUrl} alt={emoteItem.name || "Chat emote"} className="max-h-36 max-w-full object-contain"/> : <span className="text-xs text-violet-200/60">Loading emote…</span>}<span className="text-[10px] font-bold text-violet-100">{emoteItem?.name || "Emote"}</span><button type="button" disabled={!chatEmoteStyles.audioUrl} onClick={() => { const audio = new Audio(chatEmoteStyles.audioUrl); audio.play().catch(() => {}); }} className="flex items-center gap-1.5 rounded-lg border border-violet-300/30 bg-violet-400/15 px-3 py-1.5 text-[10px] font-bold text-violet-100 hover:bg-violet-400/25 disabled:opacity-40"><Play className="h-3 w-3"/> Play emote</button></div> : displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
         {dihhroGiftMatch && <a href={dihhroGiftMatch[0]} target="_blank" rel="noreferrer" className="mt-3 block max-w-sm rounded-xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/10 p-3 no-underline transition hover:border-fuchsia-300/60"><div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-fuchsia-200"><Gift className="h-4 w-4"/> NEXUS DIHHRO GIFT</div><div className="mt-1 text-sm font-bold text-white">Claim Dihhro for 1 month!</div><div className="mt-1 text-[10px] text-fuchsia-100/60">Single-use gift · Open to claim</div></a>}
         {getMediaSection()}
 
@@ -514,6 +517,7 @@ export default function Chat() {
   const [forwardState, setForwardState] = useState<ForwardTarget>({ message: null, isOpen: false });
   const [mediaPreview, setMediaPreview] = useState<MediaPreview | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showChatEmotePicker, setShowChatEmotePicker] = useState(false);
   const [gifSearch, setGifSearch] = useState("");
   const [gifResults, setGifResults] = useState<any[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
@@ -676,6 +680,11 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   const { data: callEmoteInventory = [] } = useQuery<any[]>({
     queryKey: ["/api/shop/inventory"],
     queryFn: async () => { const response = await fetch("/api/shop/inventory", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
+    staleTime: 20000,
+  });
+  const { data: chatEmoteItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/shop/items", "chat-emotes"],
+    queryFn: async () => { const response = await fetch("/api/shop/items", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
     staleTime: 20000,
   });
   const { data: userConfig, refetch: refetchConfig } = useQuery({
@@ -1244,6 +1253,13 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       peerConnectionRef.current = null;
       throw error;
     }
+  };
+
+  const sendChatEmote = (item:any) => {
+    if (!item?.id || item.type !== "emote") return;
+    sendMessage.mutate({ content: "[CHAT_EMOTE:" + Number(item.id) + "]", recipientId: selectedRecipientId ?? undefined, groupId: selectedGroupId ?? undefined, replyToId: replyTarget?.id ?? null } as any);
+    setReplyTarget(null);
+    setShowChatEmotePicker(false);
   };
 
   const sendCallEmote = async (item:any) => {
@@ -2236,6 +2252,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 onPurge={id => deleteMessageMutation.mutate(id)}
                 onMediaPreview={setMediaPreview}
                 onProfileClick={setProfileUserId}
+                emoteItem={chatEmoteItems.find((item:any) => item.type === "emote" && Number(item.id) === Number(String(msg.content || "").match(/^\[CHAT_EMOTE:(\d+)\]$/)?.[1]))}
               />
             ))}
             <div ref={chatBottomRef} className="h-2" />
@@ -2397,6 +2414,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
               </div>
 
               {canGiftDihhro && <button type="button" onClick={createDihhroGift} title="Gift one month of Dihhro" className="h-10 w-10 flex-shrink-0 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/10 text-fuchsia-200 hover:bg-fuchsia-500/20 transition"><Gift className="mx-auto h-4 w-4"/></button>}
+              <button type="button" onClick={() => setShowChatEmotePicker(v => !v)} title="Send an owned emote" className={cn("h-10 px-3 rounded-lg flex items-center justify-center gap-1.5 flex-shrink-0 border transition-all", showChatEmotePicker ? "border-fuchsia-400/50 bg-fuchsia-500/20 text-fuchsia-200" : "border-violet-400/20 bg-violet-500/5 text-violet-200 hover:bg-fuchsia-500/15 hover:border-fuchsia-400/40")}><Sparkles className="h-4 w-4"/><span className="text-[10px] font-bold tracking-wider">EMOTE</span></button>
               <button
                 type="button"
                 onClick={() => { setShowGifPicker(true); if (!gifResults.length) searchGifs(""); }}
@@ -2412,6 +2430,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 <Send className="w-4 h-4" />
               </CyberButton>
             </form>
+            {showChatEmotePicker && <div className="absolute bottom-14 right-24 z-[80] w-[min(88vw,360px)] rounded-xl border border-violet-400/30 bg-[#10091b]/[.98] p-3 shadow-2xl"><div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-widest text-violet-200">Your emotes</span><button type="button" onClick={()=>setShowChatEmotePicker(false)} className="text-violet-200/60 hover:text-white"><X className="h-4 w-4"/></button></div><div className="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto">{callEmoteInventory.filter((item:any)=>item.type==="emote").map((item:any)=><button key={item.id} type="button" onClick={()=>sendChatEmote(item)} className="rounded-lg border border-violet-400/20 bg-violet-500/10 p-2 text-center transition hover:border-fuchsia-400/50 hover:bg-fuchsia-500/15"><img src={item.imageUrl} alt={item.name} className="mx-auto h-14 w-14 object-contain"/><span className="mt-1 block truncate text-[10px] font-semibold text-violet-100">{item.name}</span></button>)}</div>{!callEmoteInventory.some((item:any)=>item.type==="emote") && <p className="py-5 text-center text-xs text-violet-100/60">You don’t own any emotes yet. Buy some in the Shop!</p>}</div>}
           </div>
         </div>
 
