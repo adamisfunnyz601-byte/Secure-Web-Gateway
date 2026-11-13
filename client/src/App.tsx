@@ -9,7 +9,6 @@ import { Loader2 } from "lucide-react";
 import Login from "@/pages/Login";
 import SignUp from "@/pages/SignUp";
 import Proxy from "@/pages/Proxy";
-import Chat from "@/pages/Chat";
 import History from "@/pages/History";
 import Admin from "@/pages/Admin";
 import Shop from "@/pages/Shop";
