@@ -81,10 +81,11 @@ export default function Admin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to review request");
+      return data;
     },
-    onSuccess: () => { toast({ title: "Status updated" }); refetchRequests(); },
+    onSuccess: (data: any) => { toast({ title: data.accountCreated ? "Account created" : "Request updated", description: data.accountCreated ? "The applicant can now sign in with their chosen username and password." : "The request status was updated." }); refetchRequests(); },
   });
 
   const createShopItem = useMutation({
@@ -102,14 +103,14 @@ export default function Admin() {
     },
   });
 
-  if (user?.role !== "owner") {
+  if (!["owner","admin"].includes(String(user?.role || "").toLowerCase())) {
     return (
       <Layout>
         <div className="h-full flex items-center justify-center">
           <div className="text-center space-y-4">
             <ShieldAlert className="w-16 h-16 text-destructive mx-auto" />
             <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-            <p className="text-muted-foreground text-sm">Owner access required</p>
+            <p className="text-muted-foreground text-sm">Owner or Admin access required</p>
           </div>
         </div>
       </Layout>
@@ -371,7 +372,7 @@ export default function Admin() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-foreground text-sm">{req.name}</span>
+                            <span className="font-semibold text-foreground text-sm">@{req.name}</span>{req.createdUserId && <span className="rounded bg-green-500/10 px-2 py-0.5 text-[10px] text-green-400">ACCOUNT #{req.createdUserId}</span>}
                             <span className={cn(
                               "text-[10px] px-2 py-0.5 rounded-full font-medium",
                               req.status === "approved" ? "bg-green-500/20 text-green-400" :
