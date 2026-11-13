@@ -118,7 +118,8 @@ export default function Hub() {
 
   const completedTasks = tasks.filter(task => task.done).length;
   const addPoints = async (amount: number) => {
-    const reward = Math.min(25, Math.max(1, Math.floor(amount)));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const reward = Math.min(25, Math.floor(amount));
     try {
       const response = await fetch("/api/hub/points/earn", {
         method: "POST", credentials: "same-origin",
