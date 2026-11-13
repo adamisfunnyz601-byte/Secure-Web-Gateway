@@ -149,6 +149,19 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Persistent moderation actions and audit trail. Role changes and moderation are server-authoritative.
+export const moderationLogs = pgTable("moderation_logs", {
+  id: serial("id").primaryKey(),
+  actorId: integer("actor_id").notNull().references(() => users.id),
+  targetId: integer("target_id").references(() => users.id),
+  action: text("action").notNull(),
+  reason: text("reason"),
+  duration: text("duration"),
+  expiresAt: timestamp("expires_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   history: many(searchHistory),
