@@ -11,7 +11,7 @@ import {
   ChevronRight, Terminal, Mic, MicOff, Video, VideoOff, X, Pause, Square, Check,
   Download, Cpu, Ghost, Forward, Trash2, Reply, Music,
   Camera, MonitorUp, PhoneOff, Binary, UserPlus, Command,
-  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film, ShieldCheck, Loader2, Link2, Pencil, Copy, Gift
+  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film, ShieldCheck, Loader2, Link2, Pencil, Copy, Gift, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
