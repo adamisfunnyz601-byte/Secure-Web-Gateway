@@ -2327,7 +2327,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
           </AnimatePresence>
 
           {/* Input */}
-          <div className="border-t border-border/60 p-3 flex-shrink-0" style={{ background: "hsl(228 7% 20%)" }}>
+          <div className="relative border-t border-border/60 p-3 flex-shrink-0" style={{ background: "hsl(228 7% 20%)" }}>
             <form onSubmit={handleTransmit} className="flex items-center gap-2">
               <button type="button" onClick={() => fileInputRef.current?.click()}
                 className={cn("w-10 h-10 rounded flex items-center justify-center transition-all flex-shrink-0",
