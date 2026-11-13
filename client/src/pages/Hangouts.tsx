@@ -41,9 +41,28 @@ export default function Hangouts(){
   const createRoom=async()=>{
     setBusy(true);setError("");
     try{
-      const response=await fetch("/api/hangouts/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:roomName.trim(),theme:selectedTheme})});
-      const data=await response.json();
-      if(!response.ok)throw new Error(data.message||"Could not create room.");
+      const response=await fetch("/api/hangouts/create",{
+        method:"POST",
+        credentials:"include",
+        headers:{"Content-Type":"application/json","Accept":"application/json"},
+        body:JSON.stringify({name:roomName.trim(),theme:selectedTheme})
+      });
+      const contentType=response.headers.get("content-type")||"";
+      const body=await response.text();
+      if(!contentType.toLowerCase().includes("application/json")){
+        const preview=body.replace(/\\s+/g," ").slice(0,140);
+        throw new Error(
+          `Hangouts API returned HTML/non-JSON (HTTP ${response.status}). This usually means the Replit server is running an older backend or the API route is not mounted. Response: ${preview||"(empty response)"}`
+        );
+      }
+      let data:any;
+      try{data=JSON.parse(body);}catch{
+        throw new Error(`Hangouts API returned invalid JSON (HTTP ${response.status}).`);
+      }
+      if(!response.ok)throw new Error(data.message||`Could not create room (HTTP ${response.status}).`);
+      if(!data||typeof data.id!=="string"||!Array.isArray(data.players)){
+        throw new Error("The server response was missing room details. Restart the Replit server and try again.");
+      }
       setRoom(data);setRoomName("");
     }catch(e:any){setError(e.message||"Could not create room.");}
     finally{setBusy(false);}
