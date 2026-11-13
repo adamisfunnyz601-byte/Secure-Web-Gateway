@@ -158,7 +158,7 @@ export default function Admin() {
           )}
         </div>
 
-        <Tabs defaultValue="keys" className="w-full">
+        <Tabs defaultValue={user?.role === "admin" ? "requests" : "keys"} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="keys">Keys</TabsTrigger>
             <TabsTrigger value="emojis" className="flex items-center gap-1">
