@@ -40,8 +40,12 @@ export default function Shop() {
   };
   const handleAudio = async (file?:File) => {
     if(!file)return; if(file.type!=="audio/mpeg"&&!file.name.toLowerCase().endsWith(".mp3")){toast({title:"MP3 required",variant:"destructive"});return;}
-    if(file.size>1.4*1024*1024){toast({title:"MP3 too large",description:"Maximum audio size is 1.4 MB.",variant:"destructive"});return;}
-    try{const data=await readFile(file);const url=URL.createObjectURL(file);const audio=new Audio(url);audio.onloadedmetadata=()=>{setAudioDuration(Math.min(20,audio.duration||0));URL.revokeObjectURL(url);};setAudioUrl(data);}catch(e:any){toast({title:"Audio upload failed",description:e.message,variant:"destructive"});}
+    if(file.size>1.4*1024*1024){toast({title:"MP3 too large",description:"Maximum image size is 1.4 MB.",variant:"destructive"});return;}
+    try{
+      const data=await readFile(file);const url=URL.createObjectURL(file);const audio=new Audio();audio.preload="metadata";
+      audio.onloadedmetadata=()=>{URL.revokeObjectURL(url);const duration=audio.duration;if(!Number.isFinite(duration)||duration<=0||duration>20){setAudioUrl("");setAudioDuration(0);toast({title:"MP3 must be 20 seconds or shorter",description:"The emote bubble stays visible for the full MP3 playback.",variant:"destructive"});return;}setAudioDuration(duration);setAudioUrl(data);};
+      audio.onerror=()=>{URL.revokeObjectURL(url);toast({title:"Could not read MP3 duration",variant:"destructive"});};audio.src=url;
+    }catch(e:any){toast({title:"Audio upload failed",description:e.message,variant:"destructive"});}
   };
   const publish = async () => {
     if(!name.trim()||!imageUrl||!Number.isSafeInteger(Number(price))||Number(price)<0){toast({title:"Complete the item details",variant:"destructive"});return;}
