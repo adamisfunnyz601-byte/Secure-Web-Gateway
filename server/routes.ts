@@ -1275,48 +1275,81 @@ export async function registerRoutes(
   });
 
   app.post("/api/shop/create", requireAuth, async (req, res) => {
-    const name = String(req.body?.name || "").trim().slice(0, 40);
-    const description = String(req.body?.description || "").trim().slice(0, 180);
-    const type = String(req.body?.type || "");
-    const price = Number(req.body?.price);
-    const imageUrl = String(req.body?.imageUrl || "");
-    if (!name || !["decoration", "emote"].includes(type) || !Number.isSafeInteger(price) || price < 0 || price > 100000) {
-      return res.status(400).json({ message: "Enter a name, valid item type and price." });
+    try {
+      const body = req.body && typeof req.body === "object" ? req.body : {};
+      const name = String(body.name ?? "").trim().slice(0, 40);
+      const description = String(body.description ?? "").trim().slice(0, 180);
+      const type = String(body.type ?? "").trim().toLowerCase();
+      const price = Number(body.price);
+
+      if (!name || !["decoration", "emote"].includes(type) ||
+          !Number.isSafeInteger(price) || price < 0 || price > 100000) {
+        return res.status(400).json({ message: "Enter a name, valid item type and price." });
+      }
+
+      // Accept the data URLs emitted by FileReader, including harmless whitespace
+      // inserted by clients, while still rejecting remote URLs and other formats.
+      const rawImage = String(body.imageUrl ?? "").replace(/\\s/g, "");
+      const imageMatch = rawImage.match(/^data:(image\\/(?:png|gif));base64,([A-Za-z0-9+/]*={0,2})$/i);
+      const imageMime = imageMatch?.[1]?.toLowerCase();
+      const imageBytes = imageMatch ? Math.floor(imageMatch[2].length * 3 / 4) : 0;
+      if (!imageMatch || (type === "emote" && imageMime !== "image/gif") ||
+          imageBytes <= 0 || imageBytes > 3 * 1024 * 1024) {
+        return res.status(400).json({
+          message: type === "decoration"
+            ? "Upload a PNG or GIF decoration smaller than 3 MB."
+            : "Upload a GIF emote smaller than 3 MB."
+        });
+      }
+
+      let suppliedStyles: any = body.cssStyles ?? {};
+      if (typeof suppliedStyles === "string") {
+        try { suppliedStyles = JSON.parse(suppliedStyles || "{}"); }
+        catch { return res.status(400).json({ message: "The item settings could not be read. Please reset the editor settings and try again." }); }
+      }
+      if (!suppliedStyles || typeof suppliedStyles !== "object" || Array.isArray(suppliedStyles)) {
+        return res.status(400).json({ message: "The item settings must be a valid object." });
+      }
+
+      let styles: any;
+      if (type === "decoration") {
+        // Static decoration transforms: accept both current and legacy editor field names.
+        const numberOr = (value: any, fallback: number) => {
+          if (value === undefined || value === null || value === "") return fallback;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+        const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+        const scale = clamp(numberOr(suppliedStyles.scale, 1), 0.1, 5);
+        const scaleX = clamp(numberOr(suppliedStyles.scaleX, 1), 0.1, 5);
+        const scaleY = clamp(numberOr(suppliedStyles.scaleY, 1), 0.1, 5);
+        const rotationAngle = clamp(numberOr(suppliedStyles.rotationAngle ?? suppliedStyles.rotation, 0), -360, 360);
+        const offsetX = clamp(numberOr(suppliedStyles.offsetX, 0), -100, 100);
+        const offsetY = clamp(numberOr(suppliedStyles.offsetY, 0), -100, 100);
+        styles = { kind: "decoration", scale, scaleX, scaleY, rotationAngle, offsetX, offsetY };
+      } else {
+        const audioUrl = String(suppliedStyles.audioUrl ?? "").replace(/\\s/g, "");
+        const audioMatch = audioUrl.match(/^data:audio\\/(?:mpeg|mp3);base64,([A-Za-z0-9+/]*={0,2})$/i);
+        const audioBytes = audioMatch ? Math.floor(audioMatch[1].length * 3 / 4) : 0;
+        if (!audioMatch || audioBytes <= 0 || audioBytes > 1.4 * 1024 * 1024) {
+          return res.status(400).json({ message: "Emotes need an MP3 smaller than 1.4 MB." });
+        }
+        const duration = Number(suppliedStyles.duration);
+        if (!Number.isFinite(duration) || duration <= 0 || duration > 20) {
+          return res.status(400).json({ message: "MP3 duration must be between 0 and 20 seconds." });
+        }
+        styles = { kind: "emote", audioUrl, duration };
+      }
+
+      const item = await storage.createShopItem({
+        name, description, type, price, imageUrl: rawImage,
+        cssStyles: JSON.stringify({ ...styles, creatorId: Number(req.session.userId!) })
+      });
+      return res.status(201).json(item);
+    } catch (error) {
+      console.error("[shop/create] Failed to publish item:", error);
+      return res.status(500).json({ message: "The shop could not save this item. Please try again." });
     }
-    const isPng = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/i.test(imageUrl);
-    const isGif = /^data:image\/gif;base64,[A-Za-z0-9+/=]+$/i.test(imageUrl);
-    if ((type === "decoration" && !isPng && !isGif) || (type === "emote" && !isGif) || imageUrl.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: type === "decoration" ? "Decorations must be PNG or GIF images under 3.5 MB." : "Emotes must be GIF images under 3.5 MB." });
-    }
-    let styles: any = {};
-    try { styles = typeof req.body?.cssStyles === "string" ? JSON.parse(req.body.cssStyles) : (req.body?.cssStyles || {}); } catch { return res.status(400).json({ message: "Invalid item animation settings." }); }
-    if (type === "decoration") {
-      // Decorations are static transforms now; accept the editor's current
-      // scale/position/rotation fields instead of requiring legacy animation fields.
-      const scale = styles.scale == null ? 1 : Number(styles.scale);
-      const scaleX = styles.scaleX == null ? 1 : Number(styles.scaleX);
-      const scaleY = styles.scaleY == null ? 1 : Number(styles.scaleY);
-      const rotationAngle = styles.rotationAngle == null ? 0 : Number(styles.rotationAngle);
-      const offsetX = styles.offsetX == null ? 0 : Number(styles.offsetX);
-      const offsetY = styles.offsetY == null ? 0 : Number(styles.offsetY);
-      if (
-        !Number.isFinite(scale) || scale < 0.1 || scale > 5 ||
-        !Number.isFinite(scaleX) || scaleX < 0.1 || scaleX > 5 ||
-        !Number.isFinite(scaleY) || scaleY < 0.1 || scaleY > 5 ||
-        !Number.isFinite(rotationAngle) || Math.abs(rotationAngle) > 360 ||
-        !Number.isFinite(offsetX) || Math.abs(offsetX) > 1000 ||
-        !Number.isFinite(offsetY) || Math.abs(offsetY) > 1000
-      ) return res.status(400).json({ message: "Invalid decoration transform settings." });
-      styles = { kind: "decoration", scale, scaleX, scaleY, rotationAngle, offsetX, offsetY };
-    } else {
-      const audioUrl = String(styles.audioUrl || "");
-      if (!/^data:audio\/mpeg;base64,[A-Za-z0-9+/=]+$/i.test(audioUrl) || audioUrl.length > 2 * 1024 * 1024) return res.status(400).json({ message: "Emotes need an MP3 under 1.5 MB." });
-      const duration = Number(styles.duration);
-      if (!Number.isFinite(duration) || duration <= 0 || duration > 20) return res.status(400).json({ message: "MP3 duration must be between 0 and 20 seconds." });
-      styles = { kind: "emote", audioUrl, duration };
-    }
-    const item = await storage.createShopItem({ name, description, type, price, imageUrl, cssStyles: JSON.stringify({ ...styles, creatorId: Number(req.session.userId!) }) });
-    res.status(201).json(item);
   });
 
   app.post("/api/admin/dihcoins/grant", requireAdmin, async (req, res) => {
