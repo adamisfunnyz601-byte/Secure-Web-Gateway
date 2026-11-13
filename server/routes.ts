@@ -1133,6 +1133,26 @@ export async function registerRoutes(
     return { call, peerId: call.callerId === userId ? call.calleeId : call.callerId };
   };
 
+  // Authenticated WebRTC mesh signalling for the shared Block Blast voice room.
+  const blockBlastMembers = new Map<number,string>();
+  const blockBlastSignals = new Map<number,any[]>();
+  app.post("/api/blockblast/voice/join", requireAuth, async (req,res) => {
+    const id=Number(req.session.userId!); const u=await storage.getUser(id); blockBlastMembers.set(id,u?.username||("Player "+id));
+    res.json({participants:Array.from(blockBlastMembers.entries()).filter(([peer])=>peer!==id).map(([userId,username])=>({userId,username}))});
+  });
+  app.get("/api/blockblast/voice/participants", requireAuth, (req,res) => { const id=Number(req.session.userId!); res.json(Array.from(blockBlastMembers.entries()).filter(([peer])=>peer!==id).map(([userId,username])=>({userId,username}))); });
+  app.post("/api/blockblast/voice/signal", requireAuth, (req,res) => {
+    const from=Number(req.session.userId!), to=Number(req.body?.to); const signal=req.body?.signal;
+    if(!blockBlastMembers.has(from)||!blockBlastMembers.has(to)||from===to) return res.status(403).json({message:"Both players must be in the voice room."});
+    if(!signal||!["offer","answer","ice","left"].includes(signal.type)) return res.status(400).json({message:"Invalid WebRTC signal."});
+    const queue=blockBlastSignals.get(to)||[]; queue.push({from,signal,createdAt:Date.now()}); if(queue.length>100)queue.splice(0,queue.length-100); blockBlastSignals.set(to,queue); res.json({success:true});
+  });
+  app.get("/api/blockblast/voice/signals", requireAuth, (req,res) => { const id=Number(req.session.userId!); const queue=blockBlastSignals.get(id)||[]; blockBlastSignals.set(id,[]); res.json(queue.filter(item=>Date.now()-item.createdAt<60000)); });
+  app.post("/api/blockblast/voice/leave", requireAuth, (req,res) => {
+    const id=Number(req.session.userId!); blockBlastMembers.delete(id);
+    for(const peer of blockBlastMembers.keys()){const queue=blockBlastSignals.get(peer)||[];queue.push({from:id,signal:{type:"left"},createdAt:Date.now()});blockBlastSignals.set(peer,queue);}
+    blockBlastSignals.delete(id); res.json({success:true});
+  });
   app.post('/api/chat/voice/start', requireAuth, async (req, res) => {
     const calleeId = Number(req.body?.calleeId);
     const callerId = Number(req.session.userId!);
