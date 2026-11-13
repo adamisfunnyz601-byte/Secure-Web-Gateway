@@ -94,7 +94,13 @@ function GlobalChatHost() {
   return (
     <div
       aria-hidden={!isChatPage}
-      style={{ visibility: isChatPage ? "visible" : "hidden", pointerEvents: isChatPage ? "auto" : "none" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 30,
+        visibility: isChatPage ? "visible" : "hidden",
+        pointerEvents: isChatPage ? "auto" : "none",
+      }}
     >
       <Chat />
     </div>
