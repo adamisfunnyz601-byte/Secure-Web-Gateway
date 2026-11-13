@@ -77,7 +77,7 @@ const TIMED_MODERATION_COMMANDS = new Set(["ban","tempban","softban","mute","tim
 // Accept custom positive durations: 5m, 12h, 5d, 2w, 5mo, 1y. `null` is permanent.
 // `m` means minutes; use `mo` for months to avoid ambiguity.
 const isValidModerationDuration = (value: string) =>
-  value === 'null' || /^[1-9]\d*(m|h|d|w|mo|y)$/i.test(value.trim());
+  value === 'null' || /^[1-9]\d*(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks|mo|y)$/i.test(value.trim());
 
 // Slash-command help and autocomplete. The server still validates and executes commands.
 const MEMBER_COMMAND_NAMES = ["help","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
@@ -1471,7 +1471,7 @@ export default function Chat() {
     if (!commandName) return;
     // Preserve the selected username and replace/append only the duration token.
     setInputContent(previous => {
-      const match = previous.match(/^\/(ban|kick|mute)(?:\s+(.*))?$/i);
+      const match = previous.match(/^\/([a-z]+)(?:\s+(.*))?$/i);
       if (!match) return previous;
       const args = (match[2] || '').trim().split(/\s+/).filter(Boolean);
       if (!args.length) return `/${commandName} ${value} `;
