@@ -457,6 +457,9 @@ export function ProfileModal({
                         </div>
                       )}
                     </div>
+                    {["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) && !isOwn && (
+                      <button onClick={giftDihhro} className="mt-2 rounded border border-fuchsia-400/40 px-2 py-1 text-[9px] font-mono text-fuchsia-300 hover:bg-fuchsia-400/10">✦ GIFT 1 MONTH DIHHRO</button>
+                    )}
                     {isOwn && !editing && (
                       <button
                         onClick={() => setEditing(true)}
@@ -598,6 +601,13 @@ export function ProfileModal({
                         />
                         <div className="text-[8px] text-white/30 text-right mt-0.5">
                           {(form.bio || "").length}/500
+                        </div>
+                      </Field>
+                      <Field label="PROFILE GRADIENT (DIHHRO)">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {["none","aurora","sunset","ocean","ember","violet","mint","mono"].map((gradient) => (
+                            <button key={gradient} type="button" onClick={() => setForm({ ...form, profileGradient: gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", form.profileGradient === gradient ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
+                          ))}
                         </div>
                       </Field>
                       <Field label="USERNAME FONT">
