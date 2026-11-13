@@ -1307,8 +1307,14 @@ export async function registerRoutes(
     const userId = Number(req.session.userId!);
     const now = Date.now();
     if (now - (blockBlastComboRewardCooldown.get(userId) || 0) < 1200) return res.status(429).json({ message: "Combo reward is cooling down." });
+    const account = await storage.getUser(userId);
+    const balance = Number(account?.coins || 0);
+    if (!Number.isSafeInteger(balance) || balance < 0 || balance + 10 > 2147483647) return res.status(400).json({ message: "Could not update DihCoins balance." });
     blockBlastComboRewardCooldown.set(userId, now);
-    const [updated] = await db.update(users).set({ coins: sql`(CASE WHEN COALESCE(NULLIF(${users.coins}, ''), '0') ~ '^[0-9]+
+    const nextBalance = balance + 10;
+    await db.update(users).set({ coins: String(nextBalance) }).where(eq(users.id, userId));
+    res.json({ success: true, awarded: 10, coins: nextBalance });
+  });
 
   // === VOICE CALL SIGNALING — authenticated WebRTC signalling ===
   // Signals and call sessions are process-local; run one server instance unless these
