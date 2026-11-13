@@ -200,11 +200,11 @@ export function ProfileModal({
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
   const [form, setForm] = useState<any>({});
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
 
   const showFullImage = (url?: string | null) => {
     if (!url) return;
