@@ -19,6 +19,7 @@ import BlockBlast from "@/pages/BlockBlast";
 import Invite from "@/pages/Invite";
 import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
+import ModerationPanel from "@/pages/ModerationPanel";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -59,6 +60,7 @@ function Router() {
       <Route path="/history">
         <ProtectedRoute component={History} />
       </Route>
+      <Route path="/moderation"><ProtectedRoute component={ModerationPanel} /></Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} />
       </Route>
