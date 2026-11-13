@@ -1349,7 +1349,7 @@ export async function registerRoutes(
       const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, requestedUsername)).limit(1);
       if (existing) return res.status(409).json({ message: "That username is already taken." });
       const request = await storage.createAccessRequest({ name: requestedUsername, passwordHash: hashAccountPassword(password), message: message.trim() });
-      res.status(201).json(request);
+      res.status(201).json({ id: request.id, name: request.name, message: request.message, status: request.status, createdAt: request.createdAt });
     } catch (err: any) {
       res.status(500).json({ message: err?.message || 'Failed' });
     }
