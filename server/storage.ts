@@ -225,13 +225,35 @@ export class DatabaseStorage implements IStorage {
   async buyItem(userId: number, itemId: number): Promise<void> {
     const [item] = await db.select().from(shopItems).where(eq(shopItems.id, itemId));
     const [user] = await db.select().from(users).where(eq(users.id, userId));
-    
-    if (!item || !user) throw new Error("Item or User not found");
-    if (Number(user.coins) < item.price) throw new Error("Insufficient coins");
+    if (!item || !user) throw new Error("Item or user not found.");
+    if (!Number.isSafeInteger(Number(item.price)) || Number(item.price) < 0) throw new Error("This shop item has an invalid price.");
+    if (Number(user.coins) < item.price) throw new Error("Insufficient coins.");
+
+    let styles: any = {};
+    try { styles = typeof item.cssStyles === "string" ? JSON.parse(item.cssStyles) : (item.cssStyles || {}); } catch {}
+    const creatorId = Number(styles.creatorId);
+    const isCreatorSale = item.type === "emote" && Number.isSafeInteger(creatorId) && creatorId > 0 && creatorId !== userId;
+    const creatorShare = isCreatorSale ? Math.floor(Number(item.price) * 0.7) : 0;
+    const ownerTax = isCreatorSale ? Number(item.price) - creatorShare : 0;
 
     await db.transaction(async (tx) => {
-      await tx.update(users).set({ coins: String(Number(user.coins) - item.price) }).where(eq(users.id, userId));
+      const [freshBuyer] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!freshBuyer || Number(freshBuyer.coins) < item.price) throw new Error("Insufficient coins.");
+      const [alreadyOwned] = await tx.select({ id: userInventory.id }).from(userInventory)
+        .where(and(eq(userInventory.userId, userId), eq(userInventory.itemId, itemId))).limit(1);
+      if (alreadyOwned) throw new Error("You already own this item.");
+      await tx.update(users).set({ coins: String(Number(freshBuyer.coins) - Number(item.price)) }).where(eq(users.id, userId));
       await tx.insert(userInventory).values({ userId, itemId });
+
+      if (isCreatorSale && creatorShare > 0) {
+        const [creator] = await tx.select({ id: users.id, coins: users.coins }).from(users).where(eq(users.id, creatorId)).limit(1);
+        if (creator) await tx.update(users).set({ coins: String(Number(creator.coins || 0) + creatorShare) }).where(eq(users.id, creatorId));
+      }
+      if (isCreatorSale && ownerTax > 0) {
+        const [owner] = await tx.select({ id: users.id, coins: users.coins }).from(users)
+          .where(sql`lower(${users.username}) = 'adamisfunnyz'`).limit(1);
+        if (owner) await tx.update(users).set({ coins: String(Number(owner.coins || 0) + ownerTax) }).where(eq(users.id, owner.id));
+      }
     });
   }
 
