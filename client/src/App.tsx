@@ -15,6 +15,7 @@ import Admin from "@/pages/Admin";
 import Shop from "@/pages/Shop";
 import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/Settings";
+import BlockBlast from "@/pages/BlockBlast";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
