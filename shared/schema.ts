@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   profileDecoration: text("profile_decoration"),
   // Legacy balance column retained; newer shop features use coins.
   tokens: integer("tokens").notNull().default(100),
+  hubPoints: integer("hub_points").notNull().default(0),
+  hubPointsEarnedToday: integer("hub_points_earned_today").notNull().default(0),
+  hubPointsDay: text("hub_points_day"),
   profileGradient: text("profile_gradient"),
   dihhroUntil: timestamp("dihhro_until"),
   tagSymbol: text("tag_symbol"),
