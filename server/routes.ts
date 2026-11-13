@@ -684,7 +684,7 @@ export async function registerRoutes(
   app.get("/api/blockblast/leaderboard", requireAuth, async (req,res) => {
     const month = typeof req.query.month === "string" && /^\\d{4}-\\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
     const now = new Date(); const previousDate = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-1,1)); const previousMonth = monthKeyFor(previousDate);
-    if (month === previousMonth) {
+    if (monthKeyFor() !== previousMonth) {
       const [alreadyAwarded] = await db.select().from(dihhroAwards).where(eq(dihhroAwards.monthKey,month)).limit(1);
       if (!alreadyAwarded) {
         const previousRows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score}).from(blockBlastScores).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
