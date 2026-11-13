@@ -590,6 +590,7 @@ export default function Chat() {
       const remote=(groupRemoteStreamsRef.current.get(peerId)||new MediaStream());
       groupRemoteStreamsRef.current.set(peerId,remote);
       if(!remote.getTracks().some(track=>track.id===event.track.id))remote.addTrack(event.track);
+      if(event.track.kind==="audio")event.track.enabled=true;
       setGroupRemoteVersion(v=>v+1);
     };
     peer.onconnectionstatechange=()=>{if(peer.connectionState==="failed")pushLog("GROUP_PEER_FAILED: "+username,"warn");};
@@ -656,6 +657,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   const [callSoundboardOpen, setCallSoundboardOpen] = useState(false);
   const [callEmoteOpen, setCallEmoteOpen] = useState(false);
   const [remoteCallEmote, setRemoteCallEmote] = useState<any>(null);
+  const [remoteAudioVersion, setRemoteAudioVersion] = useState(0);
 
   // --- LOGS ---
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -1238,6 +1240,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       remoteStreamRef.current = remote;
       // Keep the live visualizer attached to this user's microphone stream.
       if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
+      if (event.track.kind === 'audio') { event.track.enabled = true; setRemoteAudioVersion(version => version + 1); }
       if (event.track.kind === 'video') setHasRemoteVideo(true);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remote;
@@ -1245,7 +1248,9 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       }
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = remote;
-        remoteAudioRef.current.play().catch(() => {});
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1;
+        remoteAudioRef.current.play().catch(error => pushLog(`REMOTE_AUDIO_PLAY_BLOCKED: ${error?.message || error}`, 'warn'));
       }
     };
     peer.onicecandidate = event => {
@@ -1276,6 +1281,17 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       throw error;
     }
   };
+
+  useEffect(() => {
+    const audio = remoteAudioRef.current;
+    const stream = remoteStreamRef.current;
+    if (!audio || !stream || callState !== "connected") return;
+    audio.srcObject = stream;
+    audio.autoplay = true;
+    audio.muted = false;
+    audio.volume = 1;
+    audio.play().catch(error => pushLog(`REMOTE_AUDIO_PLAY_BLOCKED: ${error?.message || error}`, "warn"));
+  }, [callState, remoteAudioVersion]);
 
   const sendChatEmote = (item:any) => {
     if (!item?.id || item.type !== "emote") return;
@@ -1829,7 +1845,8 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <div className="mb-3 flex gap-2 overflow-x-auto border-b border-violet-400/15 pb-2">{groupCallParticipants.map(person=><button key={person.userId} onClick={()=>setActiveGroupCallTab(person.userId)} className={`shrink-0 rounded-t-lg border px-4 py-2 text-xs font-semibold transition ${activeGroupCallTab===person.userId?"border-violet-400/60 bg-violet-500/20 text-violet-100":"border-white/10 bg-white/5 text-white/55 hover:bg-white/10"}`}>{person.userId===Number(currentUserId)?"You":person.username}{person.userId!==Number(currentUserId)&&groupPeersRef.current.get(person.userId)?.connectionState==="connected"?" •":""}</button>)}</div>
               {groupCallParticipants.filter(person=>person.userId===activeGroupCallTab).map(person=><div key={person.userId} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 bg-[#120b20]">
-                <video autoPlay playsInline ref={node=>{if(!node)return;if(Number(person.userId)===Number(currentUserId)){if(groupLocalStreamRef.current&&node.srcObject!==groupLocalStreamRef.current)node.srcObject=groupLocalStreamRef.current;node.muted=true;}else{const stream=groupRemoteStreamsRef.current.get(person.userId);if(stream&&node.srcObject!==stream)node.srcObject=stream;}}} className="absolute inset-0 h-full w-full object-contain"/>
+                <video autoPlay playsInline muted ref={node=>{if(!node)return;if(Number(person.userId)===Number(currentUserId)){if(groupLocalStreamRef.current&&node.srcObject!==groupLocalStreamRef.current)node.srcObject=groupLocalStreamRef.current;}else{const stream=groupRemoteStreamsRef.current.get(person.userId);if(stream&&node.srcObject!==stream)node.srcObject=stream;}}} className="absolute inset-0 h-full w-full object-contain"/>
+                {person.userId!==Number(currentUserId)&&<audio autoPlay playsInline ref={node=>{if(!node)return;const stream=groupRemoteStreamsRef.current.get(person.userId);if(stream&&node.srcObject!==stream){node.srcObject=stream;node.muted=false;node.volume=1;node.play().catch(error=>pushLog("GROUP_AUDIO_PLAY_BLOCKED: "+(error?.message||error),"warn"));}}} className="hidden"/>}
                 {person.userId===Number(currentUserId)&&<div className="absolute bottom-3 left-3 rounded bg-black/60 px-3 py-1 text-xs">YOU · LOCAL PREVIEW</div>}
                 {person.userId!==Number(currentUserId)&&!groupRemoteStreamsRef.current.get(person.userId)?.getVideoTracks().some(track=>track.readyState==="live")&&<div className="text-center text-violet-100"><div className="mx-auto mb-3 flex h-24 w-24 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/10 text-3xl">{person.username.slice(0,1).toUpperCase()}</div><div className="text-lg">{person.username}</div><div className="mt-1 text-xs text-violet-200/40">VOICE CONNECTED · CAMERA OFF</div></div>}
                 <div className="absolute bottom-3 right-3 rounded bg-black/60 px-3 py-1 text-xs">{person.username}</div>
@@ -1884,7 +1901,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 {/* Remote participant is the main video; your own camera stays picture-in-picture. */}
                 <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
                   <video ref={remoteVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
-                  <audio ref={remoteAudioRef} autoPlay />
+                  <audio ref={remoteAudioRef} autoPlay playsInline muted={false} />
                   <AnimatePresence>{remoteCallEmote?.gifUrl && <motion.div initial={{opacity:0,scale:.75,y:12}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:.9,y:8}} transition={{type:"spring",stiffness:360,damping:24}} className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-2xl border border-violet-300/50 bg-[#111827]/95 p-3 shadow-2xl"><div className="mb-1 text-center text-xs font-bold text-violet-100">{remoteCallEmote.name}</div><img src={remoteCallEmote.gifUrl} alt={remoteCallEmote.name} className="h-28 w-28 rounded-xl object-contain"/></motion.div>}</AnimatePresence>
                   {!hasRemoteVideo && <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-36 h-36 rounded-full border-2 border-violet-500/30 bg-violet-500/5 flex items-center justify-center">
