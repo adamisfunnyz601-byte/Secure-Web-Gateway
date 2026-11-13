@@ -877,6 +877,7 @@ export async function registerRoutes(
         avatarUrl,
         bannerUrl,
         usernameFont,
+        profileGradient,
         tagSymbol,
         tagText,
         tagColor,
@@ -893,7 +894,8 @@ export async function registerRoutes(
       if (bannerUrl !== undefined && !isProfileImageProxyUrl(bannerUrl, req.session.userId!, "banner")) {
         update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
       }
-      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; if (!fonts.includes(String(usernameFont))) return res.status(400).json({message:"Unsupported font."}); const current = await storage.getUser(req.session.userId!); if (usernameFont === "comic-sans" && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Comic Sans is a Dihhro perk."}); update.usernameFont = usernameFont || null; }\n      if (profileGradient !== undefined) { const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"]; if (!gradients.includes(String(profileGradient))) return res.status(400).json({message:"Invalid profile gradient."}); const current = await storage.getUser(req.session.userId!); if (profileGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a Dihhro perk."}); update.profileGradient = profileGradient === "none" ? null : profileGradient; }
+      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; if (!fonts.includes(String(usernameFont))) return res.status(400).json({message:"Unsupported font."}); const current = await storage.getUser(req.session.userId!); if (usernameFont === "comic-sans" && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Comic Sans is a Dihhro perk."}); update.usernameFont = usernameFont || null; }
+      if (profileGradient !== undefined) { const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"]; if (!gradients.includes(String(profileGradient))) return res.status(400).json({message:"Invalid profile gradient."}); const current = await storage.getUser(req.session.userId!); if (profileGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a Dihhro perk."}); update.profileGradient = profileGradient === "none" ? null : profileGradient; }
       if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
         if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
           return res.status(400).json({ message: "Tag text must be a string" });
