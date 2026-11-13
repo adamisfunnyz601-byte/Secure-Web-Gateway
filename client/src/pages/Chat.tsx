@@ -516,7 +516,8 @@ export default function Chat() {
   const [callTime, setCallTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);\n  const [visualizerStream, setVisualizerStream] = useState<MediaStream | null>(null);\n  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+  const [visualizerStream, setVisualizerStream] = useState<MediaStream | null>(null);\n  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [callTargetName, setCallTargetName] = useState("");
 
@@ -1039,7 +1040,8 @@ export default function Chat() {
     pendingIceCandidatesRef.current = [];
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     remoteStreamRef.current?.getTracks().forEach(track => track.stop());
-    localStreamRef.current = null;\n    setVisualizerStream(null);
+    localStreamRef.current = null;
+    setVisualizerStream(null);
     remoteStreamRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
@@ -1075,7 +1077,8 @@ export default function Chat() {
         setIsVideoOn(false);
         toast({ title: 'Camera unavailable', description: 'Connected with microphone only.' });
       }
-      localStreamRef.current = stream;\n      setVisualizerStream(stream);
+      localStreamRef.current = stream;
+      setVisualizerStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.muted = true;
@@ -1084,7 +1087,8 @@ export default function Chat() {
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
       peer.ontrack = event => {
       const remote = remoteStreamRef.current || new MediaStream();
-      remoteStreamRef.current = remote;\n      setVisualizerStream(remote);
+      remoteStreamRef.current = remote;
+      setVisualizerStream(remote);
       if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
       if (event.track.kind === 'video') setHasRemoteVideo(true);
       if (remoteVideoRef.current) {
@@ -1285,6 +1289,7 @@ export default function Chat() {
       recorder.ondataavailable = event => { if (event.data.size > 0) chunksRef.current.push(event.data); };
       recorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
+        setRecordingStream(null);
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         if (blob.size > 0) {
           setVoiceBlob(blob);
