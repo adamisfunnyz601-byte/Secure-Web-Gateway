@@ -23,6 +23,8 @@ export const users = pgTable("users", {
   nickname: text("nickname"),
   avatarUrl: text("avatar_url"),
   usernameFont: text("username_font"),
+  profileGradient: text("profile_gradient"),
+  dihhroUntil: timestamp("dihhro_until"),
   tagSymbol: text("tag_symbol"),
   tagText: text("tag_text"),
   tagColor: text("tag_color"),
@@ -159,6 +161,23 @@ export const moderationLogs = pgTable("moderation_logs", {
   duration: text("duration"),
   expiresAt: timestamp("expires_at"),
   metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Block Blast verified account history and monthly prize tracking.
+export const blockBlastScores = pgTable("block_blast_scores", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  score: integer("score").notNull(),
+  monthKey: text("month_key").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const dihhroAwards = pgTable("dihhro_awards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  monthKey: text("month_key").notNull().unique(),
+  score: integer("score").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
