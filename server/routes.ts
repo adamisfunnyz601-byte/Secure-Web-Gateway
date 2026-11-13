@@ -697,6 +697,7 @@ export async function registerRoutes(
     const best = new Map<number,typeof rows[number]>(); rows.forEach(row=>{const old=best.get(row.userId);if(!old||row.score>old.score)best.set(row.userId,row);});
     res.json({month,entries:Array.from(best.values()).sort((a,b)=>b.score-a.score).map((row,index)=>({...row,rank:index+1}))});
   });
+  app.get("/api/blockblast/history", requireAuth, async (req,res) => { const rows=await db.select().from(blockBlastScores).where(eq(blockBlastScores.userId,req.session.userId!)).orderBy(desc(blockBlastScores.createdAt)).limit(30); res.json(rows); });
   app.post("/api/blockblast/scores", requireAuth, async (req,res) => {
     const score=Number(req.body?.score); if(!Number.isSafeInteger(score)||score<0||score>1000000) return res.status(400).json({message:"Invalid score."});
     const userId=req.session.userId!; const [recent]=await db.select().from(blockBlastScores).where(eq(blockBlastScores.userId,userId)).orderBy(desc(blockBlastScores.createdAt)).limit(1);
