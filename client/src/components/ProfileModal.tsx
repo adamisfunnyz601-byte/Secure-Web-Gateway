@@ -199,7 +199,7 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(false);\n  useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
   const [form, setForm] = useState<any>({});
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -337,7 +337,7 @@ export function ProfileModal({
     reader.readAsDataURL(file);
   };
 
-  const isOwn = profile?.id === currentUserId;
+  const isOwn = profile?.id === currentUserId;\n  const canEditProfile = Boolean(isOwn && userId != null);
   const canUseDihhro = ["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) || Boolean(viewer?.dihhroUntil && new Date(viewer.dihhroUntil) > new Date());
   const giftDihhro = async () => {
     try {
@@ -501,7 +501,7 @@ export function ProfileModal({
                     {["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) && !isOwn && (
                       <button onClick={giftDihhro} className="mt-2 rounded border border-fuchsia-400/40 px-2 py-1 text-[9px] font-mono text-fuchsia-300 hover:bg-fuchsia-400/10">✦ GIFT 1 MONTH DIHHRO</button>
                     )}
-                    {isOwn && !editing && (
+                    {canEditProfile && !editing && (
                       <button
                         onClick={() => setEditing(true)}
                         className="text-[10px] font-mono text-primary border border-primary/40 px-2 py-1 rounded hover:bg-primary/10"
@@ -540,7 +540,7 @@ export function ProfileModal({
                     </div>
                   )}
 
-                  {!editing ? (
+                  {!editing || !canEditProfile ? (
                     <>
                       <div className="border border-primary/20 rounded p-3 mb-3 bg-primary/5">
                         <div className="text-[9px] text-primary/50 font-mono uppercase mb-1">
