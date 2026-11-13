@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Trophy, Volume2, VolumeX, RotateCcw, Sparkles, MessageCircle, Mic, MicOff, Users, Send, Zap, Medal } from "lucide-react";
@@ -36,6 +37,7 @@ function PiecePreview({piece,selected,onClick,onPointerDown}:{piece:Piece|null;s
 
 function BlockBlastGame() {
  const { user } = useAuth();
+ const queryClient = useQueryClient();
  const [sharedMessages,setSharedMessages]=useState<any[]>([]);
  const [globalScores,setGlobalScores]=useState<any[]>([]);
  const [board,setBoard]=useState<string[][]>(emptyBoard);
@@ -93,7 +95,7 @@ function BlockBlastGame() {
   rows.forEach(r=>next[r].fill(""));
   cols.forEach(c=>{for(let r=0;r<SIZE;r++)next[r][c]="";});
   const nextStreak=lines?streak+1:0;const nextCombo=lines?Math.min(5,1+Math.floor(streak/2)):1;
-  if(lines&&nextCombo>=2){fetch("/api/blockblast/combo-reward",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({combo:nextCombo})}).then(async response=>{if(response.ok){const reward=await response.json();window.dispatchEvent(new CustomEvent("dihcoins-earned",{detail:reward}));}}).catch(()=>{});}
+  if(lines&&nextCombo>=2){fetch("/api/blockblast/combo-reward",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({combo:nextCombo})}).then(async response=>{if(response.ok){const reward=await response.json();queryClient.invalidateQueries({queryKey:["/api/auth/me"]});window.dispatchEvent(new CustomEvent("dihcoins-earned",{detail:reward}));}}).catch(()=>{});}
   const gained=piece.cells.length*10+(lines?lines*100*nextCombo+Math.max(0,lines-1)*50:0);
   const finalScore=score+gained;
   setBoard(next);setScore(finalScore);setStreak(nextStreak);setCombo(nextCombo);playTone(lines?880:420);
