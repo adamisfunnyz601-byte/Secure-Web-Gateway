@@ -340,7 +340,7 @@ export function ProfileModal({
               style={{
                 backgroundImage: (editing ? form.bannerUrl : profile?.bannerUrl)
                   ? `linear-gradient(rgba(20,20,30,.2), rgba(20,20,30,.55)), url(${editing ? form.bannerUrl : profile?.bannerUrl})`
-                  : undefined,
+                  : (editing ? form.profileGradient : profile?.profileGradient) === "aurora" ? "linear-gradient(120deg,#0f766e,#312e81,#86198f)" : (editing ? form.profileGradient : profile?.profileGradient) === "sunset" ? "linear-gradient(120deg,#f97316,#db2777,#7c3aed)" : (editing ? form.profileGradient : profile?.profileGradient) === "ocean" ? "linear-gradient(120deg,#0e7490,#1d4ed8,#172554)" : (editing ? form.profileGradient : profile?.profileGradient) === "ember" ? "linear-gradient(120deg,#7f1d1d,#ea580c,#f59e0b)" : (editing ? form.profileGradient : profile?.profileGradient) === "violet" ? "linear-gradient(120deg,#4c1d95,#7c3aed,#db2777)" : (editing ? form.profileGradient : profile?.profileGradient) === "mint" ? "linear-gradient(120deg,#065f46,#10b981,#a7f3d0)" : (editing ? form.profileGradient : profile?.profileGradient) === "mono" ? "linear-gradient(120deg,#111827,#4b5563,#9ca3af)" : undefined,
               }}
             >
               <button
