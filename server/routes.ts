@@ -1709,7 +1709,9 @@ export async function registerRoutes(
     const target=await storage.getUser(targetId);
     if(!target) return res.status(404).json({message:"User not found."});
     if(await blockedEitherWay(userId,targetId)) return res.status(403).json({message:"This person is unavailable."});
-    pushGroupVoiceSignal(targetId,{type:"group-invite",roomId:room.id,groupId:room.groupId,groupName:(await storage.getGroupById?.(room.groupId))?.name||"Group chat",fromId:userId,fromName:(await storage.getUser(userId))?.username||"A member",withVideo:room.withVideo});
+    const [group]=await db.select({name:groupChats.name}).from(groupChats).where(eq(groupChats.id,room.groupId)).limit(1);
+    const inviter=await storage.getUser(userId);
+    pushGroupVoiceSignal(targetId,{type:"group-invite",roomId:room.id,groupId:room.groupId,groupName:group?.name||"Group chat",fromId:userId,fromName:inviter?.username||"A member",withVideo:room.withVideo});
     res.json({success:true});
   });
   app.post("/api/chat/group-voice/join",requireAuth,async(req,res)=>{
