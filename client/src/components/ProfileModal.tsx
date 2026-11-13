@@ -525,7 +525,6 @@ export function ProfileModal({
                         {profile.pronouns && <span className="text-[10px] opacity-80">• {profile.pronouns}</span>}
                       </div>
                       {isOwn && profileEmotes.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{profileEmotes.map((item:any)=><button key={item.id} type="button" onClick={()=>playProfileEmote(item)} title={"Play "+item.name} className="rounded-md border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[9px] font-semibold text-violet-200 hover:bg-violet-500/20">{item.name}</button>)}</div>}
-                      </div>
                       {(() => {
                         const role = String(profile.role || "user").toLowerCase().replace(/_/g,"-");
                         const badges: Record<string,{label:string;cls:string}> = {
