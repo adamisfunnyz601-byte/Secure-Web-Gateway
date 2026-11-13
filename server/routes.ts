@@ -1365,7 +1365,7 @@ export async function registerRoutes(
     if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
     const requestId = Number(req.params.id);
     if (!Number.isInteger(requestId) || requestId < 1) return res.status(400).json({ message: 'Invalid request.' });
-    const [request] = await db.select().from(accessRequests).where(eq(accessRequests.id, requestId)).limit(1);
+    const request = await storage.getAccessRequest(requestId);
     if (!request) return res.status(404).json({ message: 'Access request not found.' });
     if (request.status !== "pending") return res.status(409).json({ message: "This request has already been reviewed." });
     if (status === "approved") {
@@ -1378,10 +1378,10 @@ export async function registerRoutes(
         passwordHash: request.passwordHash,
         role: "user",
       }).returning({ id: users.id });
-      await db.update(accessRequests).set({ status: "approved", createdUserId: created.id, passwordHash: null }).where(eq(accessRequests.id, requestId));
+      await storage.updateAccessRequestStatus(requestId, "approved", created.id);
       return res.json({ success: true, accountCreated: true, userId: created.id, username: request.name });
     }
-    await db.update(accessRequests).set({ status, passwordHash: null }).where(eq(accessRequests.id, requestId));
+    await storage.updateAccessRequestStatus(requestId, status);
     return res.json({ success: true, accountCreated: false });
   });
 
