@@ -133,48 +133,75 @@ function regenerateSession(req: Request) {
   });
 }
 
-function turnstileGuard(requiredWhenUnconfigured = false): RequestHandler {
+function turnstileGuard(): RequestHandler {
   return async (req, res, next) => {
     const secret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
-    const siteKey = process.env.CLOUDFLARE_TURNSTILE_SITE_KEY;
 
-    if (!secret && !siteKey) {
-      if (requiredWhenUnconfigured && process.env.NODE_ENV === "production") {
-        return res.status(503).json({ message: "Cloudflare verification is not configured yet." });
-      }
-      return next();
-    }
-    if (!secret || !siteKey) {
-      return res.status(503).json({ message: "Cloudflare verification is not fully configured." });
+    if (!secret) {
+      return res.status(503).json({
+        message: "Cloudflare Turnstile secret is missing. Add CLOUDFLARE_TURNSTILE_SECRET_KEY to Replit Secrets."
+      });
     }
 
     const token = req.body?.turnstileToken;
     if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
-      return res.status(400).json({ message: "Complete the Cloudflare verification first." });
+      return res.status(400).json({
+        message: "Complete the Cloudflare verification first."
+      });
     }
 
     try {
-      const form = new URLSearchParams({ secret, response: token });
-      if (req.ip) form.set("remoteip", req.ip);
-      const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form,
+      const form = new URLSearchParams({
+        secret,
+        response: token
       });
-      if (!response.ok) {
-        return res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
+
+      if (req.ip) form.set("remoteip", req.ip);
+
+      const verificationResponse = await fetch(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form
+        }
+      );
+
+      if (!verificationResponse.ok) {
+        return res.status(503).json({
+          message: "Cloudflare verification is temporarily unavailable. Try again."
+        });
       }
-      const result = await response.json() as { success?: boolean; hostname?: string };
+
+      const result = await verificationResponse.json() as {
+        success?: boolean;
+        hostname?: string;
+        "error-codes"?: string[];
+      };
+
       const requestHost = req.hostname.toLowerCase();
-      if (
-        result.success !== true ||
-        (result.hostname && result.hostname.toLowerCase() !== requestHost)
-      ) {
-        return res.status(403).json({ message: "Cloudflare verification failed. Please try again." });
+      const verifiedHost = result.hostname?.toLowerCase();
+
+      if (result.success !== true) {
+        console.warn("Turnstile verification rejected:", result["error-codes"] || []);
+        return res.status(403).json({
+          message: "Cloudflare verification failed or expired. Please complete it again."
+        });
       }
-      next();
-    } catch {
-      res.status(503).json({ message: "Cloudflare verification is temporarily unavailable." });
+
+      if (verifiedHost && verifiedHost !== requestHost) {
+        console.warn("Turnstile hostname mismatch:", { verifiedHost, requestHost });
+        return res.status(403).json({
+          message: "Cloudflare hostname mismatch. Check the hostname in your Turnstile widget."
+        });
+      }
+
+      return next();
+    } catch (error) {
+      console.error("Turnstile Siteverify request failed:", error);
+      return res.status(503).json({
+        message: "Could not contact Cloudflare verification. Try again."
+      });
     }
   };
 }
@@ -339,12 +366,12 @@ export async function registerRoutes(
   });
 
   // === AUTH ===
-  app.post(api.auth.login.path, async (req, res) => {
+  app.post(api.auth.login.path, authRateLimit, turnstileGuard(), async (req, res) => {
     try {
       const { serialKey, username } = api.auth.login.input.parse(req.body);
-      
+
       let user = await storage.getUserBySerial(serialKey);
-      
+
       // Check if it's the owner key
       if (serialKey === OWNER_KEY) {
         if (!user) {
@@ -369,7 +396,7 @@ export async function registerRoutes(
              // For simplicity: keys map to Users. If User exists for key, they log in.
              // If not, we create user.)
           }
-          
+
           // Create the user
           let expiresAt: Date | undefined;
           if (accessKey.type === 'limited' && accessKey.durationMinutes) {
@@ -382,11 +409,11 @@ export async function registerRoutes(
             role: "user",
             expiresAt
           });
-          
+
           await storage.markKeyAsUsed(accessKey.id);
         }
       }
-      
+
       // Check expiration
       if (user.expiresAt && new Date() > user.expiresAt) {
         return res.status(401).json({ message: "Account expired" });
@@ -399,7 +426,7 @@ export async function registerRoutes(
         presenceStatus: "online",
         lastSeen: new Date(),
       }).where(eq(users.id, user.id));
-      
+
       res.json(safeUser({ ...user, presenceStatus: "online", lastSeen: new Date() }));
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -434,14 +461,14 @@ export async function registerRoutes(
     const input = api.admin.generateKey.input.parse(req.body);
     // Generate a random key
     const key = `KEY-${randomBytes(4).toString('hex').toUpperCase()}`;
-    
+
     const newKey = await storage.createAccessKey({
       key,
       type: input.type,
       durationMinutes: input.durationMinutes,
       createdBy: req.session.userId!
     });
-    
+
     res.status(201).json(newKey);
   });
 
@@ -459,7 +486,7 @@ export async function registerRoutes(
     .from(accessKeys)
     .leftJoin(users, eq(accessKeys.key, users.serialKey))
     .orderBy(desc(accessKeys.createdAt));
-    
+
     res.json(keysWithUsers);
   });
 
@@ -672,7 +699,7 @@ export async function registerRoutes(
         tagSymbol,
         tagText,
         tagColor,
-      } = req.body;
+      } = req.body;aa
       const update: any = {};
       if (typeof username === 'string' && username.trim().length > 0) update.username = username.trim().slice(0, 32);
       if (nickname !== undefined) update.nickname = nickname ? String(nickname).slice(0, 32) : null;
@@ -888,143 +915,143 @@ export async function registerRoutes(
     res.status(201).json(item);
   });
 
-  // === VOICE CALL SIGNALING (ENHANCED) ===
+  // === VOICE CALL SIGNALING — authenticated WebRTC signalling ===
+  // Signals and call sessions are process-local; run one server instance unless these
+  // maps are moved to shared storage/pub-sub (Redis or the database).
+  interface CallSession { callerId: number; calleeId: number; withVideo: boolean; }
   const signals = new Map<number, any[]>();
-  const activeCalls = new Map<string, Set<number>>(); // key: targetId (user or group), value: set of userIds
-
-  app.post(api.chat.voice.offer.path, requireAuth, (req, res) => {
-    const { recipientId, offer, isGroup } = req.body;
-    const s = signals.get(recipientId) || [];
-    s.push({ type: 'offer', from: req.session.userId, offer, isGroup });
-    signals.set(recipientId, s);
-    res.json({ success: true });
-  });
-
-  app.get('/api/chat/voice/active', requireAuth, (req, res) => {
-    const { id, isGroup } = req.query;
-    const key = `${isGroup ? 'g' : 'u'}${id}`;
-    const participants = activeCalls.get(key) || new Set();
-    res.json(Array.from(participants));
-  });
-
-  app.post('/api/chat/voice/join', requireAuth, (req, res) => {
-    const { id, isGroup } = req.body;
-    const key = `${isGroup ? 'g' : 'u'}${id}`;
-    const participants = activeCalls.get(key) || new Set();
-    participants.add(req.session.userId!);
-    activeCalls.set(key, participants);
-    res.json({ success: true });
-  });
-
-  app.post('/api/chat/voice/leave', requireAuth, (req, res) => {
-    const { id, isGroup } = req.body;
-    const key = `${isGroup ? 'g' : 'u'}${id}`;
-    const participants = activeCalls.get(key);
-    if (participants) {
-      participants.delete(req.session.userId!);
-      if (participants.size === 0) activeCalls.delete(key);
-    }
-    res.json({ success: true });
-  });
-
-  app.post(api.chat.voice.answer.path, requireAuth, (req, res) => {
-    const { recipientId, answer } = api.chat.voice.answer.input.parse(req.body);
-    const s = signals.get(recipientId) || [];
-    s.push({ type: 'answer', from: req.session.userId, answer });
-    signals.set(recipientId, s);
-    res.json({ success: true });
-  });
-
-  app.post(api.chat.voice.ice.path, requireAuth, (req, res) => {
-    const { recipientId, candidate } = api.chat.voice.ice.input.parse(req.body);
-    const s = signals.get(recipientId) || [];
-    s.push({ type: 'ice', from: req.session.userId, candidate });
-    signals.set(recipientId, s);
-    res.json({ success: true });
-  });
-
-  app.post('/api/chat/voice/decline', requireAuth, (req, res) => {
-    const { recipientId } = req.body;
-    const s = signals.get(recipientId) || [];
-    s.push({ type: 'decline', from: req.session.userId });
-    signals.set(recipientId, s);
-    res.json({ success: true });
-  });
-
-  app.get('/api/chat/voice/poll', requireAuth, (req, res) => {
-    const userId = req.session.userId!;
-    const s = signals.get(userId) || [];
-    signals.set(userId, []); // Clear after polling
-    res.json(s);
-  });
-
-  // === SERVER-RELAY VOICE CALL SYSTEM ===
-  interface CallSession { callerId: number; calleeId: number; }
-  interface AudioChunk { senderId: number; dataUrl: string; mimeType: string; idx: number; }
   const callSessions = new Map<string, CallSession>();
-  const callAudio = new Map<string, AudioChunk[]>();
+  const activeCalls = new Map<string, Set<number>>();
+
+  const pushVoiceSignal = (userId: number, signal: any) => {
+    const queue = signals.get(userId) || [];
+    queue.push({ ...signal, createdAt: Date.now() });
+    // Bound memory if a client stops polling.
+    if (queue.length > 200) queue.splice(0, queue.length - 200);
+    signals.set(userId, queue);
+  };
+
+  const getCallPeer = (callId: unknown, userId: number) => {
+    if (typeof callId !== 'string' || !callId) return null;
+    const call = callSessions.get(callId);
+    if (!call || (call.callerId !== userId && call.calleeId !== userId)) return null;
+    return { call, peerId: call.callerId === userId ? call.calleeId : call.callerId };
+  };
 
   app.post('/api/chat/voice/start', requireAuth, async (req, res) => {
-    const { calleeId } = req.body;
-    const callerId = req.session.userId!;
-    const callId = `call-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    callSessions.set(callId, { callerId, calleeId });
-    callAudio.set(callId, []);
+    const calleeId = Number(req.body?.calleeId);
+    const callerId = Number(req.session.userId!);
+    const withVideo = Boolean(req.body?.withVideo);
+    if (!Number.isInteger(calleeId) || calleeId <= 0 || calleeId === callerId) {
+      return res.status(400).json({ message: 'Invalid call recipient' });
+    }
+    const callee = await storage.getUser(calleeId);
+    if (!callee) return res.status(404).json({ message: 'User not found' });
+    if (await blockedEitherWay(callerId, calleeId)) return res.status(403).json({ message: 'This user is unavailable' });
+
+    const callId = `call-${Date.now()}-${randomBytes(8).toString('hex')}`;
+    callSessions.set(callId, { callerId, calleeId, withVideo });
     const caller = await storage.getUser(callerId);
-    const callerName = caller?.username || `User_${callerId}`;
-    const s = signals.get(calleeId) || [];
-    s.push({ type: 'incoming', callId, fromId: callerId, fromName: callerName });
-    signals.set(calleeId, s);
+    pushVoiceSignal(calleeId, {
+      type: 'incoming', callId, fromId: callerId,
+      fromName: caller?.username || `User_${callerId}`, withVideo,
+    });
     res.json({ callId });
   });
 
   app.post('/api/chat/voice/accept', requireAuth, (req, res) => {
-    const { callId } = req.body;
-    const session = callSessions.get(callId);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-    const s = signals.get(session.callerId) || [];
-    s.push({ type: 'accepted', callId });
-    signals.set(session.callerId, s);
+    const callId = req.body?.callId;
+    const call = typeof callId === 'string' ? callSessions.get(callId) : null;
+    if (!call) return res.status(404).json({ message: 'Call not found or expired' });
+    if (call.calleeId !== req.session.userId!) return res.status(403).json({ message: 'Only the invited recipient can accept this call' });
+    pushVoiceSignal(call.callerId, { type: 'accepted', callId });
+    res.json({ success: true });
+  });
+
+  app.post('/api/chat/voice/offer', requireAuth, (req, res) => {
+    const { callId, recipientId, offer } = req.body || {};
+    const peer = getCallPeer(callId, Number(req.session.userId!));
+    if (!peer || peer.peerId !== Number(recipientId)) return res.status(403).json({ message: 'Invalid call participant' });
+    if (!offer || typeof offer.sdp !== 'string' || !['offer'].includes(String(offer.type))) {
+      return res.status(400).json({ message: 'Invalid WebRTC offer' });
+    }
+    pushVoiceSignal(peer.peerId, { type: 'offer', callId, from: req.session.userId!, offer });
+    res.json({ success: true });
+  });
+
+  app.post('/api/chat/voice/answer', requireAuth, (req, res) => {
+    const { callId, recipientId, answer } = req.body || {};
+    const peer = getCallPeer(callId, Number(req.session.userId!));
+    if (!peer || peer.peerId !== Number(recipientId)) return res.status(403).json({ message: 'Invalid call participant' });
+    if (!answer || typeof answer.sdp !== 'string' || answer.type !== 'answer') {
+      return res.status(400).json({ message: 'Invalid WebRTC answer' });
+    }
+    pushVoiceSignal(peer.peerId, { type: 'answer', callId, from: req.session.userId!, answer });
+    res.json({ success: true });
+  });
+
+  app.post('/api/chat/voice/ice', requireAuth, (req, res) => {
+    const { callId, recipientId, candidate } = req.body || {};
+    const peer = getCallPeer(callId, Number(req.session.userId!));
+    if (!peer || peer.peerId !== Number(recipientId)) return res.status(403).json({ message: 'Invalid call participant' });
+    if (!candidate || typeof candidate.candidate !== 'string') return res.status(400).json({ message: 'Invalid ICE candidate' });
+    pushVoiceSignal(peer.peerId, { type: 'ice', callId, from: req.session.userId!, candidate });
+    res.json({ success: true });
+  });
+
+  app.post('/api/chat/voice/decline', requireAuth, (req, res) => {
+    const callId = req.body?.callId;
+    const call = typeof callId === 'string' ? callSessions.get(callId) : null;
+    if (!call) return res.json({ success: true });
+    if (call.calleeId !== req.session.userId!) return res.status(403).json({ message: 'Only the invited recipient can decline this call' });
+    pushVoiceSignal(call.callerId, { type: 'declined', callId });
+    callSessions.delete(callId);
     res.json({ success: true });
   });
 
   app.post('/api/chat/voice/end', requireAuth, (req, res) => {
-    const { callId } = req.body;
-    const session = callSessions.get(callId);
-    if (session) {
-      const otherId = session.callerId === req.session.userId! ? session.calleeId : session.callerId;
-      const s = signals.get(otherId) || [];
-      s.push({ type: 'ended' });
-      signals.set(otherId, s);
-      callSessions.delete(callId);
-      callAudio.delete(callId);
+    const callId = req.body?.callId;
+    const peer = getCallPeer(callId, Number(req.session.userId!));
+    if (!peer) return res.json({ success: true });
+    pushVoiceSignal(peer.peerId, { type: 'ended', callId });
+    callSessions.delete(String(callId));
+    res.json({ success: true });
+  });
+
+  app.get('/api/chat/voice/poll', requireAuth, (req, res) => {
+    const userId = Number(req.session.userId!);
+    const queue = signals.get(userId) || [];
+    signals.set(userId, []);
+    res.json(queue);
+  });
+
+  // Optional group-call presence endpoints retained for existing clients.
+  app.get('/api/chat/voice/active', requireAuth, (req, res) => {
+    const { id, isGroup } = req.query;
+    const key = `${isGroup ? 'g' : 'u'}${id}`;
+    res.json(Array.from(activeCalls.get(key) || new Set<number>()));
+  });
+  app.post('/api/chat/voice/join', requireAuth, (req, res) => {
+    const { id, isGroup } = req.body || {};
+    const key = `${isGroup ? 'g' : 'u'}${id}`;
+    const participants = activeCalls.get(key) || new Set<number>();
+    participants.add(Number(req.session.userId!));
+    activeCalls.set(key, participants);
+    res.json({ success: true });
+  });
+  app.post('/api/chat/voice/leave', requireAuth, (req, res) => {
+    const { id, isGroup } = req.body || {};
+    const key = `${isGroup ? 'g' : 'u'}${id}`;
+    const participants = activeCalls.get(key);
+    if (participants) {
+      participants.delete(Number(req.session.userId!));
+      if (!participants.size) activeCalls.delete(key);
     }
     res.json({ success: true });
   });
 
-  app.post('/api/chat/voice/audio', requireAuth, (req, res) => {
-    const { callId, dataUrl, mimeType } = req.body;
-    const chunks = callAudio.get(callId);
-    if (!chunks) return res.json({ success: false });
-    const senderChunks = chunks.filter((c: AudioChunk) => c.senderId === req.session.userId!);
-    const idx = senderChunks.length;
-    chunks.push({ senderId: req.session.userId!, dataUrl, mimeType, idx });
-    // Keep only last 40 chunks to prevent memory bloat
-    if (chunks.length > 40) chunks.splice(0, chunks.length - 40);
-    res.json({ success: true, idx });
-  });
-
-  app.get('/api/chat/voice/audio', requireAuth, (req, res) => {
-    const callId = req.query.callId as string;
-    const after = parseInt((req.query.after as string) ?? '-1');
-    const userId = req.session.userId!;
-    const chunks = callAudio.get(callId) || [];
-    const newChunks = chunks.filter((c: AudioChunk) => c.senderId !== userId && c.idx > after);
-    res.json(newChunks);
-  });
-
   // === ACCESS REQUESTS (public - no auth required) ===
-  app.post('/api/access-requests', async (req, res) => {
+  app.post('/api/access-requests', accessRequestRateLimit, turnstileGuard(), async (req, res) => {
     try {
       const { name, message } = req.body;
       if (!name || typeof name !== 'string' || name.trim().length < 1) {

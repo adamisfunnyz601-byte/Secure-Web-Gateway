@@ -8,10 +8,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import {
   Send, Users, Hash, Phone, Plus, Volume2, Search, Settings,
-  ChevronRight, Terminal, Mic, MicOff, Video, VideoOff, X,
+  ChevronRight, Terminal, Mic, MicOff, Video, VideoOff, X, Pause, Square, Check,
   Download, Cpu, Ghost, Forward, Trash2, Reply, Music,
   Camera, MonitorUp, PhoneOff, Binary, UserPlus, Command,
-  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film
+  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film, ShieldCheck, Loader2, Link2, Pencil, Copy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -28,16 +28,87 @@ import { EmojiButton } from "@/components/EmojiPicker";
 // ============================================================
 const SESSION_CRYPT = "X-256-CHA-CHA-POLY";
 
+// GifSnap public GIF catalogue. No API key, account, or secret required.
+const GIF_API_BASE = "https://gifsnap.com/api/v1";
+
 const DEFAULT_SOUNDS = [
-  { id: 'S1', name: 'NEURAL_PING', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
-  { id: 'S2', name: 'GLITCH_PULSE', url: 'https://www.soundjay.com/buttons/sounds/button-3.mp3' },
-  { id: 'S3', name: 'DATA_EXTRACT', url: 'https://www.soundjay.com/buttons/sounds/button-10.mp3' },
-  { id: 'S4', name: 'SYS_ALARM', url: 'https://www.soundjay.com/buttons/sounds/button-4.mp3' },
-  { id: 'S5', name: 'STATIC_BURST', url: 'https://www.soundjay.com/communication/sounds/static-01.mp3' },
-  { id: 'S6', name: 'VOID_BEEP', url: 'https://www.soundjay.com/communication/sounds/beep-07.mp3' },
-  { id: 'S7', name: 'PROTOCOL_INIT', url: 'https://www.soundjay.com/buttons/sounds/button-30.mp3' },
-  { id: 'S8', name: 'TERMINATE', url: 'https://www.soundjay.com/buttons/sounds/button-11.mp3' },
+  { id: 'S1', name: 'Neural ping', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
+  { id: 'S2', name: 'Glitch pulse', url: 'https://www.soundjay.com/buttons/sounds/button-3.mp3' },
+  { id: 'S3', name: 'Data extract', url: 'https://www.soundjay.com/buttons/sounds/button-10.mp3' },
+  { id: 'S4', name: 'Sys alarm', url: 'https://www.soundjay.com/buttons/sounds/button-4.mp3' },
+  { id: 'S5', name: 'Static burst', url: 'https://www.soundjay.com/communication/sounds/static-01.mp3' },
+  { id: 'S6', name: 'Void beep', url: 'https://www.soundjay.com/communication/sounds/beep-07.mp3' },
+  { id: 'S7', name: 'Protocol init', url: 'https://www.soundjay.com/buttons/sounds/button-30.mp3' },
+  { id: 'S8', name: 'Terminate', url: 'https://www.soundjay.com/buttons/sounds/button-11.mp3' },
 ];
+
+// ============================================================
+// ADMIN COMMANDS CONFIG
+// Edit this section to configure who can use moderation commands.
+// IMPORTANT: These are frontend visibility/UX settings only. The API must
+// independently verify the authenticated user's owner/admin permissions.
+// ============================================================
+const ADMIN_COMMANDS_CONFIG = {
+  enabled: true,
+  // Add owner account IDs here if your user records do not expose role: 'owner'.
+  // Example: ownerUserIds: [1, 42]
+  ownerUserIds: [] as Array<string | number>,
+  // Any matching role grants the frontend owner UI. Keep backend checks authoritative.
+  ownerRoles: ['owner', 'OWNER'],
+  endpoint: '/api/chat/command',
+  moderationDurations: [
+    { value: '1m', label: '1 minute' },
+    { value: '1d', label: '1 day' },
+    { value: '1mo', label: '1 month' },
+    { value: '1y', label: '1 year' },
+    { value: 'null', label: 'Infinite / permanent' },
+  ],
+  commands: {
+    ban: { enabled: true, ownerOnly: true, description: 'Ban a member.' },
+    kick: { enabled: true, ownerOnly: true, description: 'Kick a member.' },
+    mute: { enabled: true, ownerOnly: true, description: 'Mute a member.' },
+  },
+} as const;
+
+const MODERATION_DURATIONS = ADMIN_COMMANDS_CONFIG.moderationDurations.map(option => option.value);
+// Accept custom positive durations: 5m, 12h, 5d, 2w, 5mo, 1y. `null` is permanent.
+// `m` means minutes; use `mo` for months to avoid ambiguity.
+const isValidModerationDuration = (value: string) =>
+  value === 'null' || /^[1-9]\d*(m|h|d|w|mo|y)$/i.test(value.trim());
+
+// Slash-command help and autocomplete. The server still validates and executes commands.
+const CHAT_COMMANDS = [
+  { name: 'help', usage: '/help', description: 'Show the available chat commands.' },
+  { name: 'me', usage: '/me <action>', description: 'Send an action-style message.', example: '/me waves' },
+  { name: 'shrug', usage: '/shrug', description: 'Send a shrug.' },
+  { name: 'roll', usage: '/roll [dice]', description: 'Roll dice.', example: '/roll d20', options: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', '2d6'] },
+  { name: 'flip', usage: '/flip', description: 'Flip a coin.' },
+  { name: 'nick', usage: '/nick <name>', description: 'Set a nickname, if enabled on this server.', example: '/nick Adam' },
+  { name: 'sfx', usage: '/sfx <sound>', description: 'Send a soundboard effect.', options: DEFAULT_SOUNDS.map(sound => sound.name) },
+  { name: 'capsI', usage: '/capsI <true|false>', description: 'Enable or disable the 1-in-50 lowercase-i-to-uppercase-I message effect.', options: ['true', 'false'] },
+  { name: 'ban', usage: '/ban <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.ban.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
+  { name: 'kick', usage: '/kick <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.kick.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
+  { name: 'mute', usage: '/mute <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.mute.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
+] as const;
+
+// Keep ordinary swearing allowed. This blocks explicit sexual content, porn terms,
+// graphic gore terms, sexual violence, and common hate/identity-attack terms.
+const BLOCKED_CHAT_TERMS = [
+  'porn', 'hentai', 'xxx', 'onlyfans', 'vore', 'gore', 'guro', 'necrophilia',
+  'rape', 'raping', 'molest', 'molestation', 'child porn', 'nude', 'nudes',
+  'penis', 'vagina', 'genital', 'genitals', 'dick', 'pussy', 'tits', 'boobs',
+  'testicles', 'masturbat', 'blowjob', 'handjob', 'ejaculat', 'orgasm', 'sexting',
+  'grope', 'fondle', 'sexual touching',
+  'nigger', 'nigga', 'faggot', 'tranny', 'retard', 'kike', 'chink', 'spic',
+  'heil hitler', 'white power', 'gas the jews', 'bandu', 'kkk', 'lancy', 'tranny', 'lancy170'
+];
+const containsBlockedChatContent = (value: string) => {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return BLOCKED_CHAT_TERMS.some(term => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    return new RegExp(`(^|\\s)${escaped}(?=$|\\s)`, 'i').test(normalized);
+  });
+};
 
 // ============================================================
 // TYPES
@@ -45,7 +116,7 @@ const DEFAULT_SOUNDS = [
 interface SoundEntry { id: string; name: string; url: string; }
 interface MediaPreview { url: string; type: 'image' | 'video' | 'audio'; name: string; }
 interface ForwardTarget { message: any; isOpen: boolean; }
-interface IncomingCall { fromId: number; fromName: string; callId: string; }
+interface IncomingCall { fromId: number; fromName: string; callId: string; withVideo?: boolean; }
 type CallState = 'idle' | 'requesting' | 'incoming' | 'connected';
 interface LogEntry { id: string; time: string; type: 'info' | 'warn' | 'crit'; msg: string; }
 
@@ -54,7 +125,7 @@ function MessageContent({ content }: { content: string }) {
     <>
       {content.split(/(@[a-zA-Z0-9_.-]+)/g).map((part, index) =>
         part.startsWith("@") ? (
-          <span key={index} className="text-primary font-semibold bg-primary/10 rounded px-0.5">
+          <span key={index} className="text-violet-200 font-semibold bg-violet-500/10 rounded px-0.5">
             {part}
           </span>
         ) : (
@@ -84,17 +155,17 @@ const CyberSidebarNode = ({
     className={cn(
       "w-full text-left px-4 py-3 border transition-all duration-200 flex items-center justify-between group mb-1.5",
       isActive
-        ? "bg-primary/20 border-primary shadow-[0_0_12px_rgba(0,255,0,0.15)]"
-        : "bg-transparent border-primary/20 opacity-70 hover:opacity-100 hover:bg-primary/5"
+        ? "bg-violet-500/20 border-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.22)]"
+        : "bg-transparent border-violet-500/20 opacity-70 hover:opacity-100 hover:bg-violet-500/5"
     )}
   >
     <div className="flex min-w-0 flex-1 items-center gap-3">
        <div className={cn("w-2 h-2 rounded-full", statusClass, isActive && status === "online" && "animate-pulse")} />
-      <span className={cn("inline-flex min-w-0 flex-1 items-center gap-2 overflow-hidden font-mono text-[12px] tracking-[0.05em] uppercase", isActive ? "text-primary font-bold" : "text-primary/70")}>
+      <span className={cn("inline-flex min-w-0 flex-1 items-center gap-2 overflow-hidden font-mono text-[12px] tracking-[0.05em] uppercase", isActive ? "text-violet-200 font-bold" : "text-violet-200/70")}>
         {label}
       </span>
     </div>
-    <ChevronRight className={cn("w-3 h-3 transition-all", isActive ? "text-primary opacity-100" : "opacity-0 group-hover:opacity-40")} />
+    <ChevronRight className={cn("w-3 h-3 transition-all", isActive ? "text-violet-200 opacity-100" : "opacity-0 group-hover:opacity-40")} />
   </motion.button>
   );
 };
@@ -131,7 +202,7 @@ function LazyMediaAttachment({
         type="button"
         onClick={loadMedia}
         disabled={loading || error}
-        className="mt-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[10px] text-primary hover:bg-primary/10 disabled:opacity-50"
+        className="mt-2 flex items-center gap-2 rounded-md border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-[10px] text-violet-200 hover:bg-violet-500/10 disabled:opacity-50"
       >
         {loading ? "Loading attachment..." : error ? "Attachment unavailable" : `Load ${message.mediaType || "attachment"}`}
       </button>
@@ -154,13 +225,13 @@ function LazyMediaAttachment({
   if (message.mediaType === "audio") {
     return (
       <div className="mt-2 flex items-center gap-3">
-        <Music className="w-4 h-4 text-primary shrink-0" />
-        <audio src={mediaUrl} controls className="h-8 flex-1 accent-primary" />
+        <Music className="w-4 h-4 text-violet-200 shrink-0" />
+        <audio src={mediaUrl} controls className="h-8 flex-1 accent-violet-400" />
       </div>
     );
   }
   return (
-    <a href={mediaUrl} download className="mt-2 inline-flex items-center gap-2 text-[10px] font-mono text-primary underline">
+    <a href={mediaUrl} download className="mt-2 inline-flex items-center gap-2 text-[10px] font-mono text-violet-200 underline">
       <Box className="w-4 h-4" /> Download file
     </a>
   );
@@ -185,7 +256,7 @@ const TerminalMessage = ({
   if (msg.mediaType === 'sfx') {
     return (
       <div className={cn("flex mb-3", isMe ? "justify-end" : "justify-start")}>
-        <div className="flex items-center gap-2 px-3 py-1.5 border border-primary/20 bg-primary/5 text-[9px] font-mono text-primary/50">
+        <div className="flex items-center gap-2 px-3 py-1.5 border border-violet-500/20 bg-violet-500/5 text-[9px] font-mono text-violet-200/50">
           <Volume2 className="w-3 h-3" />
           <span>{isMe ? "You" : displayName} played {msg.content.replace('[SFX:', '').replace(']', '')}</span>
         </div>
@@ -214,14 +285,14 @@ const TerminalMessage = ({
         )}
         {type === 'audio' && (
           <div className="p-3 flex items-center gap-3">
-            <Music className="w-4 h-4 text-primary flex-shrink-0" />
-            <audio src={msg.mediaUrl} controls className="h-8 flex-1 accent-primary" />
+            <Music className="w-4 h-4 text-violet-200 flex-shrink-0" />
+            <audio src={msg.mediaUrl} controls className="h-8 flex-1 accent-violet-400" />
           </div>
         )}
         {(type !== 'image' && type !== 'video' && type !== 'audio') && (
           <div className="p-3 flex items-center gap-3">
-            <Box className="w-4 h-4 text-primary" />
-            <a href={msg.mediaUrl} download className="text-[10px] font-mono text-primary underline">Download File</a>
+            <Box className="w-4 h-4 text-violet-200" />
+            <a href={msg.mediaUrl} download className="text-[10px] font-mono text-violet-200 underline">Download File</a>
           </div>
         )}
       </div>
@@ -268,13 +339,13 @@ const TerminalMessage = ({
         className={cn(
           "relative p-3 border text-[13px] font-mono transition-all cursor-help max-w-md",
           isMe
-            ? "bg-primary/5 border-primary/30 rounded-l-lg rounded-tr-lg hover:border-primary/60"
-            : "bg-accent/5 border-accent/30 rounded-r-lg rounded-tl-lg hover:border-accent/60"
+            ? "bg-violet-500/5 border-violet-500/30 rounded-l-lg rounded-tr-lg hover:border-violet-500/60"
+            : "bg-fuchsia-600/5 border-fuchsia-400/30 rounded-r-lg rounded-tl-lg hover:border-fuchsia-400/60"
         )}
       >
         {/* Forwarded indicator */}
         {isForwarded && (
-          <div className="flex items-center gap-1 text-[9px] text-accent/50 mb-1.5 font-mono border-b border-accent/10 pb-1.5">
+          <div className="flex items-center gap-1 text-[9px] text-fuchsia-300/50 mb-1.5 font-mono border-b border-fuchsia-400/10 pb-1.5">
             <Forward className="w-3 h-3" /> Forwarded
           </div>
         )}
@@ -282,11 +353,11 @@ const TerminalMessage = ({
         {msg.replyToContent && (
           <div className={cn(
             "border-l-2 pl-2 mb-2 py-0.5 cursor-pointer opacity-70 hover:opacity-100 transition-opacity",
-            isMe ? "border-primary/50" : "border-accent/50"
+            isMe ? "border-violet-500/50" : "border-fuchsia-400/50"
           )}>
-            <div className="flex items-center gap-1 text-[9px] font-mono mb-0.5 text-primary/60">
+            <div className="flex items-center gap-1 text-[9px] font-mono mb-0.5 text-violet-200/60">
               <Reply className="w-3 h-3" />
-              <span className="text-primary/80 font-bold">{msg.replyToSenderName}</span>
+              <span className="text-violet-200/80 font-bold">{msg.replyToSenderName}</span>
             </div>
             <div className="text-[10px] text-white/35 font-mono line-clamp-1 truncate">
               {msg.replyToContent.startsWith('[RELAY] ') ? msg.replyToContent.slice(8) : msg.replyToContent}
@@ -303,16 +374,16 @@ const TerminalMessage = ({
               <motion.div
                 initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }}
                 className={cn(
-                  "absolute z-50 bottom-full mb-2 flex flex-col bg-black border border-primary/40 p-1 shadow-2xl min-w-[110px]",
+                  "absolute z-50 bottom-full mb-2 flex flex-col bg-black border border-violet-500/40 p-1 shadow-2xl min-w-[110px]",
                   isMe ? "right-0" : "left-0"
                 )}
               >
                 <button onClick={() => { onReply(msg); setShowActions(false); }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-primary hover:bg-primary/20 font-bold uppercase">
+                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-violet-200 hover:bg-violet-500/20 font-bold uppercase">
                   <Reply className="w-3 h-3" /> Reply
                 </button>
                 <button onClick={() => { onForward(msg); setShowActions(false); }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-accent hover:bg-accent/20 font-bold uppercase border-t border-white/5">
+                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-fuchsia-300 hover:bg-fuchsia-600/20 font-bold uppercase border-t border-white/5">
                   <Forward className="w-3 h-3" /> Relay
                 </button>
                 {isMe && (
@@ -352,13 +423,27 @@ export default function Chat() {
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [joinGroupCode, setJoinGroupCode] = useState("");
+  const [newGroupIcon, setNewGroupIcon] = useState("💬");
+  const [showManageGroupModal, setShowManageGroupModal] = useState(false);
+  const [manageGroupName, setManageGroupName] = useState("");
+  const [manageGroupIcon, setManageGroupIcon] = useState("💬");
+  const [inviteLinkPreview, setInviteLinkPreview] = useState("");
 
   // --- MESSAGE STATE ---
   const [inputContent, setInputContent] = useState("");
+  const [commandSelection, setCommandSelection] = useState(0);
+  const [showRules, setShowRules] = useState(false);
+  const [capsIEnabled, setCapsIEnabled] = useState(false);
+  const [localMuteUntil, setLocalMuteUntil] = useState(0);
   const [replyTarget, setReplyTarget] = useState<any>(null);
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
   const [forwardState, setForwardState] = useState<ForwardTarget>({ message: null, isOpen: false });
   const [mediaPreview, setMediaPreview] = useState<MediaPreview | null>(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearch, setGifSearch] = useState("");
+  const [gifResults, setGifResults] = useState<any[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const [gifError, setGifError] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
 
@@ -368,6 +453,7 @@ export default function Chat() {
   const [callTime, setCallTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [callTargetName, setCallTargetName] = useState("");
 
@@ -377,6 +463,10 @@ export default function Chat() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false);
+  const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
+  const [voicePreviewUrl, setVoicePreviewUrl] = useState<string | null>(null);
+  const [voicePreviewPlaying, setVoicePreviewPlaying] = useState(false);
   const [callSoundboardOpen, setCallSoundboardOpen] = useState(false);
 
   // --- LOGS ---
@@ -388,7 +478,16 @@ export default function Chat() {
   // --- REFS ---
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const voicePreviewAudioRef = useRef<HTMLAudioElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const peerSetupPromiseRef = useRef<Promise<RTCPeerConnection> | null>(null);
+  const callPeerIdRef = useRef<number | null>(null);
+  const callInitiatorRef = useRef(false);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const callClockRef = useRef<NodeJS.Timeout | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -398,7 +497,6 @@ export default function Chat() {
   const callStateRef = useRef<CallState>('idle');
   const autoDeclineTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitializedSfxRef = useRef(false);
-  const headerChunkRef = useRef<Blob | null>(null);
 
   // --- DATA FETCHING ---
   const { data: groups = [] } = useQuery<any[]>({ queryKey: ['/api/chat/groups'] });
@@ -406,6 +504,38 @@ export default function Chat() {
     queryKey: ['/api/auth/me'],
     queryFn: async () => (await fetch('/api/auth/me')).json()
   });
+  const configUser = (userConfig as any)?.user || userConfig as any;
+  const currentUserId = (currentUser as any)?.id ?? (configUser as any)?.id;
+  const currentUserRole = (currentUser as any)?.role ?? (configUser as any)?.role;
+  const isConfiguredOwner = currentUserId != null && ADMIN_COMMANDS_CONFIG.ownerUserIds
+    .some(id => String(id) === String(currentUserId));
+  const hasConfiguredOwnerRole = ADMIN_COMMANDS_CONFIG.ownerRoles
+    .some(role => role === currentUserRole);
+  const isOwner = ADMIN_COMMANDS_CONFIG.enabled && Boolean(
+    (currentUser as any)?.isOwner || (configUser as any)?.isOwner ||
+    isConfiguredOwner || hasConfiguredOwnerRole
+  );
+  const canUseAdminCommand = (name: keyof typeof ADMIN_COMMANDS_CONFIG.commands) =>
+    ADMIN_COMMANDS_CONFIG.enabled && ADMIN_COMMANDS_CONFIG.commands[name].enabled &&
+    (!ADMIN_COMMANDS_CONFIG.commands[name].ownerOnly || isOwner);
+  // Treat configured owner IDs and owner-role accounts as immune to automatic chat filtering
+  // and to moderation commands. The server MUST enforce the same rule independently.
+  const isProtectedOwner = (user: any) => {
+    if (!user) return false;
+    const userRole = user.role ?? user.accountRole;
+    return Boolean(
+      user.isOwner || ADMIN_COMMANDS_CONFIG.ownerRoles.some(role => role === userRole) ||
+      ADMIN_COMMANDS_CONFIG.ownerUserIds.some(id => String(id) === String(user.id))
+    );
+  };
+  const findModerationTarget = (raw: string) => {
+    const value = raw.replace(/^@/, '').trim().toLowerCase();
+    if (!value) return undefined;
+    return (users || []).find((user: any) =>
+      [user.username, user.displayName, user.nickname, String(user.id)]
+        .filter(Boolean).some((candidate: string) => String(candidate).toLowerCase() === value)
+    );
+  };
 
   const updateProfile = useMutation({
     mutationFn: async (s: any) => fetch('/api/user/settings', {
@@ -425,24 +555,35 @@ export default function Chat() {
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await fetch('/api/chat/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-      if (!res.ok) throw new Error("Failed");
+    mutationFn: async (payload: { name: string; icon: string }) => {
+      const res = await fetch('/api/chat/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to create group");
       return res.json();
     },
     onSuccess: (g) => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat/groups'] });
       setShowCreateGroupModal(false);
       setNewGroupName("");
+      setNewGroupIcon("💬");
       selectGroupNode(g.id);
       toast({ title: "CLUSTER_ONLINE", description: `${g.name} initialized.` });
     }
   });
 
   const joinGroupMutation = useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: async (rawCode: string) => {
+      // Accept either a short invite code or a complete shared URL.
+      let code = rawCode.trim();
+      try {
+        if (/^https?:\/\//i.test(code)) {
+          const parsed = new URL(code);
+          code = parsed.pathname.match(/\/invite\/([^/]+)/i)?.[1] || parsed.searchParams.get('code') || code;
+        } else {
+          code = code.replace(/^\/?invite\//i, '').replace(/^\//, '');
+        }
+      } catch { /* pass the raw value to the server for validation */ }
       const res = await fetch('/api/chat/groups/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inviteCode: code }) });
-      if (!res.ok) throw new Error("Invalid code");
+      if (!res.ok) throw new Error("Invalid or expired invite link");
       return res.json();
     },
     onSuccess: (g) => {
@@ -452,8 +593,34 @@ export default function Chat() {
       selectGroupNode(g.id);
       toast({ title: "CLUSTER_ACCESSED", description: `Joined ${g.name}` });
     },
-    onError: () => toast({ title: "INVALID_CODE", variant: "destructive" })
+    onError: () => toast({ title: "INVALID_INVITE", description: "Check the invite link or code and try again.", variant: "destructive" })
   });
+
+  const updateGroupMutation = useMutation({
+    mutationFn: async ({ id, name, icon }: { id: number; name: string; icon: string }) => {
+      const res = await fetch(`/api/chat/groups/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, icon })
+      });
+      if (!res.ok) throw new Error((await res.text()) || 'Could not update group');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/groups'] });
+      setShowManageGroupModal(false);
+      toast({ title: 'GROUP_UPDATED', description: 'Your group details have been saved.' });
+    },
+    onError: () => toast({ title: 'UPDATE_FAILED', description: 'The server could not save these group changes. Check that the group update endpoint supports name and icon.', variant: 'destructive' })
+  });
+
+  // If someone opens /invite/CODE directly, pre-fill the join flow automatically.
+  useEffect(() => {
+    const match = window.location.pathname.match(/\/invite\/([^/]+)/i);
+    if (match?.[1]) {
+      setJoinGroupCode(decodeURIComponent(match[1]));
+      setShowJoinGroupModal(true);
+    }
+  }, []);
 
   // ============================================================
   // CHANNEL SELECTION
@@ -549,11 +716,173 @@ export default function Chat() {
   };
 
   // ============================================================
+  // GIF PICKER (GifSnap public catalogue - no API key)
+  // Supports trending GIFs and keyword searches, including gaming reactions.
+  // ============================================================
+  const searchGifs = async (query = gifSearch) => {
+    setGifLoading(true);
+    setGifError("");
+    try {
+      const params = new URLSearchParams({ page: "1", limit: "30" });
+      const endpoint = query.trim() ? "gifs/search" : "gifs/trending";
+      if (query.trim()) params.set("q", query.trim());
+      const response = await fetch(`${GIF_API_BASE}/${endpoint}?${params.toString()}`);
+      if (!response.ok) throw new Error(`GIF search failed (${response.status}). Please try again.`);
+      const data = await response.json();
+      const results = (Array.isArray(data?.data) ? data.data : []).map((item: any) => ({
+        id: item.id,
+        title: item.title || "Animated GIF",
+        url: item.url,
+        previewUrl: item.animated_preview?.url || item.url || item.preview_url,
+        mime: item.animated_preview?.mime_type || "image/gif",
+        sourceUrl: item.source?.url || item.source || "https://gifsnap.com",
+      })).filter((gif: any) => typeof gif.url === "string" && /^https?:\/\//i.test(gif.url));
+      setGifResults(results);
+      if (!results.length) setGifError("No GIFs found. Try another search, such as gaming, Minecraft, Roblox, reaction or victory.");
+    } catch (error: any) {
+      setGifError(error?.message || "Couldn't load GIFs. Check your connection and try again.");
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const sendGif = (gif: any) => {
+    const url = gif?.url;
+    if (!url) {
+      toast({ title: "GIF unavailable", description: "This GIF doesn't have a usable embed URL.", variant: "destructive" });
+      return;
+    }
+    sendMessage.mutate({
+      content: "",
+      recipientId: selectedRecipientId ?? undefined,
+      groupId: selectedGroupId ?? undefined,
+      mediaUrl: url,
+      mediaType: "image",
+      replyToId: replyTarget?.id ?? null,
+    } as any);
+    setReplyTarget(null);
+    setShowGifPicker(false);
+    setGifSearch("");
+    toast({ title: "GIF sent", description: "Your GIF was added to the chat." });
+  };
+
+  // ============================================================
   // SEND MESSAGE
   // ============================================================
   const handleTransmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputContent.trim() && !uploadFile) return;
+
+    // Slash commands are sent to the chat command API instead of being posted as messages.
+    const commandText = inputContent.trim();
+    let messageContent = inputContent;
+    const commandParts = commandText.match(/^\/(\S+)(?:\s+(.*))?$/);
+    const commandName = commandParts?.[1]?.toLowerCase();
+    const commandArgs = (commandParts?.[2] || '').trim();
+    if (commandName && ['ban', 'kick', 'mute'].includes(commandName) && !canUseAdminCommand(commandName as keyof typeof ADMIN_COMMANDS_CONFIG.commands)) {
+      toast({ title: 'OWNER ONLY', description: 'Only the server owner can use this command.', variant: 'destructive' });
+      return;
+    }
+    if (commandName === 'capsi') {
+      const value = commandArgs.toLowerCase();
+      if (value !== 'true' && value !== 'false') {
+        toast({ title: 'Usage', description: '/capsI true or /capsI false', variant: 'destructive' });
+        return;
+      }
+      try {
+        const response = await fetch(ADMIN_COMMANDS_CONFIG.endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: commandText }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result?.message || `Command failed (${response.status})`);
+        setCapsIEnabled(value === 'true');
+        setInputContent('');
+        toast({ title: 'capsI updated', description: value === 'true' ? 'The 1-in-50 I effect is enabled.' : 'The I effect is disabled.' });
+      } catch (error: any) {
+        toast({ title: 'Command failed', description: error?.message || 'Could not update capsI.', variant: 'destructive' });
+      }
+      return;
+    }
+    if (commandName === 'ban' || commandName === 'kick' || commandName === 'mute') {
+      const pieces = commandArgs.split(/\s+/).filter(Boolean);
+      const targetToken = pieces[0] || '';
+      const duration = (pieces[1] || '').toLowerCase();
+      const targetUser = findModerationTarget(targetToken);
+      if (!targetToken || !pieces[1] || !isValidModerationDuration(duration)) {
+        toast({ title: 'Who should be moderated?', description: `Usage: /${commandName} @username 5m|5h|5d|2w|5mo|1y|null [reason]`, variant: 'destructive' });
+        return;
+      }
+      if (!targetUser) {
+        toast({ title: 'User not found', description: `I couldn't find ${targetToken}. Use their exact username, or choose them from the suggestions.`, variant: 'destructive' });
+        return;
+      }
+      if (isProtectedOwner(targetUser)) {
+        toast({ title: 'Owner protected', description: 'Owners cannot be banned, kicked or muted.', variant: 'destructive' });
+        return;
+      }
+    }
+    // Owners are exempt from the client-side content filter and its automatic timeout.
+    if (!isOwner && !commandText.startsWith('/') && containsBlockedChatContent(inputContent)) {
+      const until = Date.now() + 5 * 60 * 1000;
+      setLocalMuteUntil(until);
+      setInputContent('');
+      toast({ title: 'Message blocked · 5 minute mute', description: 'That message contains content prohibited by the server rules. Your message was not sent.', variant: 'destructive' });
+      // Notify the server so it can enforce the timeout across devices. The server must validate this endpoint.
+      fetch('/api/chat/moderation/flag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'prohibited-content', durationSeconds: 300 }) }).catch(() => {});
+      return;
+    }
+    if (!isOwner && Date.now() < localMuteUntil && !commandText.startsWith('/')) {
+      toast({ title: 'You are muted', description: `Try again in ${Math.ceil((localMuteUntil - Date.now()) / 1000)} seconds.`, variant: 'destructive' });
+      return;
+    }
+    if (capsIEnabled && !commandText.startsWith('/') && Math.random() < 1 / 50) {
+      // The effect only changes lowercase i characters; it never changes message meaning otherwise.
+      messageContent = messageContent.replace(/i/g, 'I');
+    }
+    if (commandText === '/help') {
+      setInputContent("");
+      toast({
+        title: 'CHAT COMMANDS',
+        description: CHAT_COMMANDS.filter(command => {
+          if ('ownerOnly' in command && command.ownerOnly) {
+            const adminName = command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands;
+            return canUseAdminCommand(adminName);
+          }
+          return true;
+        }).map(command => command.usage).join('  •  '),
+      });
+      return;
+    }
+
+    if (commandText.startsWith('/') && !uploadFile) {
+      setInputContent("");
+      try {
+        const response = await fetch(ADMIN_COMMANDS_CONFIG.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify((commandName === 'ban' || commandName === 'kick' || commandName === 'mute')
+            ? (() => {
+                const pieces = commandArgs.split(/\s+/).filter(Boolean);
+                const target = findModerationTarget(pieces[0]);
+                return { text: commandText, command: commandName, targetUserId: target?.id, targetUsername: target?.username, duration: pieces[1], reason: pieces.slice(2).join(' ') };
+              })()
+            : { text: commandText }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result?.message || `Command failed (${response.status})`);
+        }
+        toast({ title: 'Command', description: result?.message || 'Command executed.' });
+      } catch (error: any) {
+        toast({
+          title: 'Command failed',
+          description: error?.message || 'The command could not be executed.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
 
     let mediaUrl: string | null = null;
     let mediaType: string | null = null;
@@ -568,7 +897,7 @@ export default function Chat() {
     }
 
     sendMessage.mutate({
-      content: inputContent || (uploadFile ? '' : ''),
+      content: messageContent || (uploadFile ? '' : ''),
       recipientId: selectedRecipientId ?? undefined,
       groupId: selectedGroupId ?? undefined,
       mediaUrl,
@@ -625,72 +954,156 @@ export default function Chat() {
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
   // ============================================================
-  // CALLING SYSTEM (SERVER-RELAY — no WebRTC)
+  // CALLING SYSTEM — WebRTC peer-to-peer audio/video
   // ============================================================
+  const postVoiceSignal = async (path: string, body: any) => {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error((await response.text()) || 'Call signalling failed');
+    return response.json().catch(() => ({}));
+  };
+
   const stopAllCallMedia = () => {
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    try { peerConnectionRef.current?.close(); } catch {}
+    peerConnectionRef.current = null;
+    peerSetupPromiseRef.current = null;
+    pendingIceCandidatesRef.current = [];
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    remoteStreamRef.current?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
+    remoteStreamRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    setHasRemoteVideo(false);
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     if (callClockRef.current) clearInterval(callClockRef.current);
+    callClockRef.current = null;
+    callPeerIdRef.current = null;
     setCallTime(0);
     setIsMuted(false);
     setIsVideoOn(false);
     setIsSharingScreen(false);
-    headerChunkRef.current = null;
+  };
+
+  const createPeerConnection = async (): Promise<RTCPeerConnection> => {
+    if (peerSetupPromiseRef.current) return peerSetupPromiseRef.current;
+    if (peerConnectionRef.current && localStreamRef.current) return peerConnectionRef.current;
+    const setup = (async () => {
+      const peer = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      });
+      peerConnectionRef.current = peer;
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: isVideoOn ? { facingMode: 'user' } : false,
+        });
+      } catch (mediaError) {
+        if (!isVideoOn) throw mediaError;
+        // Keep the call working as audio-only if the camera is unavailable/denied.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        setIsVideoOn(false);
+        toast({ title: 'Camera unavailable', description: 'Connected with microphone only.' });
+      }
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        localVideoRef.current.play().catch(() => {});
+      }
+      stream.getTracks().forEach(track => peer.addTrack(track, stream));
+      peer.ontrack = event => {
+      const remote = remoteStreamRef.current || new MediaStream();
+      remoteStreamRef.current = remote;
+      if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
+      if (event.track.kind === 'video') setHasRemoteVideo(true);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remote;
+        remoteVideoRef.current.play().catch(() => {});
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remote;
+        remoteAudioRef.current.play().catch(() => {});
+      }
+    };
+    peer.onicecandidate = event => {
+      if (event.candidate && callPeerIdRef.current != null && callIdRef.current) {
+        postVoiceSignal('/api/chat/voice/ice', {
+          callId: callIdRef.current,
+          recipientId: callPeerIdRef.current,
+          candidate: event.candidate.toJSON(),
+        }).catch(error => pushLog(`ICE_SEND_FAILED: ${String(error)}`, 'warn'));
+      }
+    };
+    peer.onconnectionstatechange = () => {
+      if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') {
+        pushLog(`WEBRTC_${peer.connectionState.toUpperCase()}`, 'warn');
+      }
+    };
+      if (callClockRef.current) clearInterval(callClockRef.current);
+      setCallTime(0);
+      callClockRef.current = setInterval(() => setCallTime(t => t + 1), 1000);
+      return peer;
+    })();
+    peerSetupPromiseRef.current = setup;
+    try { return await setup; }
+    catch (error) {
+      peerSetupPromiseRef.current = null;
+      peerConnectionRef.current?.close();
+      peerConnectionRef.current = null;
+      throw error;
+    }
   };
 
   const startCall = async (targetId: number, targetName: string, withVideo: boolean) => {
     if (callStateRef.current !== 'idle') return;
+    callPeerIdRef.current = targetId;
+    callInitiatorRef.current = true;
     setCallTargetName(targetName);
     setCallState('requesting');
     setIsVideoOn(withVideo);
     pushLog(`CALL_REQUESTING: ${targetName}`, 'warn');
     try {
-      const res = await fetch('/api/chat/voice/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calleeId: targetId })
-      });
-      const { callId } = await res.json();
-      callIdRef.current = callId;
-    } catch {
-      toast({ title: "NETWORK_ERROR", description: "Could not reach server.", variant: "destructive" });
+      const result = await postVoiceSignal('/api/chat/voice/start', { calleeId: targetId, withVideo });
+      callIdRef.current = result.callId;
+      if (!result.callId) throw new Error('The server did not return a call ID');
+    } catch (error: any) {
+      toast({ title: 'CALL_FAILED', description: error?.message || 'Could not start the call.', variant: 'destructive' });
+      callIdRef.current = null;
+      callPeerIdRef.current = null;
       setCallState('idle');
     }
   };
 
   const acceptCall = async () => {
     if (!incomingCall) return;
-    const callId = incomingCall.callId;
-    callIdRef.current = callId;
-    setCallState('connected');
-    setCallTargetName(incomingCall.fromName);
+    const call = incomingCall;
+    callIdRef.current = call.callId;
+    callPeerIdRef.current = call.fromId;
+    callInitiatorRef.current = false;
+    setCallTargetName(call.fromName);
+    setIsVideoOn(Boolean(call.withVideo));
     if (autoDeclineTimerRef.current) { clearTimeout(autoDeclineTimerRef.current); autoDeclineTimerRef.current = null; }
     setIncomingCall(null);
-    await fetch('/api/chat/voice/accept', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ callId })
-    }).catch(() => {});
-    pushLog(`CALL_ACCEPTED: ${incomingCall.fromName}`, 'info');
+    setCallState('connected');
+    try {
+      await postVoiceSignal('/api/chat/voice/accept', { callId: call.callId });
+      pushLog(`CALL_ACCEPTED: ${call.fromName}`, 'info');
+    } catch (error: any) {
+      toast({ title: 'CALL_FAILED', description: error?.message || 'Could not accept the call.', variant: 'destructive' });
+      endCall(true);
+    }
   };
 
   const endCall = (fromSignal = false) => {
-    if (!fromSignal) {
-      const callId = callIdRef.current;
-      if (callId) {
-        fetch('/api/chat/voice/end', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callId })
-        }).catch(() => {});
-      } else if (callStateRef.current === 'incoming' && incomingCall) {
-        fetch('/api/chat/voice/decline', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callId: incomingCall.callId })
-        }).catch(() => {});
-      }
+    const callId = callIdRef.current || incomingCall?.callId;
+    if (!fromSignal && callId) {
+      const endpoint = callStateRef.current === 'incoming' ? '/api/chat/voice/decline' : '/api/chat/voice/end';
+      postVoiceSignal(endpoint, { callId }).catch(() => {});
     }
     if (autoDeclineTimerRef.current) { clearTimeout(autoDeclineTimerRef.current); autoDeclineTimerRef.current = null; }
     callIdRef.current = null;
@@ -702,216 +1115,264 @@ export default function Chat() {
   };
 
   const toggleMute = () => {
-    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = isMuted; });
-    setIsMuted(!isMuted);
+    const nextMuted = !isMuted;
+    localStreamRef.current?.getAudioTracks().forEach(track => { track.enabled = !nextMuted; });
+    setIsMuted(nextMuted);
   };
 
   const toggleCamera = async () => {
     if (isVideoOn) {
-      localStreamRef.current?.getVideoTracks().forEach(t => t.stop());
+      localStreamRef.current?.getVideoTracks().forEach(track => { track.enabled = false; });
       setIsVideoOn(false);
-    } else {
-      try {
-        const vs = await navigator.mediaDevices.getUserMedia({ video: true });
-        const vt = vs.getVideoTracks()[0];
-        localStreamRef.current?.addTrack(vt);
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+      return;
+    }
+    try {
+      const existingTrack = localStreamRef.current?.getVideoTracks().find(track => track.readyState === 'live');
+      if (existingTrack) {
+        existingTrack.enabled = true;
         setIsVideoOn(true);
-      } catch { toast({ title: "CAMERA_DENIED", variant: "destructive" }); }
+        return;
+      }
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      const track = videoStream.getVideoTracks()[0];
+      const peer = peerConnectionRef.current;
+      const existingSender = peer?.getSenders().find(sender => sender.track?.kind === 'video');
+      if (existingSender) await existingSender.replaceTrack(track);
+      else if (peer) peer.addTrack(track, videoStream);
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(() => {});
+      }
+      setIsVideoOn(true);
+    } catch {
+      toast({ title: 'CAMERA_DENIED', description: 'Allow camera access to turn video on.', variant: 'destructive' });
     }
   };
 
   const shareScreen = async () => {
     if (isSharingScreen) {
-      localStreamRef.current?.getVideoTracks().forEach(t => t.stop());
+      const screenTrack = localStreamRef.current?.getVideoTracks().find(track => track.label.toLowerCase().includes('screen'));
+      screenTrack?.stop();
+      localStreamRef.current?.removeTrack(screenTrack as MediaStreamTrack);
       setIsSharingScreen(false);
       return;
     }
     try {
       const screen = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
       const track = screen.getVideoTracks()[0];
-      if (localStreamRef.current) {
-        localStreamRef.current.addTrack(track);
-        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
-      }
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      const sender = peerConnectionRef.current?.getSenders().find(item => item.track?.kind === 'video');
+      if (sender) await sender.replaceTrack(track);
+      else peerConnectionRef.current?.addTrack(track, screen);
+      if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
       setIsSharingScreen(true);
       track.onended = () => setIsSharingScreen(false);
-    } catch { toast({ title: "SCREEN_SHARE_DENIED", variant: "destructive" }); }
+    } catch { toast({ title: 'SCREEN_SHARE_DENIED', variant: 'destructive' }); }
   };
 
-  // ============================================================
-  // AUDIO RELAY EFFECT — starts recording+playback when connected
-  // ============================================================
+  // The callee creates an answer when the caller's offer arrives; the caller creates the offer after acceptance.
   useEffect(() => {
     if (callState !== 'connected') return;
-    const callId = callIdRef.current;
-    if (!callId) return;
-
-    let recorder: MediaRecorder | null = null;
-    let pendingChunks: Blob[] = [];
-    let chunkIdx = 0;
-    let lastReceivedIdx = -1;
-    let sendInterval: ReturnType<typeof setInterval>;
-    let playInterval: ReturnType<typeof setInterval>;
     let active = true;
-
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
-      localStreamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-
-      recorder = new MediaRecorder(stream, { mimeType });
-      headerChunkRef.current = null;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          if (!headerChunkRef.current) {
-            headerChunkRef.current = e.data; // First chunk contains codec header
-          } else {
-            pendingChunks.push(e.data);
-          }
+    (async () => {
+      try {
+        const peer = await createPeerConnection();
+        if (!active) { peer.close(); return; }
+        if (callInitiatorRef.current) {
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          await postVoiceSignal('/api/chat/voice/offer', {
+            callId: callIdRef.current,
+            recipientId: callPeerIdRef.current,
+            offer: peer.localDescription,
+          });
+          pushLog('WEBRTC_OFFER_SENT', 'info');
         }
-      };
-
-      recorder.start(150);
-
-      // Send a complete, playable audio blob every 800ms
-      sendInterval = setInterval(() => {
-        if (!headerChunkRef.current || pendingChunks.length === 0) return;
-        const complete = new Blob([headerChunkRef.current, ...pendingChunks], { type: mimeType });
-        pendingChunks = [];
-        const fr = new FileReader();
-        fr.onloadend = () => {
-          if (!active) return;
-          fetch('/api/chat/voice/audio', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ callId, dataUrl: fr.result, mimeType, idx: chunkIdx++ })
-          }).catch(() => {});
-        };
-        fr.readAsDataURL(complete);
-      }, 800);
-
-      // Poll for the other party's audio every 400ms
-      playInterval = setInterval(async () => {
-        if (!active) return;
-        try {
-          const res = await fetch(`/api/chat/voice/audio?callId=${callId}&after=${lastReceivedIdx}`);
-          const chunks: any[] = await res.json();
-          for (const chunk of chunks) {
-            lastReceivedIdx = chunk.idx;
-            const audio = new Audio(chunk.dataUrl);
-            audio.play().catch(() => {});
-          }
-        } catch {}
-      }, 400);
-
-      callClockRef.current = setInterval(() => setCallTime(t => t + 1), 1000);
-      setCallTime(0);
-      pushLog(`RELAY_ACTIVE — streaming via server`, 'info');
-    }).catch(() => {
-      toast({ title: "HARDWARE_FAILURE", description: "Mic access denied.", variant: "destructive" });
-      endCall(true);
-    });
-
-    return () => {
-      active = false;
-      recorder?.stop();
-      localStreamRef.current?.getTracks().forEach(t => t.stop());
-      localStreamRef.current = null;
-      clearInterval(sendInterval);
-      clearInterval(playInterval);
-      if (callClockRef.current) clearInterval(callClockRef.current);
-    };
+      } catch (error: any) {
+        toast({ title: 'CALL_MEDIA_ERROR', description: error?.message || 'Could not start microphone/camera.', variant: 'destructive' });
+        endCall(true);
+      }
+    })();
+    return () => { active = false; };
   }, [callState]);
 
   // ============================================================
-  // AUDIO RECORDING (VOICE MESSAGE)
+  // AUDIO RECORDING (VOICE MESSAGE) — stop to preview, send explicitly
   // ============================================================
   const startVoiceRecord = async () => {
+    if (isRecording || recorderRef.current?.state === 'recording') return;
     try {
+      if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+      setVoicePreviewUrl(null);
+      setVoiceBlob(null);
+      setVoicePreviewPlaying(false);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recorderRef.current = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg' });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderRef.current = recorder;
       chunksRef.current = [];
-      recorderRef.current.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorderRef.current.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        if (chunksRef.current.length === 0) return;
-        const blob = new Blob(chunksRef.current, { type: recorderRef.current?.mimeType || 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          sendMessage.mutate({
-            content: '[VOICE_MESSAGE]',
-            recipientId: selectedRecipientId ?? undefined,
-            groupId: selectedGroupId ?? undefined,
-            mediaUrl: reader.result as string,
-            mediaType: 'audio',
-            replyToId: replyTarget?.id ?? null,
-          } as any);
-          setReplyTarget(null);
-          pushLog("VOICE_MESSAGE_SENT", 'info');
-        };
-        reader.readAsDataURL(blob);
+      recorder.ondataavailable = event => { if (event.data.size > 0) chunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size > 0) {
+          setVoiceBlob(blob);
+          setVoicePreviewUrl(URL.createObjectURL(blob));
+          pushLog('VOICE_RECORDING_READY_TO_SEND', 'info');
+        }
+        setIsRecording(false);
+        setIsRecordingPaused(false);
       };
-      recorderRef.current.start(100); // collect data every 100ms
+      recorder.start(150);
       setIsRecording(true);
-      pushLog("VOICE_RECORDING_STARTED", 'warn');
+      setIsRecordingPaused(false);
+      pushLog('VOICE_RECORDING_STARTED', 'warn');
     } catch {
-      toast({ title: "MIC_DENIED", description: "Microphone access required.", variant: "destructive" });
+      toast({ title: 'MIC_DENIED', description: 'Microphone access required.', variant: 'destructive' });
     }
   };
 
   const stopVoiceRecord = () => {
-    if (recorderRef.current && recorderRef.current.state === 'recording') {
-      recorderRef.current.stop();
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  };
+
+  const togglePauseVoiceRecord = () => {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    if (recorder.state === 'recording') {
+      recorder.pause();
+      setIsRecordingPaused(true);
+    } else if (recorder.state === 'paused') {
+      recorder.resume();
+      setIsRecordingPaused(false);
     }
-    setIsRecording(false);
+  };
+
+  const playVoicePreview = async () => {
+    if (!voicePreviewAudioRef.current) return;
+    try {
+      if (voicePreviewPlaying) {
+        voicePreviewAudioRef.current.pause();
+        voicePreviewAudioRef.current.currentTime = 0;
+        setVoicePreviewPlaying(false);
+      } else {
+        await voicePreviewAudioRef.current.play();
+        setVoicePreviewPlaying(true);
+      }
+    } catch { toast({ title: 'PREVIEW_ERROR', description: 'Could not play the recording.', variant: 'destructive' }); }
+  };
+
+  const discardVoiceMessage = () => {
+    if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl);
+    setVoicePreviewUrl(null);
+    setVoiceBlob(null);
+    setVoicePreviewPlaying(false);
+    if (voicePreviewAudioRef.current) voicePreviewAudioRef.current.pause();
+  };
+
+  const sendVoiceMessage = () => {
+    if (!voiceBlob) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      sendMessage.mutate({
+        content: '[VOICE_MESSAGE]',
+        recipientId: selectedRecipientId ?? undefined,
+        groupId: selectedGroupId ?? undefined,
+        mediaUrl: reader.result as string,
+        mediaType: 'audio',
+        replyToId: replyTarget?.id ?? null,
+      } as any);
+      setReplyTarget(null);
+      discardVoiceMessage();
+      pushLog('VOICE_MESSAGE_SENT', 'info');
+    };
+    reader.readAsDataURL(voiceBlob);
   };
 
   // ============================================================
-  // UNIFIED CALL SIGNAL POLL (always on while logged in)
-  // Handles: incoming (callee), accepted (caller), ended/decline (either)
+  // UNIFIED CALL SIGNAL POLL — call state + WebRTC SDP/ICE
   // ============================================================
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let polling = false;
+    const pollSignals = async () => {
+      if (polling) return;
+      polling = true;
       try {
-        const res = await fetch('/api/chat/voice/poll');
-        if (!res.ok) return;
-        const sigs: any[] = await res.json();
-        for (const sig of sigs) {
+        const response = await fetch('/api/chat/voice/poll');
+        if (!response.ok) return;
+        const signals: any[] = await response.json();
+        for (const signal of signals) {
           const state = callStateRef.current;
-          if (sig.type === 'incoming' && state === 'idle') {
-            setIncomingCall({ fromId: sig.fromId, fromName: sig.fromName, callId: sig.callId });
+          if (signal.type === 'incoming' && state === 'idle') {
+            callIdRef.current = signal.callId;
+            callPeerIdRef.current = signal.fromId;
+            callInitiatorRef.current = false;
+            setIncomingCall({ fromId: signal.fromId, fromName: signal.fromName, callId: signal.callId, withVideo: Boolean(signal.withVideo) });
             setCallState('incoming');
-            pushLog(`INCOMING_CALL: ${sig.fromName}`, 'warn');
+            pushLog(`INCOMING_CALL: ${signal.fromName}`, 'warn');
             if (autoDeclineTimerRef.current) clearTimeout(autoDeclineTimerRef.current);
             autoDeclineTimerRef.current = setTimeout(() => {
               if (callStateRef.current === 'incoming') {
-                pushLog('AUTO_DECLINED (timeout)', 'warn');
-                fetch('/api/chat/voice/end', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ callId: sig.callId })
-                }).catch(() => {});
+                postVoiceSignal('/api/chat/voice/decline', { callId: signal.callId }).catch(() => {});
                 setIncomingCall(null);
+                callIdRef.current = null;
+                callPeerIdRef.current = null;
                 setCallState('idle');
+                toast({ title: 'Missed call', description: 'The incoming call timed out.' });
               }
             }, 30000);
-          } else if (sig.type === 'accepted' && state === 'requesting') {
+          } else if (signal.type === 'accepted' && state === 'requesting' && signal.callId === callIdRef.current) {
             setCallState('connected');
             pushLog('CALL_CONNECTED', 'info');
-          } else if (sig.type === 'ended' || sig.type === 'decline' || sig.type === 'declined') {
-            if (state === 'requesting') {
-              toast({ title: "CALL_DECLINED", description: "They rejected the connection.", variant: "destructive" });
+          } else if ((signal.type === 'declined' || signal.type === 'ended') && signal.callId === callIdRef.current) {
+            if (signal.type === 'declined') toast({ title: 'Call declined.' });
+            endCall(true);
+          } else if (signal.type === 'offer' && signal.callId === callIdRef.current && state === 'connected') {
+            try {
+              const peer = await createPeerConnection();
+              await peer.setRemoteDescription(new RTCSessionDescription(signal.offer));
+              for (const candidate of pendingIceCandidatesRef.current.splice(0)) await peer.addIceCandidate(new RTCIceCandidate(candidate));
+              const answer = await peer.createAnswer();
+              await peer.setLocalDescription(answer);
+              await postVoiceSignal('/api/chat/voice/answer', {
+                callId: callIdRef.current,
+                recipientId: signal.from,
+                answer: peer.localDescription,
+              });
+              pushLog('WEBRTC_ANSWER_SENT', 'info');
+            } catch (error: any) {
+              pushLog(`WEBRTC_OFFER_ERROR: ${error?.message || error}`, 'warn');
+              toast({ title: 'Call connection failed', description: error?.message || 'Could not answer the call.', variant: 'destructive' });
+              endCall(true);
             }
-            if (state !== 'idle') endCall(true);
+          } else if (signal.type === 'answer' && signal.callId === callIdRef.current && state === 'connected') {
+            try {
+              const peer = peerConnectionRef.current;
+              if (peer && !peer.currentRemoteDescription) {
+                await peer.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                for (const candidate of pendingIceCandidatesRef.current.splice(0)) await peer.addIceCandidate(new RTCIceCandidate(candidate));
+              }
+            } catch (error: any) { pushLog(`WEBRTC_ANSWER_ERROR: ${error?.message || error}`, 'warn'); }
+          } else if (signal.type === 'ice' && signal.callId === callIdRef.current && state === 'connected') {
+            try {
+              const peer = peerConnectionRef.current;
+              if (peer?.remoteDescription) await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              else pendingIceCandidatesRef.current.push(signal.candidate);
+            } catch (error: any) { pushLog(`WEBRTC_ICE_ERROR: ${error?.message || error}`, 'warn'); }
           }
         }
-      } catch {}
-    }, 3000);
+      } catch (error) {
+        pushLog(`CALL_SIGNAL_POLL_FAILED: ${String(error)}`, 'warn');
+      } finally { polling = false; }
+    };
+    const interval = setInterval(pollSignals, 700);
+    pollSignals();
     return () => clearInterval(interval);
   }, []);
 
@@ -948,6 +1409,93 @@ export default function Chat() {
       }).slice(0, 6)
     : [];
 
+  const slashParts = inputContent.match(/^\/([^\s]*)(?:\s+(.*))?$/);
+  const typedCommand = slashParts?.[1]?.toLowerCase() ?? null;
+  const commandArgument = slashParts?.[2] ?? null;
+  const matchingCommands = typedCommand !== null && commandArgument === null
+    ? CHAT_COMMANDS.filter(command => command.name.startsWith(typedCommand) && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
+    : [];
+  const activeCommand = typedCommand !== null
+    ? CHAT_COMMANDS.find(command => command.name === typedCommand && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
+    : undefined;
+  const commandTokens = commandArgument?.trim().split(/\s+/).filter(Boolean) || [];
+  const isModerationCommand = ['ban', 'kick', 'mute'].includes(activeCommand?.name || '');
+  const targetQuery = commandTokens[0] || '';
+  const targetTokenComplete = Boolean(commandArgument && /\s$/.test(commandArgument));
+  const moderationUserOptions = isModerationCommand && commandArgument !== null &&
+    (!targetTokenComplete && commandTokens.length <= 1)
+    ? (users || []).filter((user: any) => user.id !== currentUserId && !isProtectedOwner(user) &&
+        `${user.username || ''} ${user.displayName || ''} ${user.nickname || ''}`.toLowerCase().includes(targetQuery.replace(/^@/, '').toLowerCase()))
+        .slice(0, 7)
+    : [];
+  const lastCommandToken = commandArgument && /\s$/.test(commandArgument) ? '' : (commandArgument?.match(/\S+$/)?.[0] || '');
+  const shouldSuggestDuration = !isModerationCommand ||
+    (commandTokens.length === 1 && targetTokenComplete) ||
+    (commandTokens.length === 2 && !targetTokenComplete);
+  const parameterOptions = activeCommand && commandArgument !== null && shouldSuggestDuration && 'options' in activeCommand
+    ? activeCommand.options.filter(option => option.toLowerCase().includes(lastCommandToken.toLowerCase()))
+    : [];
+  const showCommandMenu = inputContent.startsWith('/') && !mentionMatch && (matchingCommands.length > 0 || parameterOptions.length > 0 || moderationUserOptions.length > 0 || inputContent === '/');
+
+  const insertCommand = (name: string) => {
+    setInputContent(`/${name} `);
+    setCommandSelection(0);
+  };
+
+  const insertModerationTarget = (user: any) => {
+    const commandName = activeCommand?.name;
+    if (!commandName) return;
+    setInputContent(`/${commandName} @${user.username} `);
+    setCommandSelection(0);
+  };
+
+  const insertParameter = (value: string) => {
+    const commandName = activeCommand?.name;
+    if (!commandName) return;
+    // Preserve the selected username and replace/append only the duration token.
+    setInputContent(previous => {
+      const match = previous.match(/^\/(ban|kick|mute)(?:\s+(.*))?$/i);
+      if (!match) return previous;
+      const args = (match[2] || '').trim().split(/\s+/).filter(Boolean);
+      if (!args.length) return `/${commandName} ${value} `;
+      if (args.length === 1) args.push(value);
+      else args[1] = value;
+      return `/${commandName} ${args.join(' ')} `;
+    });
+    setCommandSelection(0);
+  };
+
+  const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const optionsCount = moderationUserOptions.length || parameterOptions.length || matchingCommands.length;
+    if (showCommandMenu && optionsCount > 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      setCommandSelection(current => e.key === 'ArrowDown'
+        ? (current + 1) % optionsCount
+        : (current - 1 + optionsCount) % optionsCount);
+      return;
+    }
+    if (showCommandMenu && e.key === 'Tab') {
+      const targetOption = moderationUserOptions[commandSelection];
+      const option = parameterOptions[commandSelection] || matchingCommands[commandSelection];
+      if (targetOption || option) {
+        e.preventDefault();
+        if (moderationUserOptions.length) insertModerationTarget(targetOption);
+        else if (parameterOptions.length) insertParameter(option);
+        else insertCommand(option.name);
+      }
+      return;
+    }
+    if (showCommandMenu && e.key === 'Enter' && optionsCount > 0 && inputContent === '/') {
+      e.preventDefault();
+      insertCommand(matchingCommands[commandSelection]?.name || 'help');
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTransmit();
+    }
+  };
+
   const insertMention = (username: string) => {
     setInputContent(prev => prev.replace(/(?:^|\s)@([^\s@]*)$/, match => `${match.slice(0, match.lastIndexOf("@"))}@${username} `));
   };
@@ -957,24 +1505,24 @@ export default function Chat() {
   // ============================================================
   return (
     <Layout>
-      <div className="flex h-[calc(100vh-140px)] gap-4 overflow-hidden">
+      <div className="relative isolate flex h-[calc(100vh-140px)] gap-4 overflow-hidden rounded-2xl border border-violet-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(124,58,237,0.13),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(217,70,239,0.08),transparent_40%),#07040d] p-2 shadow-[0_0_50px_rgba(91,33,182,0.10)]">
 
         {/* ======================================================
             INCOMING CALL OVERLAY
             ====================================================== */}
         <AnimatePresence>
           {callState === 'incoming' && incomingCall && (
-            <div className="fixed inset-0 z-[900] flex items-center justify-center bg-black/90 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[900] flex items-center justify-center bg-[#08040f]/90 backdrop-blur-xl backdrop-blur-sm">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="cyber-box w-full max-w-sm bg-black border-primary p-10 text-center"
+                className="rounded-2xl border border-violet-500/25 bg-[#0c0615]/85 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.10)] w-full max-w-sm bg-[#0c0615]/90 backdrop-blur-xl border-violet-500 p-10 text-center"
               >
-                <div className="w-20 h-20 mx-auto mb-6 border-2 border-primary rounded-full flex items-center justify-center animate-pulse">
-                  <Phone className="w-8 h-8 text-primary" />
+                <div className="w-20 h-20 mx-auto mb-6 border-2 border-violet-500 rounded-full flex items-center justify-center animate-pulse">
+                  <Phone className="w-8 h-8 text-violet-200" />
                 </div>
-                <h3 className="font-display text-2xl text-primary tracking-widest mb-2 uppercase">Incoming Call</h3>
-                <p className="font-mono text-primary/60 mb-8 text-sm">{incomingCall.fromName}</p>
+                <h3 className="font-display text-2xl text-violet-200 tracking-widest mb-2 uppercase">Incoming Call</h3>
+                <p className="font-mono text-violet-200/60 mb-8 text-sm">{incomingCall.fromName}</p>
                 <div className="flex gap-4">
                   <button onClick={acceptCall} className="flex-1 py-3 bg-green-600 border border-green-400 text-white font-display tracking-widest uppercase hover:bg-green-500 transition-colors flex items-center justify-center gap-2">
                     <Phone className="w-5 h-5" /> Accept
@@ -1000,24 +1548,27 @@ export default function Chat() {
               className="fixed inset-0 bg-black z-[800] flex flex-col"
             >
               <div className="flex-1 flex">
-                {/* Local video feed */}
-                <div className="flex-1 relative bg-black flex items-center justify-center">
-                  {isVideoOn ? (
-                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-6">
-                      <div className="w-36 h-36 rounded-full border-2 border-primary/30 bg-primary/5 flex items-center justify-center">
-                        <Ghost className="w-16 h-16 text-primary animate-pulse" />
-                      </div>
-                      <div className="text-center">
-                        <div className="font-display text-3xl text-primary tracking-[0.6em] uppercase">{callTargetName}</div>
-                        <div className="text-[10px] font-mono text-primary/40 mt-3 tracking-widest uppercase">
-                          {callState === 'requesting' ? '◌ RINGING...' : `◉ CONNECTED — ${Math.floor(callTime / 60)}:${(callTime % 60).toString().padStart(2, '0')}`}
-                        </div>
+                {/* Remote participant is the main video; your own camera stays picture-in-picture. */}
+                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+                  <video ref={remoteVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+                  <audio ref={remoteAudioRef} autoPlay />
+                  {!hasRemoteVideo && <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <div className="w-36 h-36 rounded-full border-2 border-violet-500/30 bg-violet-500/5 flex items-center justify-center">
+                      <Ghost className="w-16 h-16 text-violet-200 animate-pulse" />
+                    </div>
+                    <div className="text-center mt-5">
+                      <div className="font-display text-3xl text-violet-200 tracking-[0.3em] uppercase">{callTargetName}</div>
+                      <div className="text-[10px] font-mono text-violet-200/40 mt-3 tracking-widest uppercase">
+                        {callState === 'requesting' ? '◌ RINGING...' : `◉ CONNECTED — ${Math.floor(callTime / 60)}:${(callTime % 60).toString().padStart(2, '0')}`}
                       </div>
                     </div>
-                  )}
-                  <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 border border-primary/30 px-3 py-1 text-[10px] font-mono text-primary">
+                  </div>}
+                  <div className="absolute bottom-4 right-4 z-10 w-36 sm:w-48 aspect-video overflow-hidden rounded-xl border-2 border-violet-400/60 bg-[#10091b] shadow-2xl">
+                    <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+                    {!isVideoOn && <div className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-violet-200/50">CAMERA OFF</div>}
+                    <span className="absolute bottom-1 left-2 text-[8px] font-mono text-white bg-black/50 px-1.5 py-0.5">YOU</span>
+                  </div>
+                  <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 border border-violet-500/30 px-3 py-1 text-[10px] font-mono text-violet-200">
                     {callState === 'requesting' ? (
                       <><span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />RINGING...</>
                     ) : (
@@ -1026,18 +1577,21 @@ export default function Chat() {
                   </div>
                 </div>
               </div>
+              <div className="h-9 shrink-0 flex items-center justify-center gap-1 border-t border-violet-500/15 bg-[#09050f]" aria-label="Call audio visualizer">
+                {Array.from({ length: 44 }, (_, i) => <span key={i} className={cn("w-1 rounded-full bg-gradient-to-t from-violet-700 to-fuchsia-300", callState === 'connected' && "animate-pulse")} style={{ height: `${4 + ((i * 13) % 24)}px`, animationDelay: `${i * 18}ms` }} />)}
+              </div>
 
               {/* Soundboard in call (collapsible) */}
               <AnimatePresence>
                 {callSoundboardOpen && (
                   <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                    className="bg-black/95 border-t border-primary/20 overflow-hidden">
+                    className="bg-[#0b0614]/95 backdrop-blur-xl border-t border-violet-500/20 overflow-hidden">
                     <div className="p-4">
-                      <div className="text-[8px] font-mono text-primary/40 mb-3 uppercase tracking-widest">Soundboard — click to broadcast</div>
+                      <div className="text-[8px] font-mono text-violet-200/40 mb-3 uppercase tracking-widest">Soundboard — click to broadcast</div>
                       <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
                         {sounds.map(s => (
                           <button key={s.id} onClick={() => handlePlaySound(s)}
-                            className="p-2 border border-primary/20 bg-primary/5 hover:bg-primary/25 hover:border-primary/60 text-[8px] font-mono uppercase transition-all truncate">
+                            className="p-2 border border-violet-500/20 bg-violet-500/5 hover:bg-violet-500/25 hover:border-violet-500/60 text-[8px] font-mono uppercase transition-all truncate">
                             {s.name}
                           </button>
                         ))}
@@ -1048,31 +1602,31 @@ export default function Chat() {
               </AnimatePresence>
 
               {/* Call controls */}
-              <div className="h-32 bg-black border-t border-primary/20 flex items-center justify-center gap-6">
+              <div className="h-32 bg-black border-t border-violet-500/20 flex items-center justify-center gap-6">
                 <button
                   onClick={toggleMute}
-                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isMuted ? "bg-red-600 border-red-400" : "border-white/20 hover:border-primary")}
+                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isMuted ? "bg-red-600 border-red-400" : "border-white/20 hover:border-violet-500")}
                   title={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                 </button>
                 <button
                   onClick={toggleCamera}
-                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isVideoOn ? "bg-primary border-primary text-black" : "border-white/20 hover:border-primary")}
+                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isVideoOn ? "bg-violet-500 border-violet-500 text-black" : "border-white/20 hover:border-violet-500")}
                   title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                 >
                   {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
                 </button>
                 <button
                   onClick={shareScreen}
-                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isSharingScreen ? "bg-accent border-accent text-black" : "border-white/20 hover:border-accent")}
+                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", isSharingScreen ? "bg-fuchsia-600 border-fuchsia-400 text-black" : "border-white/20 hover:border-fuchsia-400")}
                   title="Share screen"
                 >
                   <MonitorUp className="w-6 h-6" />
                 </button>
                 <button
                   onClick={() => setCallSoundboardOpen(v => !v)}
-                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", callSoundboardOpen ? "bg-primary/20 border-primary" : "border-white/20 hover:border-primary")}
+                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", callSoundboardOpen ? "bg-violet-500/20 border-violet-500" : "border-white/20 hover:border-violet-500")}
                   title="Soundboard"
                 >
                   <Volume2 className="w-6 h-6" />
@@ -1093,19 +1647,19 @@ export default function Chat() {
             ====================================================== */}
         <AnimatePresence>
           {showEveryoneList && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0c0615]/80 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-                className="cyber-box w-full max-w-md bg-black border-primary p-6">
+                className="rounded-2xl border border-violet-500/25 bg-[#0c0615]/85 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.10)] w-full max-w-md bg-[#0c0615]/90 backdrop-blur-xl border-violet-500 p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="font-display text-primary uppercase tracking-widest">Global_Directory</h2>
-                  <button onClick={() => setShowEveryoneList(false)}><X className="w-5 h-5 text-primary/60 hover:text-primary" /></button>
+                  <h2 className="font-display text-violet-200 uppercase tracking-widest">Global_Directory</h2>
+                  <button onClick={() => setShowEveryoneList(false)}><X className="w-5 h-5 text-violet-200/60 hover:text-violet-200" /></button>
                 </div>
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                   {users?.filter((u: any) => u.id !== currentUser?.id).map((u: any) => (
-                    <div key={u.id} className="flex items-center justify-between p-3 border border-primary/20 bg-primary/5">
+                    <div key={u.id} className="flex items-center justify-between p-3 border border-violet-500/20 bg-violet-500/5">
                       <div className="flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e]" />
-                        <span className="font-mono text-primary text-sm">{u.username}</span>
+                        <span className="font-mono text-violet-200 text-sm">{u.username}</span>
                       </div>
                       <div className="flex gap-2">
                         <CyberButton variant="primary" onClick={() => { selectPrivateNode(u.id); setShowEveryoneList(false); }} className="px-2 py-1 text-[10px]">MSG</CyberButton>
@@ -1122,13 +1676,16 @@ export default function Chat() {
 
         <AnimatePresence>
           {showCreateGroupModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0c0615]/80 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-                className="cyber-box w-full max-w-sm bg-black border-primary p-6">
-                <h2 className="font-display text-primary uppercase tracking-widest mb-5">Create Cluster</h2>
-                <CyberInput value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Cluster name..." className="mb-4" onKeyDown={e => e.key === 'Enter' && createGroupMutation.mutate(newGroupName)} />
+                className="rounded-2xl border border-violet-500/25 bg-[#0c0615]/85 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.10)] w-full max-w-sm bg-[#0c0615]/90 backdrop-blur-xl border-violet-500 p-6">
+                <div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-violet-200 uppercase tracking-widest">Create a group</h2><p className="mt-1 text-[10px] text-violet-200/45">Start a private space and invite your friends.</p></div><span className="text-3xl">{newGroupIcon}</span></div>
+                <label className="mb-2 block text-[9px] font-mono uppercase tracking-widest text-violet-200/50">Group name</label>
+                <CyberInput value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="e.g. Gaming Squad" className="mb-4" onKeyDown={e => e.key === 'Enter' && createGroupMutation.mutate({ name: newGroupName.trim(), icon: newGroupIcon })} />
+                <label className="mb-2 block text-[9px] font-mono uppercase tracking-widest text-violet-200/50">Choose an icon</label>
+                <div className="mb-5 grid grid-cols-8 gap-2">{['💬','🎮','👾','🚀','⭐','🔥','🛡️','🎨','🎵','⚡','🌌','🐉','🏆','🧩','🖤','🌈'].map(icon => <button key={icon} type="button" onClick={() => setNewGroupIcon(icon)} className={cn('rounded-lg border p-2 text-xl transition-all', newGroupIcon === icon ? 'border-fuchsia-400 bg-fuchsia-500/20' : 'border-violet-500/15 bg-violet-500/5 hover:border-violet-400/50')}>{icon}</button>)}</div>
                 <div className="flex gap-2">
-                  <CyberButton variant="primary" onClick={() => createGroupMutation.mutate(newGroupName)} disabled={!newGroupName.trim()} className="flex-1">CREATE</CyberButton>
+                  <CyberButton variant="primary" onClick={() => createGroupMutation.mutate({ name: newGroupName.trim(), icon: newGroupIcon })} disabled={!newGroupName.trim() || createGroupMutation.isPending} className="flex-1">{createGroupMutation.isPending ? 'CREATING…' : 'CREATE GROUP'}</CyberButton>
                   <CyberButton variant="secondary" onClick={() => setShowCreateGroupModal(false)} className="flex-1">CANCEL</CyberButton>
                 </div>
               </motion.div>
@@ -1138,15 +1695,32 @@ export default function Chat() {
 
         <AnimatePresence>
           {showJoinGroupModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#0c0615]/80 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-                className="cyber-box w-full max-w-sm bg-black border-primary p-6">
-                <h2 className="font-display text-primary uppercase tracking-widest mb-5">Join Cluster</h2>
-                <CyberInput value={joinGroupCode} onChange={e => setJoinGroupCode(e.target.value)} placeholder="Cluster invite code..." className="mb-4" onKeyDown={e => e.key === 'Enter' && joinGroupMutation.mutate(joinGroupCode)} />
+                className="rounded-2xl border border-violet-500/25 bg-[#0c0615]/85 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.10)] w-full max-w-sm bg-[#0c0615]/90 backdrop-blur-xl border-violet-500 p-6">
+                <h2 className="font-display text-violet-200 uppercase tracking-widest mb-2">Join a group</h2>
+                <p className="mb-4 text-[10px] text-violet-200/45">Paste an invite URL or enter its code. Example: https://your-site.com/invite/h432y2r</p>
+                <CyberInput value={joinGroupCode} onChange={e => setJoinGroupCode(e.target.value)} placeholder="Paste invite link or code..." className="mb-2" onKeyDown={e => e.key === 'Enter' && joinGroupMutation.mutate(joinGroupCode)} />
+                {joinGroupCode.trim() && <div className="mb-4 rounded-lg border border-violet-500/15 bg-violet-500/5 p-3 text-[10px] text-violet-200/70"><Link2 className="mr-2 inline h-3 w-3" />{/^https?:\/\//i.test(joinGroupCode.trim()) ? 'Invite link detected — ready to join.' : `Invite code: ${joinGroupCode.trim()}`}</div>}
                 <div className="flex gap-2">
-                  <CyberButton variant="primary" onClick={() => joinGroupMutation.mutate(joinGroupCode)} disabled={!joinGroupCode.trim()} className="flex-1">JOIN</CyberButton>
+                  <CyberButton variant="primary" onClick={() => joinGroupMutation.mutate(joinGroupCode)} disabled={!joinGroupCode.trim() || joinGroupMutation.isPending} className="flex-1">{joinGroupMutation.isPending ? 'JOINING…' : 'JOIN GROUP'}</CyberButton>
                   <CyberButton variant="secondary" onClick={() => setShowJoinGroupModal(false)} className="flex-1">CANCEL</CyberButton>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showManageGroupModal && selectedGroupId && (
+            <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl">
+              <motion.div initial={{ opacity: 0, scale: .94, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .94 }} className="w-full max-w-md rounded-2xl border border-violet-400/25 bg-[#0c0615] p-6 shadow-[0_0_45px_rgba(139,92,246,.15)]">
+                <div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-violet-100">GROUP SETTINGS</h2><p className="mt-1 text-[10px] text-violet-200/40">Personalise your group.</p></div><button onClick={() => setShowManageGroupModal(false)} className="text-violet-200/50 hover:text-white"><X /></button></div>
+                <label className="mb-2 block text-[9px] font-mono uppercase tracking-widest text-violet-200/50">Group name</label>
+                <CyberInput value={manageGroupName} onChange={e => setManageGroupName(e.target.value)} placeholder="Group name" className="mb-4" />
+                <label className="mb-2 block text-[9px] font-mono uppercase tracking-widest text-violet-200/50">Group icon</label>
+                <div className="mb-5 grid grid-cols-8 gap-2">{['💬','🎮','👾','🚀','⭐','🔥','🛡️','🎨','🎵','⚡','🌌','🐉','🏆','🧩','🖤','🌈'].map(icon => <button key={icon} type="button" onClick={() => setManageGroupIcon(icon)} className={cn('rounded-lg border p-2 text-xl transition-all', manageGroupIcon === icon ? 'border-fuchsia-400 bg-fuchsia-500/20' : 'border-violet-500/15 bg-violet-500/5 hover:border-violet-400/50')}>{icon}</button>)}</div>
+                <div className="flex gap-2"><CyberButton variant="primary" className="flex-1" disabled={!manageGroupName.trim() || updateGroupMutation.isPending} onClick={() => updateGroupMutation.mutate({ id: selectedGroupId, name: manageGroupName.trim(), icon: manageGroupIcon })}>{updateGroupMutation.isPending ? 'SAVING…' : 'SAVE CHANGES'}</CyberButton><CyberButton variant="secondary" className="flex-1" onClick={() => setShowManageGroupModal(false)}>CANCEL</CyberButton></div>
               </motion.div>
             </div>
           )}
@@ -1155,11 +1729,11 @@ export default function Chat() {
         {/* Forward Modal */}
         <AnimatePresence>
           {forwardState.isOpen && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[#08040f]/90 backdrop-blur-xl">
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-                className="cyber-box w-full max-w-md bg-black border-accent/40 p-6">
+                className="rounded-2xl border border-violet-500/25 bg-[#0c0615]/85 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.10)] w-full max-w-md bg-black border-fuchsia-400/40 p-6">
                 <div className="flex justify-between items-center mb-5">
-                  <h2 className="font-display text-accent uppercase tracking-widest">Relay Data</h2>
+                  <h2 className="font-display text-fuchsia-300 uppercase tracking-widest">Relay Data</h2>
                   <button onClick={() => setForwardState({ message: null, isOpen: false })}><X className="w-5 h-5" /></button>
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-1">
@@ -1173,7 +1747,7 @@ export default function Chat() {
                         setForwardState({ message: null, isOpen: false });
                         toast({ title: "RELAY_SENT" });
                       }}
-                      className="w-full p-3 border border-white/5 hover:border-accent hover:bg-accent/10 text-left font-mono text-sm text-white/60 hover:text-accent transition-all"
+                      className="w-full p-3 border border-white/5 hover:border-fuchsia-400 hover:bg-fuchsia-600/10 text-left font-mono text-sm text-white/60 hover:text-fuchsia-300 transition-all"
                     >
                       {t.name} <span className="text-[9px] opacity-40">({t.type})</span>
                     </button>
@@ -1203,29 +1777,40 @@ export default function Chat() {
         <AnimatePresence>
           {isSidebarOpen && (
             <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
-              className="w-72 flex-shrink-0 flex flex-col bg-black border border-primary/20 overflow-hidden">
-              <div className="p-4 border-b border-primary/20 bg-primary/5">
+              className="w-72 flex-shrink-0 flex flex-col bg-black border border-violet-500/20 overflow-hidden">
+              <div className="p-4 border-b border-violet-500/20 bg-violet-500/5">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-display text-[11px] tracking-[0.4em] uppercase text-primary">NEXUS SERVER</h2>
+                  <h2 className="font-display text-[11px] tracking-[0.4em] uppercase text-violet-200">NEXUS SERVER</h2>
                   <div className="flex gap-1">
-                    <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:text-white text-primary/20 transition-colors"><X className="w-4 h-4" /></button>
+                    <button title="Create group" onClick={() => setShowCreateGroupModal(true)} className="rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 p-1.5 text-fuchsia-200 transition hover:bg-fuchsia-500/20"><Plus className="h-4 w-4" /></button>
+                    <button title="Join group" onClick={() => setShowJoinGroupModal(true)} className="rounded-md border border-violet-400/20 p-1.5 text-violet-200 transition hover:bg-violet-500/10"><UserPlus className="h-4 w-4" /></button>
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:text-white text-violet-200/20 transition-colors"><X className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
 
-              <div className="p-3 border-b border-primary/10">
+              <div className="p-3 border-b border-violet-500/10">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-primary/30" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-200/30" />
                   <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-black border border-primary/10 pl-8 pr-3 py-1.5 text-[10px] font-mono text-primary outline-none focus:border-primary/40"
+                    className="w-full bg-black border border-violet-500/10 pl-8 pr-3 py-1.5 text-[10px] font-mono text-violet-200 outline-none focus:border-violet-500/40"
                     placeholder="Find a conversation or person..." />
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div className="mb-2 grid grid-cols-2 gap-2 px-1">
+                  <button onClick={() => setShowCreateGroupModal(true)} className="flex items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/10 px-2 py-2 text-[9px] font-bold text-fuchsia-200 transition hover:bg-fuchsia-500/20"><Plus className="h-3.5 w-3.5" /> CREATE GROUP</button>
+                  <button onClick={() => setShowJoinGroupModal(true)} className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-500/5 px-2 py-2 text-[9px] font-bold text-violet-200 transition hover:bg-violet-500/15"><UserPlus className="h-3.5 w-3.5" /> JOIN GROUP</button>
+                </div>
                 <CyberSidebarNode label="# general" isActive={!selectedRecipientId && !selectedGroupId} onClick={selectBroadcast} status="online" />
-                <div className="pt-2 pb-1 px-3 text-[8px] font-bold text-primary/30 uppercase tracking-widest flex items-center gap-2">
-                  <span className="w-2 h-px bg-primary/20 flex-1" /> DIRECT MESSAGES <span className="w-2 h-px bg-primary/20 flex-1" />
+                <div className="pt-3 pb-1 px-3 text-[8px] font-bold text-fuchsia-200/50 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-px bg-fuchsia-500/20 flex-1" /> GROUP CHATS <span className="w-2 h-px bg-fuchsia-500/20 flex-1" />
+                </div>
+                {(filteredGroups as any[]).map((g: any) => <CyberSidebarNode key={`group-${g.id}`} label={<><span className="text-base leading-none">{g.icon || '💬'}</span><span className="truncate">{g.name}</span></>} isActive={selectedGroupId === g.id} onClick={() => selectGroupNode(g.id)} status="online" />)}
+                {filteredGroups.length === 0 && <div className="px-4 py-2 text-[9px] font-mono text-violet-200/25">No groups yet. Create one above.</div>}
+                <div className="pt-3 pb-1 px-3 text-[8px] font-bold text-violet-200/30 uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-2 h-px bg-violet-500/20 flex-1" /> DIRECT MESSAGES <span className="w-2 h-px bg-violet-500/20 flex-1" />
                 </div>
                 {filteredUsers?.map((u: any) => (
                   <CyberSidebarNode
@@ -1247,17 +1832,17 @@ export default function Chat() {
                   />
                 ))}
                 {filteredUsers?.length === 0 && (
-                  <div className="px-4 py-3 text-[9px] font-mono text-primary/30 italic">No people found.</div>
+                  <div className="px-4 py-3 text-[9px] font-mono text-violet-200/30 italic">No people found.</div>
                 )}
               </div>
 
-              <div className="p-3 border-t border-primary/20 bg-black flex items-center gap-3">
-                <div className="w-8 h-8 border border-primary/20 flex items-center justify-center bg-primary/5">
-                  <Cpu className="w-4 h-4 text-primary" />
+              <div className="p-3 border-t border-violet-500/20 bg-black flex items-center gap-3">
+                <div className="w-8 h-8 border border-violet-500/20 flex items-center justify-center bg-violet-500/5">
+                  <Cpu className="w-4 h-4 text-violet-200" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <div className="text-[10px] font-bold text-primary uppercase truncate">{currentUser?.username}</div>
+                    <div className="text-[10px] font-bold text-violet-200 uppercase truncate">{currentUser?.username}</div>
                     <UserProfileTag
                       tagSymbol={currentUser?.tagSymbol}
                       tagText={currentUser?.tagText}
@@ -1265,7 +1850,7 @@ export default function Chat() {
                       size="compact"
                     />
                   </div>
-                  <div className="text-[8px] text-primary/30 font-mono">ONLINE</div>
+                  <div className="text-[8px] text-violet-200/30 font-mono">ONLINE</div>
                 </div>
               </div>
             </motion.div>
@@ -1275,35 +1860,39 @@ export default function Chat() {
         {/* ======================================================
             MAIN CHAT AREA
             ====================================================== */}
-        <div className="flex-1 flex flex-col border border-primary/10 bg-black/70 overflow-hidden">
+        <div className="flex-1 flex flex-col border border-violet-500/10 bg-black/70 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-primary/20 bg-black/60 flex-shrink-0">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/20 bg-black/60 flex-shrink-0">
             <div className="flex items-center gap-3">
               {!isSidebarOpen && (
-                <button onClick={() => setIsSidebarOpen(true)} className="p-1 border border-primary/20 hover:bg-primary/10 text-primary">
+                <button onClick={() => setIsSidebarOpen(true)} className="p-1 border border-violet-500/20 hover:bg-violet-500/10 text-violet-200">
                   <TerminalSquare className="w-5 h-5" />
                 </button>
               )}
-              <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
-              <h2 className="font-display text-sm tracking-[0.4em] text-primary uppercase">{activeChannelName}</h2>
+              <div className="w-2 h-2 rounded-full bg-violet-500 animate-ping" />
+              <h2 className="font-display text-sm tracking-[0.25em] text-violet-200 uppercase">{selectedGroupId ? `${(groups as any[]).find((g: any) => g.id === selectedGroupId)?.icon || '💬'} ${activeChannelName}` : activeChannelName}</h2>
+              {selectedGroupId && <button onClick={() => { const g = (groups as any[]).find((item: any) => item.id === selectedGroupId); setManageGroupName(g?.name || ''); setManageGroupIcon(g?.icon || '💬'); setShowManageGroupModal(true); }} title="Rename group or change icon" className="rounded-md border border-violet-500/20 p-1.5 text-violet-200/60 transition hover:border-fuchsia-400/50 hover:text-fuchsia-200"><Pencil className="h-3.5 w-3.5" /></button>}
               {selectedGroupId && (
-                <span className="text-[8px] font-mono text-primary/30 border border-primary/20 px-2 py-0.5">
+                <span className="text-[8px] font-mono text-violet-200/30 border border-violet-500/20 px-2 py-0.5">
                   CODE: {(groups as any[]).find((g: any) => g.id === selectedGroupId)?.inviteCode || '...'}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowRules(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 py-2 text-[10px] font-semibold tracking-wide text-fuchsia-200 transition-all duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300/60 hover:bg-fuchsia-500/20 hover:shadow-[0_0_18px_rgba(217,70,239,0.18)] active:translate-y-0">
+                <ShieldCheck className="h-3.5 w-3.5" /> RULES
+              </button>
               <CyberButton onClick={() => setShowEveryoneList(true)} variant="primary" className="px-3 py-1.5 text-[10px] hidden sm:flex">
                 <Users className="w-3.5 h-3.5 mr-1.5" /> DIR
               </CyberButton>
               {selectedRecipientId && (
                 <>
                   <button onClick={() => startCall(selectedRecipientId, activeChannelName, false)}
-                    className="p-2 border border-primary/20 hover:border-primary text-primary transition-all" title="Voice Call">
+                    className="p-2 border border-violet-500/20 hover:border-violet-500 text-violet-200 transition-all" title="Voice Call">
                     <Phone className="w-4 h-4" />
                   </button>
                   <button onClick={() => startCall(selectedRecipientId, activeChannelName, true)}
-                    className="p-2 border border-primary/20 hover:border-primary text-primary transition-all" title="Video Call">
+                    className="p-2 border border-violet-500/20 hover:border-violet-500 text-violet-200 transition-all" title="Video Call">
                     <Video className="w-4 h-4" />
                   </button>
                 </>
@@ -1313,23 +1902,16 @@ export default function Chat() {
 
           {/* Group invite code banner */}
           {selectedGroupId && (
-            <div className="px-5 py-2 border-b border-accent/20 bg-accent/5 flex items-center gap-3 flex-shrink-0">
-              <Binary className="w-3.5 h-3.5 text-accent" />
-              <span className="text-[9px] font-mono text-accent/60">Invite Code:</span>
-              <span className="text-[9px] font-mono text-accent font-bold select-all">
-                {(groups as any[]).find((g: any) => g.id === selectedGroupId)?.inviteCode}
-              </span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText((groups as any[]).find((g: any) => g.id === selectedGroupId)?.inviteCode);
-                  toast({ title: "CODE_COPIED" });
-                }}
-                className="text-[8px] font-mono text-accent/60 hover:text-accent underline">Copy</button>
+            <div className="px-5 py-2 border-b border-fuchsia-400/20 bg-fuchsia-600/5 flex items-center gap-3 flex-shrink-0">
+              <Binary className="w-3.5 h-3.5 text-fuchsia-300" />
+              <span className="text-[9px] font-mono text-fuchsia-300/60">INVITE LINK</span>
+              <span className="min-w-0 flex-1 truncate text-[10px] font-mono text-fuchsia-200 select-all">{`${window.location.origin}/invite/${(groups as any[]).find((g: any) => g.id === selectedGroupId)?.inviteCode || ''}`}</span>
+              <button type="button" onClick={() => { const code = (groups as any[]).find((g: any) => g.id === selectedGroupId)?.inviteCode; if (!code) return; navigator.clipboard.writeText(`${window.location.origin}/invite/${code}`); toast({ title: 'INVITE_LINK_COPIED', description: 'Share this link so friends can join.' }); }} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-fuchsia-400/25 px-2 py-1 text-[8px] font-mono text-fuchsia-200 hover:bg-fuchsia-500/10"><Copy className="h-3 w-3" /> COPY LINK</button>
             </div>
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-1">
+          <div className="flex-1 overflow-y-auto p-5 space-y-1 scroll-smooth [scrollbar-gutter:stable]">
             {unifiedMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full opacity-10">
                 <Bug className="w-12 h-12 mb-4" />
@@ -1355,9 +1937,9 @@ export default function Chat() {
           <AnimatePresence>
             {replyTarget && (
               <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                className="border-t border-primary/20 px-5 py-2 bg-primary/5 flex items-center justify-between overflow-hidden flex-shrink-0">
-                <span className="text-[9px] font-mono text-primary/60">Replying to <strong>{replyTarget.senderName}</strong>: {replyTarget.content?.slice(0, 50)}</span>
-                <button onClick={() => setReplyTarget(null)}><X className="w-3.5 h-3.5 text-primary/40 hover:text-primary" /></button>
+                className="border-t border-violet-500/20 px-5 py-2 bg-violet-500/5 flex items-center justify-between overflow-hidden flex-shrink-0">
+                <span className="text-[9px] font-mono text-violet-200/60">Replying to <strong>{replyTarget.senderName}</strong>: {replyTarget.content?.slice(0, 50)}</span>
+                <button onClick={() => setReplyTarget(null)}><X className="w-3.5 h-3.5 text-violet-200/40 hover:text-violet-200" /></button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1366,17 +1948,57 @@ export default function Chat() {
           <AnimatePresence>
             {uploadFile && uploadPreview && (
               <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                className="border-t border-accent/20 px-5 py-2 bg-accent/5 flex items-center gap-4 overflow-hidden flex-shrink-0">
-                {uploadFile.type.startsWith('image/') && <img src={uploadPreview} className="w-12 h-12 object-cover border border-accent/30" />}
-                {uploadFile.type.startsWith('video/') && <Film className="w-5 h-5 text-accent" />}
-                {uploadFile.type.startsWith('audio/') && <Music className="w-5 h-5 text-accent" />}
+                className="border-t border-fuchsia-400/20 px-5 py-2 bg-fuchsia-600/5 flex items-center gap-4 overflow-hidden flex-shrink-0">
+                {uploadFile.type.startsWith('image/') && <img src={uploadPreview} className="w-12 h-12 object-cover border border-fuchsia-400/30" />}
+                {uploadFile.type.startsWith('video/') && <Film className="w-5 h-5 text-fuchsia-300" />}
+                {uploadFile.type.startsWith('audio/') && <Music className="w-5 h-5 text-fuchsia-300" />}
                 <div className="flex-1">
-                  <div className="text-[10px] font-mono text-accent truncate">{uploadFile.name}</div>
-                  <div className="text-[8px] text-accent/40">{(uploadFile.size / 1024).toFixed(0)} KB</div>
+                  <div className="text-[10px] font-mono text-fuchsia-300 truncate">{uploadFile.name}</div>
+                  <div className="text-[8px] text-fuchsia-300/40">{(uploadFile.size / 1024).toFixed(0)} KB</div>
                 </div>
                 <button onClick={() => { setUploadFile(null); setUploadPreview(null); }}>
-                  <X className="w-4 h-4 text-accent/40 hover:text-accent" />
+                  <X className="w-4 h-4 text-fuchsia-300/40 hover:text-fuchsia-300" />
                 </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {(isRecording || voiceBlob) && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+                className="mx-3 mb-2 rounded-xl border border-violet-400/25 bg-[#10091b]/95 px-3 py-3 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 min-w-[100px]">
+                  <span className={cn("w-2 h-2 rounded-full", isRecording ? "bg-red-400 animate-pulse" : "bg-violet-300")} />
+                  <span className="text-[10px] font-mono text-violet-200 uppercase tracking-wider">
+                    {isRecording ? (isRecordingPaused ? 'Recording paused' : 'Recording…') : 'Voice preview'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-[90px] h-7 flex items-center justify-center gap-1 overflow-hidden" aria-label="Audio visualizer">
+                  {Array.from({ length: 28 }, (_, i) => <span key={i} className={cn("w-1 rounded-full bg-gradient-to-t from-violet-600 to-fuchsia-300", isRecording && !isRecordingPaused && "animate-pulse")} style={{ height: `${5 + ((i * 17) % 19)}px`, animationDelay: `${i * 25}ms` }} />)}
+                </div>
+                {isRecording ? (
+                  <>
+                    <button type="button" onClick={togglePauseVoiceRecord} className="p-2 rounded-lg border border-violet-400/30 text-violet-200 hover:bg-violet-500/15" title={isRecordingPaused ? 'Resume recording' : 'Pause recording'}>
+                      {isRecordingPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                    </button>
+                    <button type="button" onClick={stopVoiceRecord} className="p-2 rounded-lg border border-red-400/40 text-red-300 hover:bg-red-500/15" title="Stop recording">
+                      <Square className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <audio ref={voicePreviewAudioRef} src={voicePreviewUrl || undefined} onEnded={() => setVoicePreviewPlaying(false)} className="hidden" />
+                    <button type="button" onClick={playVoicePreview} className="p-2 rounded-lg border border-violet-400/30 text-violet-200 hover:bg-violet-500/15" title={voicePreviewPlaying ? 'Restart preview' : 'Play preview'}>
+                      <Play className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={discardVoiceMessage} className="p-2 rounded-lg border border-white/15 text-white/60 hover:bg-white/10" title="Discard recording">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={sendVoiceMessage} className="px-3 py-2 rounded-lg bg-violet-500 text-white text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-violet-400 flex items-center gap-2">
+                      <Check className="w-4 h-4" /> Send
+                    </button>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1386,23 +2008,15 @@ export default function Chat() {
             <form onSubmit={handleTransmit} className="flex items-center gap-2">
               <button type="button" onClick={() => fileInputRef.current?.click()}
                 className={cn("w-10 h-10 rounded flex items-center justify-center transition-all flex-shrink-0",
-                  uploadFile ? "bg-accent/20 text-accent" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
+                  uploadFile ? "bg-fuchsia-600/20 text-fuchsia-300" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
                 <Plus className="w-5 h-5" />
               </button>
 
-              <button type="button"
-                onMouseDown={startVoiceRecord}
-                onMouseUp={stopVoiceRecord}
-                onMouseLeave={stopVoiceRecord}
-                onTouchStart={startVoiceRecord}
-                onTouchEnd={stopVoiceRecord}
-                className={cn(
-                  "w-10 h-10 rounded flex items-center justify-center flex-shrink-0 transition-all",
-                  isRecording
-                    ? "bg-red-500/20 text-red-400 animate-pulse"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                )}
-                title="Hold to record voice message">
+              <button type="button" onClick={startVoiceRecord} disabled={isRecording || Boolean(voiceBlob)}
+                className={cn("w-10 h-10 rounded flex items-center justify-center flex-shrink-0 transition-all",
+                  isRecording ? "bg-red-500/20 text-red-400 animate-pulse" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  (isRecording || voiceBlob) && "opacity-50 cursor-not-allowed")}
+                title="Start voice recording">
                 <Mic className="w-4 h-4" />
               </button>
 
@@ -1410,10 +2024,45 @@ export default function Chat() {
                 <input
                   value={inputContent}
                   onChange={e => setInputContent(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTransmit(); } }}
-                  placeholder="Message..."
-                  className="w-full h-10 bg-input border border-border rounded-lg px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-primary/50 transition-all"
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder="Message... (type / for commands)"
+                  className="w-full h-10 bg-input/90 border border-border rounded-xl px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground shadow-inner transition-all duration-200 ease-out focus:-translate-y-px focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400/60 focus:shadow-[0_0_22px_rgba(139,92,246,0.12)]"
                 />
+                {showCommandMenu && (
+                  <div className="absolute bottom-12 left-0 right-0 z-50 rounded-xl border border-violet-400/30 bg-[#10091b]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.2)] overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-violet-400/15">
+                      <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-violet-200/70">{moderationUserOptions.length ? 'Choose a member' : parameterOptions.length ? 'Command parameters' : 'Available commands'}</span>
+                      <span className="text-[8px] font-mono text-violet-200/35">↑ ↓ navigate · TAB complete · ENTER run</span>
+                    </div>
+                    {(moderationUserOptions.length ? moderationUserOptions : parameterOptions.length ? parameterOptions : matchingCommands).map((item: any, index: number) => {
+                      const selected = index === commandSelection;
+                      const isTargetSuggestion = moderationUserOptions.length > 0;
+                      const isDurationSuggestion = !isTargetSuggestion && parameterOptions.length > 0;
+                      const command = isDurationSuggestion ? activeCommand : item;
+                      const targetUser = isTargetSuggestion ? item : null;
+                      return (
+                        <button
+                          key={isTargetSuggestion ? `target-${item.id}` : isDurationSuggestion ? `${command?.name}-${item}` : item.name}
+                          type="button"
+                          onMouseEnter={() => setCommandSelection(index)}
+                          onClick={() => isTargetSuggestion ? insertModerationTarget(targetUser) : isDurationSuggestion ? insertParameter(item) : insertCommand(item.name)}
+                          className={cn('w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors', selected ? 'bg-violet-500/20' : 'hover:bg-violet-500/10')}
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/15 text-violet-200"><Command className="w-3.5 h-3.5" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[11px] font-mono text-fuchsia-200">{isTargetSuggestion ? `@${item.username}` : isDurationSuggestion ? item : command?.usage}</span>
+                            <span className="block text-[9px] text-violet-100/45">{isTargetSuggestion ? (item.displayName || item.nickname || 'Chat member') : isDurationSuggestion ? `Duration for /${command?.name}` : command?.description}</span>
+                          </span>
+                          {selected && <span className="text-[8px] font-mono text-violet-200/50">TAB</span>}
+                        </button>
+                      );
+                    })}
+                    {activeCommand && commandArgument !== null && parameterOptions.length === 0 && moderationUserOptions.length === 0 && (
+                      <div className="px-3 py-2 text-[9px] font-mono text-violet-200/45">Usage: {activeCommand.usage}{isModerationCommand ? ' · Type a username to choose a member, then select a duration.' : ('example' in activeCommand && activeCommand.example ? ` · Example: ${activeCommand.example}` : '')}</div>
+                    )}
+                    {inputContent === '/' && <div className="px-3 py-2 text-[9px] font-mono text-violet-200/40">Type a command name or choose /help to see the list.</div>}
+                  </div>
+                )}
                 {mentionCandidates.length > 0 && (
                   <div className="absolute bottom-12 left-0 right-0 z-40 rounded-lg border border-border bg-[hsl(225_7%_15%)] shadow-2xl overflow-hidden">
                     <div className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border">
@@ -1441,6 +2090,15 @@ export default function Chat() {
                 )}
               </div>
 
+              <button
+                type="button"
+                onClick={() => { setShowGifPicker(true); if (!gifResults.length) searchGifs(""); }}
+                title="Send a GIF"
+                className="h-10 px-3 rounded-lg flex items-center justify-center gap-1.5 flex-shrink-0 border border-violet-400/20 bg-violet-500/5 text-violet-200 hover:bg-fuchsia-500/15 hover:border-fuchsia-400/40 hover:text-fuchsia-200 transition-all duration-200"
+              >
+                <Film className="w-4 h-4" />
+                <span className="text-[10px] font-bold tracking-wider">GIF</span>
+              </button>
               <EmojiButton onSelect={emoji => setInputContent(prev => prev + emoji)} />
 
               <CyberButton type="submit" disabled={!inputContent.trim() && !uploadFile} size="sm" className="h-10 px-4 flex-shrink-0">
@@ -1455,29 +2113,29 @@ export default function Chat() {
             ====================================================== */}
         <div className="hidden xl:flex w-72 flex-col gap-4 flex-shrink-0">
           {/* Diagnostic log */}
-          <CyberCard className="p-4 border-primary/20 bg-black/80 flex flex-col" style={{ height: '45%' }}>
-            <h3 className="text-[9px] font-display text-primary tracking-[0.4em] mb-3 flex items-center gap-2">
+          <CyberCard className="p-4 border-violet-500/20 bg-[#0c0615]/80 backdrop-blur-xl flex flex-col" style={{ height: '45%' }}>
+            <h3 className="text-[9px] font-display text-violet-200 tracking-[0.4em] mb-3 flex items-center gap-2">
               <Terminal className="w-3 h-3 animate-pulse" /> DIAGNOSTIC_LOG
             </h3>
             <div className="flex-1 overflow-y-auto space-y-2 font-mono text-[8px]">
               {logs.map(log => (
-                <div key={log.id} className="border-l-2 border-primary/20 pl-2">
-                  <div className={cn("font-bold", log.type === 'crit' ? "text-red-400" : log.type === 'warn' ? "text-yellow-400" : "text-primary/50")}>{log.time}</div>
-                  <div className="text-primary/60 truncate">{log.msg}</div>
+                <div key={log.id} className="border-l-2 border-violet-500/20 pl-2">
+                  <div className={cn("font-bold", log.type === 'crit' ? "text-red-400" : log.type === 'warn' ? "text-yellow-400" : "text-violet-200/50")}>{log.time}</div>
+                  <div className="text-violet-200/60 truncate">{log.msg}</div>
                 </div>
               ))}
-              {!logs.length && <div className="text-primary/20 italic animate-pulse">Scanning...</div>}
+              {!logs.length && <div className="text-violet-200/20 italic animate-pulse">Scanning...</div>}
             </div>
           </CyberCard>
 
           {/* Soundboard */}
-          <CyberCard className="p-4 border-primary/20 bg-black/80 flex flex-col flex-1 overflow-hidden">
+          <CyberCard className="p-4 border-violet-500/20 bg-[#0c0615]/80 backdrop-blur-xl flex flex-col flex-1 overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[9px] font-display text-primary tracking-[0.4em] flex items-center gap-2">
+              <h3 className="text-[9px] font-display text-violet-200 tracking-[0.4em] flex items-center gap-2">
                 <Volume2 className="w-3 h-3" /> SOUNDBOARD
               </h3>
               <button onClick={() => soundFileInputRef.current?.click()}
-                className="text-[8px] font-mono text-primary/40 hover:text-accent border border-primary/20 hover:border-accent px-2 py-0.5 transition-colors flex items-center gap-1">
+                className="text-[8px] font-mono text-violet-200/40 hover:text-fuchsia-300 border border-violet-500/20 hover:border-fuchsia-400 px-2 py-0.5 transition-colors flex items-center gap-1">
                 <Upload className="w-2.5 h-2.5" /> IMPORT
               </button>
             </div>
@@ -1485,14 +2143,14 @@ export default function Chat() {
               <div className="grid grid-cols-2 gap-1.5 pr-1">
                 {sounds.map(s => (
                   <button key={s.id} onClick={() => handlePlaySound(s)}
-                    className="p-2 border border-primary/10 bg-primary/5 hover:bg-primary/20 hover:border-primary/40 text-[8px] font-mono text-left uppercase transition-all truncate group">
+                    className="p-2 border border-violet-500/10 bg-violet-500/5 hover:bg-violet-500/20 hover:border-violet-500/40 text-[8px] font-mono text-left uppercase transition-all truncate group">
                     <Play className="w-2.5 h-2.5 inline mr-1 opacity-0 group-hover:opacity-100" />{s.name}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-primary/10">
-              <div className="text-[8px] font-mono text-primary/30 mb-2 uppercase">Custom Ringtone URL</div>
+            <div className="mt-3 pt-3 border-t border-violet-500/10">
+              <div className="text-[8px] font-mono text-violet-200/30 mb-2 uppercase">Custom Ringtone URL</div>
               <CyberInput
                 value={userConfig?.ringtoneUrl || ""}
                 onChange={e => updateProfile.mutate({ ringtoneUrl: e.target.value })}
@@ -1503,6 +2161,64 @@ export default function Chat() {
           </CyberCard>
         </div>
       </div>
+      <AnimatePresence>
+        {showGifPicker && (
+          <motion.div
+            className="fixed inset-0 z-[960] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onMouseDown={e => { if (e.target === e.currentTarget) setShowGifPicker(false); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="w-full max-w-2xl max-h-[82vh] overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[#10091b]/95 shadow-[0_20px_80px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)] flex flex-col"
+            >
+              <div className="flex items-center justify-between border-b border-violet-400/15 px-5 py-4">
+                <div className="flex items-center gap-2"><Film className="w-5 h-5 text-fuchsia-300" /><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">GIF LIBRARY</div><div className="mt-1 text-[10px] text-violet-100/45">Browse trending GIFs or search gaming, memes and reactions.</div></div></div>
+                <button onClick={() => setShowGifPicker(false)} className="rounded-lg p-2 text-violet-200/60 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
+              </div>
+              <form onSubmit={e => { e.preventDefault(); searchGifs(); }} className="flex gap-2 p-4 border-b border-violet-400/10">
+                <input value={gifSearch} onChange={e => setGifSearch(e.target.value)} placeholder="Search gaming, Roblox, Minecraft, reactions..." autoFocus className="h-10 min-w-0 flex-1 rounded-lg border border-violet-400/20 bg-black/30 px-3 text-sm text-white outline-none placeholder:text-violet-100/30 focus:border-fuchsia-400/50" />
+                <button type="submit" disabled={gifLoading} className="h-10 rounded-lg bg-violet-500/20 px-4 text-xs font-bold text-violet-100 hover:bg-violet-500/30 disabled:opacity-50">{gifLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</button>
+              </form>
+              {gifError ? (
+                <div className="p-8 text-center text-sm text-red-300">{gifError}</div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  {gifLoading && !gifResults.length ? <div className="flex justify-center p-10"><Loader2 className="h-6 w-6 animate-spin text-fuchsia-300" /></div> : null}
+                  {!gifLoading && !gifResults.length && <div className="p-8 text-center text-xs text-violet-100/40">Search for something to find GIFs.</div>}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {gifResults.map((gif: any) => {
+                      const previewUrl = gif.previewUrl || gif.url;
+                      return <button key={gif.id} type="button" onClick={() => sendGif(gif)} title={`${gif.title} · ${gif.license}`} className="group relative overflow-hidden rounded-lg border border-violet-400/10 bg-black/30 aspect-video hover:border-fuchsia-400/60 hover:shadow-[0_0_18px_rgba(217,70,239,0.18)] transition-all">
+                        {previewUrl && <img src={previewUrl} alt={gif.title || "GIF"} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />}
+                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[9px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity">Send GIF</span>
+                      </button>;
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by GifSnap · No API key required.</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showRules && (
+          <motion.div className="fixed inset-0 z-[950] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={e => { if (e.target === e.currentTarget) setShowRules(false); }}>
+            <motion.div initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.2, ease: 'easeOut' }} className="w-full max-w-lg overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[#10091b]/95 shadow-[0_20px_80px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)]">
+              <div className="flex items-center justify-between border-b border-violet-400/15 px-5 py-4"><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">SERVER RULES</div><div className="mt-1 text-[10px] text-violet-100/45">Keep the community safe and welcoming.</div></div><button onClick={() => setShowRules(false)} className="rounded-lg p-2 text-violet-200/60 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button></div>
+              <ol className="space-y-3 px-6 py-5 text-sm leading-relaxed text-violet-50/85 list-decimal marker:font-bold marker:text-fuchsia-300">
+                <li><span className="font-semibold text-white">No NSFW</span> — porn, gore, vore, or other explicit content.</li>
+                <li><span className="font-semibold text-white">Be kind</span> — no racism, queerphobia, ableism, or other hateful behaviour.</li>
+                <li><span className="font-semibold text-white">Don’t be weird</span> — respect boundaries and keep interactions appropriate.</li>
+                <li><span className="font-semibold text-white">No spamming</span> — don’t flood chats or repeatedly disrupt conversations.</li>
+              </ol>
+              <div className="border-t border-violet-400/15 px-5 py-3 text-[9px] text-violet-100/35">Messages containing prohibited content may be blocked and result in a 5-minute mute.</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <ProfileModal
         userId={profileUserId}
         currentUserId={currentUser?.id ?? -1}
