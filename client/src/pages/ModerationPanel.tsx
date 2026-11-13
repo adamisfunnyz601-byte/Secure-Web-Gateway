@@ -35,6 +35,8 @@ export default function ModerationPanel() {
   const [busy, setBusy] = useState(false);
   const [advancedCommand, setAdvancedCommand] = useState("warn");
   const [advancedArgs, setAdvancedArgs] = useState("");
+  const [coinAmount, setCoinAmount] = useState("100");
+  const [coinBusy, setCoinBusy] = useState(false);
   const role = String(user?.role || "").toLowerCase().replace(/_/g, "-");
   const staff = ["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(role);
   const { data: users = [], isLoading, refetch } = useQuery<any[]>({
@@ -48,6 +50,22 @@ export default function ModerationPanel() {
   }), [users, search]);
   const target = users.find((u:any) => String(u.id) === targetId);
   const protectedTarget = target && String(target.role).toLowerCase() === "owner";
+
+  const grantDihCoins = async () => {
+    if (!target) { toast({ title: "Choose a member first", variant: "destructive" }); return; }
+    const amount = Number(coinAmount);
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100000) { toast({ title: "Invalid DihCoins amount", description: "Enter 1–100,000.", variant: "destructive" }); return; }
+    setCoinBusy(true);
+    try {
+      const response = await fetch("/api/admin/dihcoins/grant", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: target.id, amount }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not grant DihCoins.");
+      toast({ title: "DihCoins granted", description: "Added " + amount.toLocaleString() + " DihCoins to @" + target.username + "'s balance." });
+      setCoinAmount("100");
+      await refetch();
+    } catch (error:any) { toast({ title: "Grant failed", description: error.message, variant: "destructive" }); }
+    finally { setCoinBusy(false); }
+  };
 
   const runAdvancedCommand = async () => {
     const commandText = "/" + advancedCommand + (advancedArgs.trim() ? " " + advancedArgs.trim() : "");
@@ -110,6 +128,12 @@ export default function ModerationPanel() {
             <input value={advancedArgs} onChange={e=>setAdvancedArgs(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runAdvancedCommand();}} placeholder="Arguments: @username 1h reason…" className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"/>
             <button disabled={busy} onClick={runAdvancedCommand} className="mt-2 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">{busy ? "Running…" : "Run selected command"}</button>
           </div>
+          {["owner","admin"].includes(role) && <div className="border-t border-border pt-4">
+            <h3 className="text-sm font-bold text-amber-300">DihCoins wallet</h3>
+            <p className="mt-1 text-[11px] text-muted-foreground">Grant currency to the selected member. Only admins and owners can use this.</p>
+            <label className="mt-3 block text-xs text-muted-foreground">Amount<input type="number" min="1" max="100000" value={coinAmount} onChange={e=>setCoinAmount(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground"/></label>
+            <button disabled={coinBusy || !target} onClick={grantDihCoins} className="mt-2 w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2.5 text-sm font-bold text-amber-200 transition hover:bg-amber-400/20 disabled:opacity-40">{coinBusy ? "Granting…" : "Grant DihCoins"}</button>
+          </div>}
           <p className="text-[11px] leading-relaxed text-muted-foreground">Your role permissions and the target's role are verified on the server. A failed permission check will not apply the action.</p>
         </section>
       </div>
