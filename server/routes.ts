@@ -16,10 +16,19 @@ import {
 import { z } from "zod";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import sharp from "sharp";
 import { rateLimit } from "express-rate-limit";
 
+const hashAccountPassword = (password: string) => {
+  const salt = randomBytes(16).toString("hex");
+  return salt + ":" + scryptSync(password, salt, 64).toString("hex");
+};
+const verifyAccountPassword = (password: string, stored: string) => {
+  const [salt, hash] = String(stored || "").split(":");
+  if (!salt || !hash || !/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(hash)) return false;
+  return timingSafeEqual(scryptSync(password, salt, 64), Buffer.from(hash, "hex"));
+};
 type OAuthProvider = "google" | "microsoft";
 
 declare module "express-session" {
@@ -371,6 +380,11 @@ export async function registerRoutes(
       const { serialKey, username } = api.auth.login.input.parse(req.body);
 
       let user = await storage.getUserBySerial(serialKey);
+      if (!user && username) {
+        const [namedUser] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+        if (namedUser?.passwordHash && verifyAccountPassword(serialKey, namedUser.passwordHash)) user = namedUser;
+        else if (namedUser) return res.status(401).json({ message: "Incorrect username or password." });
+      }
 
       // Check if it's the owner key
       if (serialKey === OWNER_KEY) {
@@ -1321,14 +1335,14 @@ export async function registerRoutes(
   // === ACCESS REQUESTS (public - no auth required) ===
   app.post('/api/access-requests', accessRequestRateLimit, turnstileGuard(), async (req, res) => {
     try {
-      const { name, message } = req.body;
-      if (!name || typeof name !== 'string' || name.trim().length < 1) {
-        return res.status(400).json({ message: 'Name is required' });
-      }
-      if (!message || typeof message !== 'string' || message.trim().length < 5) {
-        return res.status(400).json({ message: 'Message is required (min 5 characters)' });
-      }
-      const request = await storage.createAccessRequest({ name: name.trim(), message: message.trim() });
+      const { username, name, password, message } = req.body;
+      const requestedUsername = String(username || name || "").trim();
+      if (!/^[A-Za-z0-9_.-]{3,24}$/.test(requestedUsername)) return res.status(400).json({ message: "Username must be 3–24 characters using letters, numbers, dots, dashes or underscores." });
+      if (typeof password !== "string" || password.length < 8 || password.length > 128) return res.status(400).json({ message: "Password must be between 8 and 128 characters." });
+      if (typeof message !== "string" || message.trim().length < 5 || message.trim().length > 500) return res.status(400).json({ message: "Tell us why you want to join (5–500 characters)." });
+      const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, requestedUsername)).limit(1);
+      if (existing) return res.status(409).json({ message: "That username is already taken." });
+      const request = await storage.createAccessRequest({ name: requestedUsername, passwordHash: hashAccountPassword(password), message: message.trim() });
       res.status(201).json(request);
     } catch (err: any) {
       res.status(500).json({ message: err?.message || 'Failed' });
@@ -1342,11 +1356,27 @@ export async function registerRoutes(
 
   app.patch('/api/admin/requests/:id', requireOwner, async (req, res) => {
     const { status } = req.body;
-    if (!['pending', 'approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
+    if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
+    const requestId = Number(req.params.id);
+    if (!Number.isInteger(requestId) || requestId < 1) return res.status(400).json({ message: 'Invalid request.' });
+    const [request] = await db.select().from(accessRequests).where(eq(accessRequests.id, requestId)).limit(1);
+    if (!request) return res.status(404).json({ message: 'Access request not found.' });
+    if (request.status !== "pending") return res.status(409).json({ message: "This request has already been reviewed." });
+    if (status === "approved") {
+      if (!request.passwordHash) return res.status(400).json({ message: "This older request has no saved password. Ask the applicant to submit a new request." });
+      const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, request.name)).limit(1);
+      if (existing) return res.status(409).json({ message: "That username is now taken. Reject this request and ask them to apply with another username." });
+      const [created] = await db.insert(users).values({
+        username: request.name,
+        serialKey: "ACCOUNT-" + randomBytes(24).toString("hex"),
+        passwordHash: request.passwordHash,
+        role: "user",
+      }).returning({ id: users.id });
+      await db.update(accessRequests).set({ status: "approved", createdUserId: created.id, passwordHash: null }).where(eq(accessRequests.id, requestId));
+      return res.json({ success: true, accountCreated: true, userId: created.id, username: request.name });
     }
-    await storage.updateAccessRequestStatus(Number(req.params.id), status);
-    res.json({ success: true });
+    await db.update(accessRequests).set({ status, passwordHash: null }).where(eq(accessRequests.id, requestId));
+    return res.json({ success: true, accountCreated: false });
   });
 
   // === CUSTOM EMOJIS ===
