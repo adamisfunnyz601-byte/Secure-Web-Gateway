@@ -306,6 +306,7 @@ export function ProfileModal({
   };
 
   const isOwn = profile?.id === currentUserId;
+  const canUseDihhro = ["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) || Boolean(viewer?.dihhroUntil && new Date(viewer.dihhroUntil) > new Date());
     try {
       const response = await fetch("/api/admin/dihhro/grant", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, months: 1 }) });
       const data = await response.json().catch(() => ({}));
@@ -606,7 +607,7 @@ export function ProfileModal({
                       <Field label="PROFILE GRADIENT (DIHHRO)">
                         <div className="grid grid-cols-4 gap-1.5">
                           {["none","aurora","sunset","ocean","ember","violet","mint","mono"].map((gradient) => (
-                            <button key={gradient} type="button" onClick={() => setForm({ ...form, profileGradient: gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", form.profileGradient === gradient ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
+                            <button key={gradient} type="button" disabled={gradient !== "none" && !canUseDihhro} onClick={() => setForm({ ...form, profileGradient: gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", form.profileGradient === gradient ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
                           ))}
                         </div>
                       </Field>
