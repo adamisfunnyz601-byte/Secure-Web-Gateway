@@ -518,7 +518,8 @@ export default function Chat() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
-  const [visualizerStream, setVisualizerStream] = useState<MediaStream | null>(null);\n  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  const [visualizerStream, setVisualizerStream] = useState<MediaStream | null>(null);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [callTargetName, setCallTargetName] = useState("");
 
