@@ -30,7 +30,7 @@ import { EmojiButton } from "@/components/EmojiPicker";
 const SESSION_CRYPT = "X-256-CHA-CHA-POLY";
 
 // GifSnap public GIF catalogue. No API key, account, or secret required.
-const GIF_API_BASE = "https://gifsnap.com/api/v1";
+const GIF_API_BASE = "https://gifcities.archive.org/api/v1/gifsearch";
 
 const DEFAULT_SOUNDS = [
   { id: 'S1', name: 'Neural ping', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
@@ -935,24 +935,30 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     setGifLoading(true);
     setGifError("");
     try {
-      const params = new URLSearchParams({ page: "1", limit: "30" });
-      const endpoint = query.trim() ? "gifs/search" : "gifs/trending";
-      if (query.trim()) params.set("q", query.trim());
-      const response = await fetch(`${GIF_API_BASE}/${endpoint}?${params.toString()}`);
-      if (!response.ok) throw new Error(`GIF search failed (${response.status}). Please try again.`);
-      const data = await response.json();
-      const results = (Array.isArray(data?.data) ? data.data : []).map((item: any) => ({
-        id: item.id,
-        title: item.title || "Animated GIF",
-        url: item.url,
-        previewUrl: item.animated_preview?.url || item.url || item.preview_url,
-        mime: item.animated_preview?.mime_type || "image/gif",
-        sourceUrl: item.source?.url || item.source || "https://gifsnap.com",
-      })).filter((gif: any) => typeof gif.url === "string" && /^https?:\/\//i.test(gif.url));
+      // Internet Archive GifCities is keyless and hosted separately from the old provider.
+      const term = query.trim() || "funny";
+      const response = await fetch(`${GIF_API_BASE}?q=${encodeURIComponent(term)}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error(`GIF search failed (${response.status}). Try another search in a moment.`);
+      const payload = await response.json();
+      const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
+      const results = rows.map((item: any, index: number) => {
+        const candidate = item.url || item.gif_url || item.image_url || item.url_text;
+        const url = typeof candidate === "string" && /^https?:\/\//i.test(candidate)
+          ? candidate
+          : (typeof item.archive_url === "string" ? item.archive_url : "");
+        return {
+          id: String(item.id || item.digest || url || index),
+          title: item.title || item.url_text || "Internet Archive GIF",
+          url,
+          previewUrl: item.thumbnail || item.preview_url || url,
+          sourceUrl: "https://gifcities.org/",
+          license: "Internet Archive · archived GeoCities"
+        };
+      }).filter((gif: any) => gif.url && /^https?:\/\//i.test(gif.url));
       setGifResults(results);
-      if (!results.length) setGifError("No GIFs found. Try another search, such as gaming, Minecraft, Roblox, reaction or victory.");
+      if (!results.length) setGifError("No GIFs found for that search. Try a simpler word such as funny, cat, dance or reaction.");
     } catch (error: any) {
-      setGifError(error?.message || "Couldn't load GIFs. Check your connection and try again.");
+      setGifError(error?.message || "Couldn't reach the Internet Archive GIF search. Try again shortly.");
     } finally {
       setGifLoading(false);
     }
@@ -2567,7 +2573,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                   </div>
                 </div>
               )}
-              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by GifSnap · No API key required.</div>
+              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by Internet Archive GifCities · No API key required.</div>
             </motion.div>
           </motion.div>
         )}
