@@ -418,6 +418,12 @@ export async function registerRoutes(
       if (user.expiresAt && new Date() > user.expiresAt) {
         return res.status(401).json({ message: "Account expired" });
       }
+      const [activeBan] = await db.select().from(moderationLogs)
+        .where(and(eq(moderationLogs.targetId, user.id), sql`${moderationLogs.action} IN ('ban','tempban','permban','softban')`))
+        .orderBy(desc(moderationLogs.createdAt)).limit(1);
+      if (activeBan && (!activeBan.expiresAt || activeBan.expiresAt > new Date())) {
+        return res.status(403).json({ message: "This account is currently banned." });
+      }
 
       // Set session
       req.session.userId = user.id;
@@ -624,6 +630,15 @@ export async function registerRoutes(
     const durationToken = String(req.body?.duration || args[1] || "");
     const durationMs = ["ban","tempban","mute","timeout","jail","restrict","shadowban","softban"].includes(name) ? parseDurationMs(durationToken) : null;
     if (["ban","tempban","mute","timeout","jail","restrict","shadowban","softban"].includes(name) && durationMs === undefined) return res.status(400).json({ message: "Provide a duration such as 10m, 2h, 3d, 1w, 1mo, 1y or null." });
+    if (name === "role" || name === "promote" || name === "demote") {
+      if (!target) return res.status(400).json({ message: "Specify a target username." });
+      const desired = canonicalRole(String(args[1] || req.body?.role || ""));
+      if (!["admin","trial-admin","moderator","trial-moderator","helper","trial-helper","user"].includes(desired)) return res.status(400).json({ message: "Usage: /role @user admin|trial-admin|moderator|trial-moderator|helper|trial-helper|user" });
+      if (aRole !== "owner" && (roleRank[desired] ?? 0) >= (roleRank[aRole] ?? 0)) return res.status(403).json({ message: "You cannot assign a role equal to or above your own." });
+      await db.update(users).set({ role: desired }).where(eq(users.id, target.id));
+      await db.insert(moderationLogs).values({ actorId, targetId: target.id, action: "role-change", reason: `Role set to ${desired}`, metadata: { to: desired } });
+      return res.json({ message: `${target.username} is now ${desired}.` });
+    }
     const reason = String(req.body?.reason || args.slice(2).join(" ") || "").slice(0,300);
     const action = name;
     await db.insert(moderationLogs).values({
@@ -660,6 +675,12 @@ export async function registerRoutes(
 
   app.post(api.chat.send.path, requireAuth, async (req, res) => {
     const input = api.chat.send.input.parse(req.body);
+    const [activeMute] = await db.select().from(moderationLogs)
+      .where(and(eq(moderationLogs.targetId, req.session.userId!), sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict')`))
+      .orderBy(desc(moderationLogs.createdAt)).limit(1);
+    if (activeMute && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) {
+      return res.status(403).json({ message: "You are currently muted or restricted by moderation." });
+    }
     if (input.recipientId && input.groupId) {
       return res.status(400).json({ message: "Choose a DM or a channel, not both" });
     }
