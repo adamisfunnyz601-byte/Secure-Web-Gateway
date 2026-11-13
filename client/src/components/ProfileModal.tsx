@@ -199,7 +199,8 @@ export function ProfileModal({
 }: ProfileModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);\n  useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
   const [form, setForm] = useState<any>({});
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -337,7 +338,8 @@ export function ProfileModal({
     reader.readAsDataURL(file);
   };
 
-  const isOwn = profile?.id === currentUserId;\n  const canEditProfile = Boolean(isOwn && userId != null);
+  const isOwn = profile?.id === currentUserId;
+  const canEditProfile = Boolean(isOwn && userId != null);
   const canUseDihhro = ["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) || Boolean(viewer?.dihhroUntil && new Date(viewer.dihhroUntil) > new Date());
   const giftDihhro = async () => {
     try {
