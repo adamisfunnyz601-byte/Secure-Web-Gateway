@@ -19,6 +19,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
   ];
 
+  if (["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(String(user?.role || "").toLowerCase().replace(/_/g,"-"))) {
+    navItems.push({ href: "/moderation", label: "Moderation", icon: ShieldAlert });
+  }
+
   if (["owner", "admin", "trial-admin"].includes(String(user?.role || "").toLowerCase())) {
     navItems.push({ href: "/admin", label: "Admin", icon: ShieldAlert });
   }
