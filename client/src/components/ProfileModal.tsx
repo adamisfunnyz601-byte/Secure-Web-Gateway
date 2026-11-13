@@ -78,7 +78,8 @@ export const USERNAME_FONTS: {
   },
 ];
 
-export function getFontClass(id?: string | null) {\n  if (id?.startsWith("custom-gradient|")) id = id.split("|")[1] || "default";
+export function getFontClass(id?: string | null) {
+  if (id?.startsWith("custom-gradient|")) id = id.split("|")[1] || "default";
   return (
     USERNAME_FONTS.find((f) => f.id === id)?.className ||
     USERNAME_FONTS[0].className
@@ -109,7 +110,8 @@ export function getUsernameGradientStyle(value?: string | null): React.CSSProper
   if (!/^[a-z-]+$/.test(font||"") || !/^#[0-9a-f]{6}$/i.test(a||"") || !/^#[0-9a-f]{6}$/i.test(b||"")) return {};
   return {backgroundImage:`linear-gradient(90deg,${a},${b})`,backgroundClip:"text",WebkitBackgroundClip:"text",color:"transparent"};
 }
-\nexport function Avatar({
+
+export function Avatar({
   url,
   name,
   size = 32,
@@ -229,7 +231,12 @@ export function ProfileModal({
         avatarUrl: profile.avatarUrl || "",
         bannerUrl: profile.bannerUrl || "",
         usernameFont: profile.usernameFont || "default",
-        profileGradient: profile.profileGradient || "none",\n        customProfileStart: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[0] : "#0ea5e9",\n        customProfileMiddle: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[1] : "#8b5cf6",\n        customProfileEnd: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[2] : "#ec4899",\n        customTextStart: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[2] : "#22d3ee",\n        customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
+        profileGradient: profile.profileGradient || "none",
+        customProfileStart: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[0] : "#0ea5e9",
+        customProfileMiddle: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[1] : "#8b5cf6",
+        customProfileEnd: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[2] : "#ec4899",
+        customTextStart: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[2] : "#22d3ee",
+        customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
         tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
         tagText: profile.tagText || "",
         tagColor: profile.tagColor || PROFILE_TAG_COLORS[0],
