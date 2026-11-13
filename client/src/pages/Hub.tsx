@@ -6,7 +6,7 @@ import {
   Gamepad2, Trophy, Target, Flame, Zap, Clock3, StickyNote, CheckSquare,
   Dices, Coins, Brain, MousePointer2, Swords, Sparkles, ArrowRight,
   RotateCcw, Play, Pause, Plus, Trash2, Star, Shield, Users, ShoppingBag,
-  MessageSquare, Blocks, Timer, Lightbulb, Shuffle, Hash, Type, Palette
+  MessageSquare, Blocks, Users, Timer, Lightbulb, Shuffle, Hash, Type, Palette
 } from "lucide-react";
 
 type Task = { id: number; text: string; done: boolean };
@@ -27,6 +27,7 @@ const games = [
 const shortcuts = [
   { title: "Messages", description: "Talk to friends and join conversations.", href: "/chat", icon: MessageSquare },
   { title: "Block Blast", description: "Play the block placement puzzle.", href: "/block-blast", icon: Blocks },
+  { title: "2D Hangouts", description: "Explore shared rooms with friends.", href: "/hangouts", icon: Users },
   { title: "Cosmetic Shop", description: "Browse profile decorations and emotes.", href: "/shop", icon: ShoppingBag },
   { title: "My Profile", description: "Customise your public identity.", href: "/profile", icon: Users },
   { title: "Settings", description: "Manage presence and notifications.", href: "/settings", icon: Shield },
