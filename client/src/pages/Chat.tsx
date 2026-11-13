@@ -11,7 +11,7 @@ import {
   ChevronRight, Terminal, Mic, MicOff, Video, VideoOff, X, Pause, Square, Check,
   Download, Cpu, Ghost, Forward, Trash2, Reply, Music,
   Camera, MonitorUp, PhoneOff, Binary, UserPlus, Command,
-  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film, ShieldCheck, Loader2, Link2, Pencil, Copy
+  Box, TerminalSquare, Bug, Upload, Play, ImageIcon, Film, ShieldCheck, Loader2, Link2, Pencil, Copy, Gift
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -317,6 +317,7 @@ const TerminalMessage = ({
 
   const isForwarded = msg.content?.startsWith('[RELAY] ');
   const displayContent = isForwarded ? msg.content.slice('[RELAY] '.length) : msg.content;
+  const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
     <div className={cn("flex mb-5 group gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
@@ -378,6 +379,7 @@ const TerminalMessage = ({
           </div>
         )}
         {displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
+        {dihhroGiftMatch && <a href={dihhroGiftMatch[0]} target="_blank" rel="noreferrer" className="mt-3 block max-w-sm rounded-xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/10 p-3 no-underline transition hover:border-fuchsia-300/60"><div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-fuchsia-200"><Gift className="h-4 w-4"/> NEXUS DIHHRO GIFT</div><div className="mt-1 text-sm font-bold text-white">Claim Dihhro for 1 month!</div><div className="mt-1 text-[10px] text-fuchsia-100/60">Single-use gift · Open to claim</div></a>}
         {getMediaSection()}
 
         <AnimatePresence>
