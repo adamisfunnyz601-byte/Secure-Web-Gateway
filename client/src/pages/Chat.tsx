@@ -531,6 +531,7 @@ export default function Chat() {
   const staffRoles = ['owner','admin','trial-admin','moderator','trial-moderator','helper','trial-helper'];
   const isStaff = staffRoles.includes(String(currentUserRole || '').toLowerCase().replace(/_/g,'-'));
   const canUseAdminCommand = (_name: string) => ADMIN_COMMANDS_CONFIG.enabled && isStaff;
+  const canGiftDihhro = ["owner","admin"].includes(String(currentUserRole || "").toLowerCase());
   // Treat configured owner IDs and owner-role accounts as immune to automatic chat filtering
   // and to moderation commands. The server MUST enforce the same rule independently.
   const isProtectedOwner = (user: any) => {
@@ -2018,6 +2019,19 @@ export default function Chat() {
             )}
           </AnimatePresence>
 
+  const createDihhroGift = async () => {
+    try {
+      const response = await fetch("/api/dihhro/gift-links", { method:"POST", credentials:"same-origin" });
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.message || "Could not create gift link");
+      const url = `${window.location.origin}${data.url}`;
+      sendMessage.mutate({ content: `🎁 Claim Dihhro for 1 month! ${url}`, recipientId: selectedRecipientId ?? undefined, groupId: selectedGroupId ?? undefined } as any);
+      toast({ title:"Dihhro gift link created", description:"A single-use gift embed has been sent to this chat." });
+    } catch (error:any) {
+      toast({ title:"Gift link failed", description:error.message || "Could not create gift link", variant:"destructive" });
+    }
+  };
+
           {/* Input */}
           <div className="border-t border-border/60 p-3 flex-shrink-0" style={{ background: "hsl(228 7% 20%)" }}>
             <form onSubmit={handleTransmit} className="flex items-center gap-2">
@@ -2105,6 +2119,7 @@ export default function Chat() {
                 )}
               </div>
 
+              {canGiftDihhro && <button type="button" onClick={createDihhroGift} title="Gift one month of Dihhro" className="h-10 w-10 flex-shrink-0 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/10 text-fuchsia-200 hover:bg-fuchsia-500/20 transition"><Gift className="mx-auto h-4 w-4"/></button>}
               <button
                 type="button"
                 onClick={() => { setShowGifPicker(true); if (!gifResults.length) searchGifs(""); }}
