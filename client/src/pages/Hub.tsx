@@ -54,7 +54,11 @@ export default function Hub() {
   const [notes, setNotes] = useState<Note[]>(Array.isArray(saved.notes) ? saved.notes : []);
   const [noteDraft, setNoteDraft] = useState("");
   const [taskDraft, setTaskDraft] = useState("");
-  const [points, setPoints] = useState(Number(saved.points) || 0);
+  const [points, setPoints] = useState(0);
+  const [tokens, setTokens] = useState(0);
+  const [walletMessage, setWalletMessage] = useState("");
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [exchanging, setExchanging] = useState(false);
   const [streak, setStreak] = useState(Number(saved.streak) || 0);
   const [lastVisit, setLastVisit] = useState(String(saved.lastVisit || ""));
   const [activeGame, setActiveGame] = useState<string | null>(null);
@@ -76,7 +80,7 @@ export default function Hub() {
   const [focusRunning, setFocusRunning] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, notes, points, streak, diceBest, lastVisit }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, notes, streak, diceBest, lastVisit }));
   }, [tasks, notes, points, streak, diceBest, lastVisit]);
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export default function Hub() {
     if (lastVisit !== today) {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
       setStreak(lastVisit === yesterday ? value => value + 1 : 1);
-      setPoints(value => value + 10);
+      addPoints(10);
       setLastVisit(today);
     }
   }, [lastVisit]);
@@ -99,8 +103,56 @@ export default function Hub() {
     if (focusSeconds === 0) setFocusRunning(false);
   }, [focusSeconds]);
 
+  useEffect(() => {
+    let active = true;
+    fetch("/api/hub/wallet", { credentials: "same-origin", headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || "Could not load your Hub wallet.");
+        if (active) { setPoints(Number(data.hubPoints) || 0); setTokens(Number(data.tokens) || 0); }
+      })
+      .catch(error => { if (active) setWalletMessage(error.message || "Could not load your Hub wallet."); })
+      .finally(() => { if (active) setWalletLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   const completedTasks = tasks.filter(task => task.done).length;
-  const addPoints = (amount: number) => setPoints(value => value + amount);
+  const addPoints = async (amount: number) => {
+    const reward = Math.min(25, Math.max(1, Math.floor(amount)));
+    try {
+      const response = await fetch("/api/hub/points/earn", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ amount: reward })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not claim Hub Points.");
+      setPoints(Number(data.hubPoints) || 0);
+      setWalletMessage("+" + data.awarded + " Hub Points earned!");
+    } catch (error: any) {
+      setWalletMessage(error.message || "Could not claim Hub Points.");
+    }
+  };
+  const exchangePoints = async () => {
+    const amount = Math.floor(points / 5) * 5;
+    if (amount < 5 || exchanging) return;
+    setExchanging(true);
+    setWalletMessage("");
+    try {
+      const response = await fetch("/api/hub/exchange", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ points: amount })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Exchange failed.");
+      setPoints(Number(data.hubPoints) || 0);
+      setTokens(Number(data.tokens) || 0);
+      setWalletMessage("Exchanged " + data.pointsSpent + " Hub Points for " + data.tokensAwarded + " tokens!");
+    } catch (error: any) {
+      setWalletMessage(error.message || "Exchange failed.");
+    } finally { setExchanging(false); }
+  };
   const resetReaction = () => {
     setReactionState("wait");
     setReactionResult(null);
@@ -157,6 +209,19 @@ export default function Hub() {
               <Stat icon={Flame} label="Streak" value={streak} />
               <Stat icon={Target} label="Tasks" value={completedTasks + "/" + tasks.length} />
             </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-xl border border-violet-500/25 bg-gradient-to-r from-violet-950/40 to-slate-950 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div>
+            <div className="mb-2 flex items-center gap-2"><Coins className="h-5 w-5 text-violet-300" /><h2 className="font-bold text-foreground">Hub Points exchange</h2></div>
+            <p className="text-sm text-muted-foreground">Trade 5 Hub Points for 2 account tokens. Exchanges are permanent and update your account balance.</p>
+            <p className="mt-2 text-xs text-violet-200">Available to exchange: {Math.floor(points / 5) * 5} points · Rate: 5 → 2</p>
+            {walletMessage && <p role="status" className="mt-2 text-xs text-muted-foreground">{walletMessage}</p>}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-center"><p className="text-[10px] uppercase tracking-wider text-slate-400">Tokens</p><p className="text-xl font-black text-white">{walletLoading ? "…" : tokens}</p></div>
+            <button disabled={walletLoading || exchanging || points < 5} onClick={exchangePoints} className="rounded-lg bg-violet-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-40">{exchanging ? "Exchanging…" : "Exchange points"}</button>
           </div>
         </section>
 
