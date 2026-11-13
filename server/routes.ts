@@ -1265,8 +1265,8 @@ export async function registerRoutes(
     }
     const isPng = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/i.test(imageUrl);
     const isGif = /^data:image\/gif;base64,[A-Za-z0-9+/=]+$/i.test(imageUrl);
-    if ((type === "decoration" && !isPng) || (type === "emote" && !isGif) || imageUrl.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ message: type === "decoration" ? "Decorations must be PNG images under 3.5 MB." : "Emotes must be GIF images under 3.5 MB." });
+    if ((type === "decoration" && !isPng && !isGif) || (type === "emote" && !isGif) || imageUrl.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: type === "decoration" ? "Decorations must be PNG or GIF images under 3.5 MB." : "Emotes must be GIF images under 3.5 MB." });
     }
     let styles: any = {};
     try { styles = typeof req.body?.cssStyles === "string" ? JSON.parse(req.body.cssStyles) : (req.body?.cssStyles || {}); } catch { return res.status(400).json({ message: "Invalid item animation settings." }); }
