@@ -1,6 +1,6 @@
 
 import { db } from "./db";
-import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts } from "@shared/schema";
+import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts, moderationLogs } from "@shared/schema";
 import { eq, desc, and, or, gt, sql } from "drizzle-orm";
 import type { Express, Request, RequestHandler } from "express";
 import type { Server } from "http";
@@ -514,6 +514,134 @@ export async function registerRoutes(
   app.delete(api.history.clear.path, requireAuth, async (req, res) => {
     await storage.clearHistory(req.session.userId!);
     res.status(204).send();
+  });
+
+  // === SERVER-AUTHORITATIVE ROLE + MODERATION COMMANDS ===
+  const roleRank: Record<string, number> = {
+    owner: 100, admin: 90, "trial-admin": 80, moderator: 70,
+    "trial-moderator": 60, helper: 40, "trial-helper": 30, user: 0,
+  };
+  const canonicalRole = (role: string) => role.toLowerCase().replace(/_/g, "-");
+  const actorRole = async (id: number) => {
+    const actor = await storage.getUser(id);
+    return actor ? canonicalRole(actor.role) : "user";
+  };
+  const canModerate = (actor: string, target: string) =>
+    actor === "owner" || (roleRank[actor] ?? 0) > (roleRank[target] ?? 0);
+  const moderationCommandNames = [
+    "ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings",
+    "softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen",
+    "freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown",
+    "purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes",
+    "strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote",
+    "nickreset","restrict","unrestrict"
+  ];
+  const memberCommandNames = [
+    "help","me","shrug","roll","flip","avatar","profile","serverinfo","userinfo","ping",
+    "whoami","rules","invite","coinflip","8ball","choose","quote","uptime"
+  ];
+  const parseDurationMs = (value: string) => {
+    if (value === "null") return null;
+    const match = value.match(/^([1-9]\\d*)(m|h|d|w|mo|y)$/i);
+    if (!match) return undefined;
+    const n = Number(match[1]);
+    const unit = match[2].toLowerCase();
+    return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
+  };
+
+  app.get("/api/chat/commands", requireAuth, (_req, res) => {
+    res.json({ moderation: moderationCommandNames, member: memberCommandNames });
+  });
+
+  app.patch("/api/admin/users/:id/role", requireAuth, async (req, res) => {
+    const actorId = req.session.userId!;
+    const actor = await storage.getUser(actorId);
+    const targetId = Number(req.params.id);
+    const target = await storage.getUser(targetId);
+    const requestedRole = typeof req.body?.role === "string" ? canonicalRole(req.body.role) : "";
+    if (!actor || !target) return res.status(404).json({ message: "User not found" });
+    if (!["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper","user"].includes(requestedRole)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+    const aRole = canonicalRole(actor.role), tRole = canonicalRole(target.role);
+    if (tRole === "owner" || requestedRole === "owner") return res.status(403).json({ message: "Owner role is immutable and protected." });
+    if (aRole !== "owner" && aRole !== "admin") return res.status(403).json({ message: "Only Owner or Admin can assign roles." });
+    if (aRole !== "owner" && (roleRank[tRole] ?? 0) >= (roleRank[aRole] ?? 0)) return res.status(403).json({ message: "You cannot change a peer or higher-ranked role." });
+    if (aRole !== "owner" && (roleRank[requestedRole] ?? 0) >= (roleRank[aRole] ?? 0)) return res.status(403).json({ message: "You cannot assign a role equal to or above your own." });
+    await db.update(users).set({ role: requestedRole }).where(eq(users.id, targetId));
+    await db.insert(moderationLogs).values({ actorId, targetId, action: "role-change", reason: `Role changed from ${target.role} to ${requestedRole}`, metadata: { from: tRole, to: requestedRole } });
+    res.json({ success: true, userId: targetId, role: requestedRole });
+  });
+
+  app.post("/api/chat/command", requireAuth, async (req, res) => {
+    const actorId = req.session.userId!;
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text.startsWith("/") || text.length > 500) return res.status(400).json({ message: "Invalid command." });
+    const [rawName, ...args] = text.slice(1).split(/\\s+/);
+    const name = (rawName || "").toLowerCase();
+    const actor = await storage.getUser(actorId);
+    if (!actor) return res.status(401).json({ message: "Session user not found." });
+    const aRole = canonicalRole(actor.role);
+    const isModCommand = moderationCommandNames.includes(name);
+    if (isModCommand && (roleRank[aRole] ?? 0) < roleRank["trial-moderator"]) return res.status(403).json({ message: "You do not have permission to use moderation commands." });
+    if (!isModCommand && !memberCommandNames.includes(name)) return res.status(400).json({ message: "Unknown command. Use /help." });
+
+    if (!isModCommand) {
+      if (name === "help") return res.json({ message: `Member commands: /${memberCommandNames.join(", /")}. Moderation commands require staff permissions.` });
+      if (name === "ping") return res.json({ message: "Pong! API is responding." });
+      if (name === "whoami") return res.json({ message: `You are ${actor.username} (${aRole}).` });
+      if (name === "roll" || name === "coinflip" || name === "flip") {
+        const sides = name === "roll" ? Math.min(100, Math.max(2, Number((args[0] || "d6").replace(/^d/i, "")) || 6)) : 2;
+        return res.json({ message: name === "roll" ? `You rolled ${1 + Math.floor(Math.random()*sides)} (d${sides}).` : Math.random() < .5 ? "Heads!" : "Tails!" });
+      }
+      if (name === "me") return res.json({ message: args.join(" ").slice(0, 200) ? `* ${actor.username} ${args.join(" ").slice(0,200)}` : "Usage: /me <action>" });
+      if (name === "shrug") return res.json({ message: "¯\\_(ツ)_/¯" });
+      if (name === "8ball") return res.json({ message: ["Absolutely.","Probably.","Ask again later.","Unlikely.","No."][Math.floor(Math.random()*5)] });
+      if (name === "choose") return res.json({ message: args.join(" ").split("|").map(x=>x.trim()).filter(Boolean).sort(()=>Math.random()-.5)[0] || "Usage: /choose option A | option B" });
+      if (name === "rules") return res.json({ message: "Be respectful, do not harass others, and follow the community rules." });
+      if (name === "serverinfo") return res.json({ message: "Secure Web Gateway community chat." });
+      if (name === "userinfo" || name === "profile" || name === "avatar") {
+        const target = await storage.getUser(Number(args[0])) || (args[0] ? await storage.getUserBySerial(args[0]) : actor);
+        return res.json({ message: target ? `${target.username} · ${canonicalRole(target.role)}` : "User not found." });
+      }
+      return res.json({ message: `/${name} is recognised. This command does not change account data.` });
+    }
+
+    const needsTarget = !["slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","clear","slowchat","unslowchat","reports","uptime"].includes(name);
+    let targetId = Number(req.body?.targetUserId || args[0]?.replace(/^@/,""));
+    let target = Number.isInteger(targetId) && targetId > 0 ? await storage.getUser(targetId) : undefined;
+    if (!target && args[0]) {
+      const all = await storage.getAllUsers();
+      target = all.find((u:any) => u.username.toLowerCase() === args[0].replace(/^@/,"").toLowerCase());
+      targetId = target?.id;
+    }
+    if (needsTarget && (!target || !targetId)) return res.status(400).json({ message: "Specify a valid target username or user ID." });
+    if (target) {
+      const tRole = canonicalRole(target.role);
+      if (targetId === actorId) return res.status(400).json({ message: "You cannot moderate yourself." });
+      if (tRole === "owner" || !canModerate(aRole,tRole)) return res.status(403).json({ message: "That member is protected by the role hierarchy." });
+    }
+    const durationToken = String(req.body?.duration || args[1] || "");
+    const durationMs = ["ban","tempban","mute","timeout","jail","restrict","shadowban","softban"].includes(name) ? parseDurationMs(durationToken) : null;
+    if (["ban","tempban","mute","timeout","jail","restrict","shadowban","softban"].includes(name) && durationMs === undefined) return res.status(400).json({ message: "Provide a duration such as 10m, 2h, 3d, 1w, 1mo, 1y or null." });
+    const reason = String(req.body?.reason || args.slice(2).join(" ") || "").slice(0,300);
+    const action = name;
+    await db.insert(moderationLogs).values({
+      actorId, targetId: targetId || null, action, reason: reason || null,
+      duration: durationToken || null,
+      expiresAt: durationMs ? new Date(Date.now()+durationMs) : null,
+      metadata: { command: name, actorRole: aRole },
+    });
+    if (name === "purge" || name === "clear") {
+      const count = Math.min(100, Math.max(1, Number(args[0]) || 10));
+      const deleted = await db.delete(messages).where(sql`${messages.id} IN (SELECT id FROM messages WHERE group_id IS NULL AND recipient_id IS NULL ORDER BY created_at DESC LIMIT ${count})`).returning({id:messages.id});
+      return res.json({ message: `Removed ${deleted.length} recent public messages. Audit entry saved.` });
+    }
+    if (name === "warnings" || name === "strikes" || name === "notes" || name === "reports") {
+      const rows = await db.select().from(moderationLogs).where(targetId ? eq(moderationLogs.targetId,targetId) : eq(moderationLogs.actorId,actorId)).orderBy(desc(moderationLogs.createdAt)).limit(20);
+      return res.json({ message: rows.length ? rows.map(row=>`#${row.id} ${row.action}: ${row.reason || "No reason"}`).join(" · ") : "No records found." });
+    }
+    res.json({ message: `/${name} recorded for ${target?.username || "the current chat"}.` });
   });
 
   // === CHAT ===
