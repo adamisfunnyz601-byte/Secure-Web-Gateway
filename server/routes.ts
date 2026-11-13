@@ -683,6 +683,16 @@ export async function registerRoutes(
   app.get("/api/dihhro/me", requireAuth, async (req,res) => { const u=await storage.getUser(req.session.userId!); res.json({active:Boolean(u?.dihhroUntil&&u.dihhroUntil>new Date()),expiresAt:u?.dihhroUntil||null}); });
   app.get("/api/blockblast/leaderboard", requireAuth, async (req,res) => {
     const month = typeof req.query.month === "string" && /^\\d{4}-\\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
+    const now = new Date(); const previousDate = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-1,1)); const previousMonth = monthKeyFor(previousDate);
+    if (month === previousMonth) {
+      const [alreadyAwarded] = await db.select().from(dihhroAwards).where(eq(dihhroAwards.monthKey,month)).limit(1);
+      if (!alreadyAwarded) {
+        const previousRows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score}).from(blockBlastScores).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
+        const monthlyBest = new Map<number,number>(); previousRows.forEach(row=>monthlyBest.set(row.userId,Math.max(monthlyBest.get(row.userId)||0,row.score)));
+        const winner = Array.from(monthlyBest.entries()).sort((a,b)=>b[1]-a[1])[0];
+        if (winner) { const winnerUser=await storage.getUser(winner[0]); const base=winnerUser?.dihhroUntil&&winnerUser.dihhroUntil>new Date()?winnerUser.dihhroUntil:new Date(); const expiry=new Date(base.getTime()+30*86400000); await db.update(users).set({dihhroUntil:expiry}).where(eq(users.id,winner[0])); await db.insert(dihhroAwards).values({userId:winner[0],monthKey:month,score:winner[1],expiresAt:expiry}); }
+      }
+    }
     const rows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score,username:users.username,displayName:users.displayName}).from(blockBlastScores).innerJoin(users,eq(users.id,blockBlastScores.userId)).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
     const best = new Map<number,typeof rows[number]>(); rows.forEach(row=>{const old=best.get(row.userId);if(!old||row.score>old.score)best.set(row.userId,row);});
     res.json({month,entries:Array.from(best.values()).sort((a,b)=>b.score-a.score).map((row,index)=>({...row,rank:index+1}))});
@@ -896,7 +906,7 @@ export async function registerRoutes(
       if (bannerUrl !== undefined && !isProfileImageProxyUrl(bannerUrl, req.session.userId!, "banner")) {
         update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
       }
-      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; if (!fonts.includes(String(usernameFont))) return res.status(400).json({message:"Unsupported font."}); const current = await storage.getUser(req.session.userId!); if (usernameFont === "comic-sans" && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Comic Sans is a Dihhro perk."}); update.usernameFont = usernameFont || null; }
+      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; if (!fonts.includes(String(usernameFont))) return res.status(400).json({message:"Unsupported font."}); const current = await storage.getUser(req.session.userId!); if (usernameFont === "comic-sans" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Comic Sans is a Dihhro perk."}); update.usernameFont = usernameFont || null; }
       if (profileGradient !== undefined) { const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"]; if (!gradients.includes(String(profileGradient))) return res.status(400).json({message:"Invalid profile gradient."}); const current = await storage.getUser(req.session.userId!); if (profileGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a Dihhro perk."}); update.profileGradient = profileGradient === "none" ? null : profileGradient; }
       if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
         if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
