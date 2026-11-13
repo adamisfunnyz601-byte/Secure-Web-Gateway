@@ -78,14 +78,38 @@ export const USERNAME_FONTS: {
   },
 ];
 
-export function getFontClass(id?: string | null) {
+export function getFontClass(id?: string | null) {\n  if (id?.startsWith("custom-gradient|")) id = id.split("|")[1] || "default";
   return (
     USERNAME_FONTS.find((f) => f.id === id)?.className ||
     USERNAME_FONTS[0].className
   );
 }
 
-export function Avatar({
+
+const PROFILE_GRADIENTS: Record<string,string> = {
+  aurora:"linear-gradient(120deg,#0f766e,#312e81,#86198f)",
+  sunset:"linear-gradient(120deg,#f97316,#db2777,#7c3aed)",
+  ocean:"linear-gradient(120deg,#0e7490,#1d4ed8,#172554)",
+  ember:"linear-gradient(120deg,#7f1d1d,#ea580c,#f59e0b)",
+  violet:"linear-gradient(120deg,#4c1d95,#7c3aed,#db2777)",
+  mint:"linear-gradient(120deg,#065f46,#10b981,#a7f3d0)",
+  mono:"linear-gradient(120deg,#111827,#4b5563,#9ca3af)",
+};
+export function getProfileGradientStyle(value?: string | null): React.CSSProperties {
+  if (!value || value === "none") return {};
+  if (value.startsWith("custom:")) {
+    const colors=value.slice(7).split(":");
+    if (colors.length===3 && colors.every(color=>/^#[0-9a-f]{6}$/i.test(color))) return {backgroundImage:`linear-gradient(120deg,${colors.join(",")})`};
+  }
+  return PROFILE_GRADIENTS[value] ? {backgroundImage:PROFILE_GRADIENTS[value]} : {};
+}
+export function getUsernameGradientStyle(value?: string | null): React.CSSProperties {
+  if (!value?.startsWith("custom-gradient|")) return {};
+  const [,font,a,b]=value.split("|");
+  if (!/^[a-z-]+$/.test(font||"") || !/^#[0-9a-f]{6}$/i.test(a||"") || !/^#[0-9a-f]{6}$/i.test(b||"")) return {};
+  return {backgroundImage:`linear-gradient(90deg,${a},${b})`,backgroundClip:"text",WebkitBackgroundClip:"text",color:"transparent"};
+}
+\nexport function Avatar({
   url,
   name,
   size = 32,
@@ -205,7 +229,7 @@ export function ProfileModal({
         avatarUrl: profile.avatarUrl || "",
         bannerUrl: profile.bannerUrl || "",
         usernameFont: profile.usernameFont || "default",
-        profileGradient: profile.profileGradient || "none",
+        profileGradient: profile.profileGradient || "none",\n        customProfileStart: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[0] : "#0ea5e9",\n        customProfileMiddle: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[1] : "#8b5cf6",\n        customProfileEnd: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[2] : "#ec4899",\n        customTextStart: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[2] : "#22d3ee",\n        customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
         tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
         tagText: profile.tagText || "",
         tagColor: profile.tagColor || PROFILE_TAG_COLORS[0],
@@ -350,7 +374,7 @@ export function ProfileModal({
               style={{
                 backgroundImage: (editing ? form.bannerUrl : profile?.bannerUrl)
                   ? `linear-gradient(rgba(20,20,30,.2), rgba(20,20,30,.55)), url(${editing ? form.bannerUrl : profile?.bannerUrl})`
-                  : (editing ? form.profileGradient : profile?.profileGradient) === "aurora" ? "linear-gradient(120deg,#0f766e,#312e81,#86198f)" : (editing ? form.profileGradient : profile?.profileGradient) === "sunset" ? "linear-gradient(120deg,#f97316,#db2777,#7c3aed)" : (editing ? form.profileGradient : profile?.profileGradient) === "ocean" ? "linear-gradient(120deg,#0e7490,#1d4ed8,#172554)" : (editing ? form.profileGradient : profile?.profileGradient) === "ember" ? "linear-gradient(120deg,#7f1d1d,#ea580c,#f59e0b)" : (editing ? form.profileGradient : profile?.profileGradient) === "violet" ? "linear-gradient(120deg,#4c1d95,#7c3aed,#db2777)" : (editing ? form.profileGradient : profile?.profileGradient) === "mint" ? "linear-gradient(120deg,#065f46,#10b981,#a7f3d0)" : (editing ? form.profileGradient : profile?.profileGradient) === "mono" ? "linear-gradient(120deg,#111827,#4b5563,#9ca3af)" : undefined,
+                  : (getProfileGradientStyle(editing ? form.profileGradient : profile?.profileGradient).backgroundImage as string | undefined),
               }}
             >
               <button
@@ -613,12 +637,25 @@ export function ProfileModal({
                           {(form.bio || "").length}/500
                         </div>
                       </Field>
-                      <Field label="PROFILE GRADIENT (DIHHRO)">
+                      <Field label="CUSTOM PROFILE GRADIENT (DIHHRO)">
                         <div className="grid grid-cols-4 gap-1.5">
                           {["none","aurora","sunset","ocean","ember","violet","mint","mono"].map((gradient) => (
                             <button key={gradient} type="button" disabled={gradient !== "none" && !canUseDihhro} onClick={() => setForm({ ...form, profileGradient: gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", form.profileGradient === gradient ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
                           ))}
                         </div>
+                        <div className="mt-3 rounded-xl border border-white/10 p-3" style={getProfileGradientStyle(form.profileGradient?.startsWith("custom:")?form.profileGradient:"custom:"+form.customProfileStart+":"+form.customProfileMiddle+":"+form.customProfileEnd)}>
+                          <div className="text-center py-3 text-xs font-bold text-white drop-shadow">PROFILE PREVIEW</div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {["customProfileStart","customProfileMiddle","customProfileEnd"].map((key,i)=><label key={key} className="text-[9px] text-white/50">{["START","MIDDLE","END"][i]}<input type="color" value={form[key]||["#0ea5e9","#8b5cf6","#ec4899"][i]} disabled={!canUseDihhro} onChange={e=>setForm({...form,[key]:e.target.value,profileGradient:"custom:"+[form.customProfileStart||"#0ea5e9",form.customProfileMiddle||"#8b5cf6",form.customProfileEnd||"#ec4899"].map((v,j)=>j===i?e.target.value:v).join(":")})} className="mt-1 h-9 w-full cursor-pointer rounded bg-transparent"/></label>)}
+                        </div>
+                      </Field>
+                      <Field label="USERNAME TEXT GRADIENT (DIHHRO)">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-[9px] text-white/50">START COLOR<input type="color" value={form.customTextStart||"#22d3ee"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextStart:e.target.value,usernameFont:"custom-gradient|default|"+e.target.value+"|"+(form.customTextEnd||"#a78bfa")})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
+                          <label className="text-[9px] text-white/50">END COLOR<input type="color" value={form.customTextEnd||"#a78bfa"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextEnd:e.target.value,usernameFont:"custom-gradient|default|"+(form.customTextStart||"#22d3ee")+"|"+e.target.value})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
+                        </div>
+                        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3 text-center text-xl font-black" style={getUsernameGradientStyle(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont:"custom-gradient|default|"+(form.customTextStart||"#22d3ee")+"|"+(form.customTextEnd||"#a78bfa"))}>Your name</div>
                       </Field>
                       <Field label="USERNAME FONT">
                         <div className="grid grid-cols-2 gap-1.5">
