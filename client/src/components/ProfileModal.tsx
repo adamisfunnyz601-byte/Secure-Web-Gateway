@@ -492,10 +492,22 @@ export function ProfileModal({
                         <span className="text-[10px] text-white/50 capitalize">{profile.presenceStatus || "offline"}</span>
                         {profile.pronouns && <span className="text-[10px] text-white/40">• {profile.pronouns}</span>}
                       </div>
-                      {(["owner","admin"].includes(profile.role) || (profile.dihhroUntil && new Date(profile.dihhroUntil) > new Date())) && (
-                        <div className="inline-flex items-center gap-1 mt-1 text-[9px] text-fuchsia-400 font-mono border border-fuchsia-500/40 px-1.5 py-0.5 rounded">
-                          <Sparkles className="w-2.5 h-2.5" /> {profile.role === "owner" ? "OWNER" : ["admin"].includes(profile.role) ? "ADMIN · DIHHRO" : "DIHHRO"}
-                        </div>
+                      {(() => {
+                        const role = String(profile.role || "user").toLowerCase().replace(/_/g,"-");
+                        const badges: Record<string,{label:string;cls:string}> = {
+                          owner:{label:"♛ OWNER",cls:"border-amber-300/50 bg-amber-300/10 text-amber-200"},
+                          admin:{label:"✦ ADMIN",cls:"border-red-400/50 bg-red-400/10 text-red-300"},
+                          "trial-admin":{label:"TRIAL ADMIN",cls:"border-orange-300/50 bg-orange-300/10 text-orange-200"},
+                          moderator:{label:"✧ MODERATOR",cls:"border-violet-400/50 bg-violet-400/10 text-violet-200"},
+                          "trial-moderator":{label:"TRIAL MOD",cls:"border-indigo-400/50 bg-indigo-400/10 text-indigo-200"},
+                          helper:{label:"✚ HELPER",cls:"border-sky-400/50 bg-sky-400/10 text-sky-200"},
+                          "trial-helper":{label:"TRIAL HELPER",cls:"border-cyan-400/50 bg-cyan-400/10 text-cyan-200"},
+                        };
+                        const badge = badges[role];
+                        return badge ? <div className={cn("inline-flex items-center gap-1 mt-1 rounded border px-2 py-1 text-[9px] font-black tracking-wider",badge.cls)}>{badge.label}</div> : null;
+                      })()}
+                      {(["owner","admin"].includes(String(profile.role).toLowerCase()) || (profile.dihhroUntil && new Date(profile.dihhroUntil) > new Date())) && (
+                        <div className="inline-flex items-center gap-1 mt-1 rounded border border-fuchsia-500/40 bg-fuchsia-400/10 px-2 py-1 text-[9px] font-black tracking-wider text-fuchsia-300"><Sparkles className="w-2.5 h-2.5"/> DIHHRO</div>
                       )}
                     </div>
                     {["owner","admin"].includes(String(viewer?.role || "").toLowerCase()) && !isOwn && (
