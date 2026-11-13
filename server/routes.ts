@@ -468,6 +468,12 @@ export async function registerRoutes(
     try {
       const key = String(req.params.key || "").trim();
       if (!key || key.length > 128) return res.status(400).json({ valid: false, message: "Invalid invitation link." });
+      // Group-chat links use GC-XXXXXX codes, not access-key records.
+      if (/^GC-/i.test(key)) {
+        const group = await storage.getGroupByCode(key.toUpperCase());
+        if (!group) return res.status(404).json({ valid: false, message: "This group invitation is invalid or the group no longer exists." });
+        return res.json({ valid: true, type: "group", groupName: group.name });
+      }
       const invite = await storage.getAccessKey(key);
       if (!invite) return res.status(404).json({ valid: false, message: "This invitation link is invalid or has been revoked." });
       if (invite.isUsed) return res.status(410).json({ valid: false, message: "This invitation has already been used or revoked and is no longer available." });
