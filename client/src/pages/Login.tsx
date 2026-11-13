@@ -154,6 +154,7 @@ export default function Login() {
 
   // Access request state
   const [reqName, setReqName] = useState("");
+  const [reqPassword, setReqPassword] = useState("");
   const [reqMessage, setReqMessage] = useState("");
   const [showEmojiBar, setShowEmojiBar] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
@@ -237,6 +238,9 @@ export default function Login() {
     setRequestError("");
 
     if (!requestTurnstileToken) {
+                  reqName.trim().length < 3 ||
+                  reqPassword.length < 8 ||
+                  reqMessage.trim().length < 5 ||
       setRequestError(
         "Please complete Cloudflare verification first."
       );
@@ -252,7 +256,8 @@ export default function Login() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          name: reqName.trim() || "Anonymous",
+          username: reqName.trim(),
+          password: reqPassword,
           message: reqMessage.trim(),
           turnstileToken: requestTurnstileToken
         })
@@ -270,6 +275,7 @@ export default function Login() {
 
       setRequestSent(true);
       setReqName("");
+      setReqPassword("");
       setReqMessage("");
       setRequestTurnstileToken("");
 
@@ -484,21 +490,28 @@ export default function Login() {
                 </div>
 
                 <CyberInput
-                  label="Your Name"
-                  placeholder="Enter your name..."
+                  label="Username"
+                  placeholder="Choose a username (3–24 characters)"
                   value={reqName}
                   onChange={e => setReqName(e.target.value)}
+                />
+                <CyberInput
+                  label="Password"
+                  type="password"
+                  placeholder="Choose a password (at least 8 characters)"
+                  value={reqPassword}
+                  onChange={e => setReqPassword(e.target.value)}
                 />
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Message (optional)
+                    Why do you want to join?
                   </label>
 
                   <textarea
                     value={reqMessage}
                     onChange={e => setReqMessage(e.target.value)}
-                    placeholder="Write a message (optional)..."
+                    placeholder="Tell the admins why you would like to join (5–500 characters)..."
                     rows={4}
                     className={cn(
                       "w-full bg-input border border-border rounded px-3 py-2 resize-none",
