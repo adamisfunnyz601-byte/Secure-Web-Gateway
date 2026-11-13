@@ -310,6 +310,12 @@ export async function registerRoutes(
     }
     next();
   };
+  const requireAdmin = async (req: Request, res: any, next: any) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Login required." });
+    const actor = await storage.getUser(req.session.userId);
+    if (!actor || !["owner","admin"].includes(String(actor.role).toLowerCase())) return res.status(403).json({ message: "Owner or Admin access required." });
+    next();
+  };
 
   const blockedEitherWay = async (userId: number, otherId: number) => {
     const [block] = await db.select({ id: blocks.id }).from(blocks).where(
@@ -1349,12 +1355,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/admin/requests', requireOwner, async (req, res) => {
+  app.get('/api/admin/requests', requireAdmin, async (req, res) => {
     const requests = await storage.listAccessRequests();
     res.json(requests);
   });
 
-  app.patch('/api/admin/requests/:id', requireOwner, async (req, res) => {
+  app.patch('/api/admin/requests/:id', requireAdmin, async (req, res) => {
     const { status } = req.body;
     if (!['pending', 'approved', 'rejected'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
     const requestId = Number(req.params.id);
