@@ -575,6 +575,13 @@ export async function registerRoutes(
     return n * ({ m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000, y: 31536000000 } as Record<string, number>)[unit];
   };
 
+  app.get("/api/moderation/users", requireAuth, async (req, res) => {
+    const actor = await storage.getUser(req.session.userId!);
+    const allowed = ["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"];
+    if (!actor || !allowed.includes(canonicalRole(actor.role))) return res.status(403).json({ message: "Staff access required." });
+    return res.json(await storage.getAllUsers());
+  });
+
   app.get("/api/chat/commands", requireAuth, (_req, res) => {
     res.json({ moderation: moderationCommandNames, member: memberCommandNames });
   });
