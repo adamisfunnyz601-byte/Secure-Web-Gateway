@@ -75,9 +75,12 @@ export default function Shop() {
       const res=await fetch("/api/shop/equip",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({decorationId,nameStyleId})});
       const data=await res.json().catch(()=>({}));
       if(!res.ok) throw new Error(data.message || "Could not update equipped item.");
+      const nextDecorationId = decorationId == null ? null : String(decorationId);
+      const nextNameStyleId = nameStyleId == null ? null : String(nameStyleId);
+      queryClient.setQueryData(["/api/auth/me"], (current:any) => current ? {...current, decorationId:nextDecorationId, nameStyleId:nextNameStyleId} : current);
+      queryClient.setQueryData(["/api/user/profile", user?.id], (current:any) => current ? {...current, decorationId:nextDecorationId, nameStyleId:nextNameStyleId} : current);
       await queryClient.invalidateQueries({queryKey:["/api/auth/me"]});
       await queryClient.invalidateQueries({queryKey:["/api/user/profile"]});
-      await queryClient.invalidateQueries({queryKey:["/api/user/profile", user?.id]});
       toast({title:unequip?"Decoration unequipped":"Profile decoration equipped"});
     } catch(error:any) {
       toast({title:"Could not update decoration",description:error.message,variant:"destructive"});
