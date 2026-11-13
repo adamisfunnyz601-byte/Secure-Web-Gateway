@@ -163,7 +163,10 @@ export default function Login() {
   const [requestTurnstileToken, setRequestTurnstileToken] = useState("");
 
   useEffect(() => {
-    if (user) setLocation("/proxy");
+    if (user) {
+      const inviteCode = new URLSearchParams(window.location.search).get("invite");
+      setLocation(inviteCode ? `/invite/${encodeURIComponent(inviteCode)}` : "/proxy");
+    }
   }, [user, setLocation]);
 
   // Login Cloudflare callbacks
