@@ -73,9 +73,9 @@ function BlockBlastGame() {
  const playTone=useCallback((frequency:number)=>{if(!sound)return;try{const ctx=new AudioContext();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=frequency;gain.gain.setValueAtTime(.06,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.13);osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+.14);osc.onended=()=>ctx.close();}catch{}},[sound]);
 
  const finishGame=useCallback((finalScore:number)=>{setGameOver(true);const entry={score:finalScore,date:new Date().toISOString()};setHistory(prev=>[entry,...prev].sort((a,b)=>b.score-a.score).slice(0,30));setBest(prev=>Math.max(prev,finalScore));fetch("/api/blockblast/scores",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({score:finalScore})}).then(()=>fetch("/api/blockblast/history",{credentials:"same-origin"})).then(r=>r?.ok?r.json():null).then((rows:any)=>{if(Array.isArray(rows)){const saved=rows.map((row:any)=>({score:row.score,date:row.createdAt}));setHistory(saved);setBest(Math.max(0,...saved.map((x:any)=>x.score)));}}).catch(()=>{});},[]);
- const place=(row:number,col:number)=>{
-  if(gameOver||!pieces[selected])return;
-  const piece=pieces[selected];if(!canPlace(board,piece,row,col)){playTone(110);return;}
+ const place=(row:number,col:number,pieceIndex=selected)=>{
+  if(gameOver||!pieces[pieceIndex])return;
+  const piece=pieces[pieceIndex];if(!canPlace(board,piece,row,col)){playTone(110);return;}
   const next=board.map(line=>[...line]);piece.cells.forEach(([y,x])=>next[row+y][col+x]=piece.color);
   setPlacementCells(piece.cells.map(([y,x])=>`${row+y}-${col+x}`));window.setTimeout(()=>setPlacementCells([]),420);
   let rows:number[]=[];let cols:number[]=[];
