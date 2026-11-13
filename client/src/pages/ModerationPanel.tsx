@@ -5,6 +5,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Search, Ban, VolumeX, Volume2, UserX, AlertTriangle, RefreshCw, Clock3 } from "lucide-react";
 
+const allModerationCommands = [
+  "ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings",
+  "softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen",
+  "freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge",
+  "purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike",
+  "strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset",
+  "restrict","unrestrict","unkick"
+] as const;
+
 const actions = [
   { id: "mute", label: "Mute", icon: VolumeX, timed: true },
   { id: "unmute", label: "Unmute", icon: Volume2 },
@@ -24,6 +33,8 @@ export default function ModerationPanel() {
   const [duration, setDuration] = useState("1h");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [advancedCommand, setAdvancedCommand] = useState("warn");
+  const [advancedArgs, setAdvancedArgs] = useState("");
   const role = String(user?.role || "").toLowerCase().replace(/_/g, "-");
   const staff = ["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(role);
   const { data: users = [], isLoading, refetch } = useQuery<any[]>({
@@ -37,6 +48,20 @@ export default function ModerationPanel() {
   }), [users, search]);
   const target = users.find((u:any) => String(u.id) === targetId);
   const protectedTarget = target && String(target.role).toLowerCase() === "owner";
+
+  const runAdvancedCommand = async () => {
+    const commandText = "/" + advancedCommand + (advancedArgs.trim() ? " " + advancedArgs.trim() : "");
+    setBusy(true);
+    try {
+      const response = await fetch("/api/chat/command", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: commandText }) });
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(data.message || "Command failed");
+      toast({ title: "Command completed", description: data.message || commandText });
+      setAdvancedArgs("");
+      await refetch();
+    } catch (e:any) { toast({ title: "Command failed", description: e.message || "Try again.", variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
 
   const runAction = async (action: string, timed = false) => {
     if (!target) { toast({ title: "Choose a member first", variant: "destructive" }); return; }
@@ -76,6 +101,15 @@ export default function ModerationPanel() {
           <label className="block text-xs font-medium text-muted-foreground">Reason (optional)<textarea value={reason} onChange={e=>setReason(e.target.value)} rows={3} maxLength={240} placeholder="Reason for this action…" className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"/></label>
           {protectedTarget && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">Owner accounts are protected from moderation.</p>}
           <div className="grid grid-cols-2 gap-2">{actions.map(a=><button key={a.id} disabled={busy || !target || !!protectedTarget} onClick={()=>runAction(a.id, "timed" in a && Boolean(a.timed))} className="flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-2 py-2.5 text-xs font-semibold transition hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"><a.icon className="h-4 w-4"/>{a.label}</button>)}</div>
+          <div className="border-t border-border pt-4">
+            <h3 className="text-sm font-bold">All moderation commands</h3>
+            <p className="mt-1 text-[11px] text-muted-foreground">Run any supported command here. The server validates arguments and permissions.</p>
+            <select value={advancedCommand} onChange={e=>setAdvancedCommand(e.target.value)} className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground">
+              {allModerationCommands.map(name=><option key={name} value={name}>/{name}</option>)}
+            </select>
+            <input value={advancedArgs} onChange={e=>setAdvancedArgs(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") runAdvancedCommand();}} placeholder="Arguments: @username 1h reason…" className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"/>
+            <button disabled={busy} onClick={runAdvancedCommand} className="mt-2 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">{busy ? "Running…" : "Run selected command"}</button>
+          </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">Your role permissions and the target's role are verified on the server. A failed permission check will not apply the action.</p>
         </section>
       </div>
