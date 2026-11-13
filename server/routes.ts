@@ -1700,6 +1700,14 @@ export async function registerRoutes(
     groupVoiceRooms.set(roomId,room);
     res.json({roomId,participants:[]});
   });
+
+  app.get("/api/chat/group-voice/members",requireAuth,async(req,res)=>{
+    const userId=Number(req.session.userId!),groupId=Number(req.query.groupId);
+    if(!Number.isInteger(groupId)||groupId<=0||!await isGroupChatMember(groupId,userId)) return res.status(403).json({message:"You are not a member of this group."});
+    const members=await db.select({userId:users.id,username:users.username}).from(groupChatMembers)
+      .innerJoin(users,eq(groupChatMembers.userId,users.id)).where(eq(groupChatMembers.groupId,groupId));
+    res.json(members);
+  });
   app.post("/api/chat/group-voice/invite",requireAuth,async(req,res)=>{
     const userId=Number(req.session.userId!), targetId=Number(req.body?.userId), room=getGroupVoiceRoom(req.body?.roomId,userId);
     if(!room) return res.status(403).json({message:"You are not in this group call."});
