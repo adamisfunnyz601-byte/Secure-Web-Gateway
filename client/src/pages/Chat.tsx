@@ -544,6 +544,8 @@ export default function Chat() {
   const [voicePreviewUrl, setVoicePreviewUrl] = useState<string | null>(null);
   const [voicePreviewPlaying, setVoicePreviewPlaying] = useState(false);
   const [callSoundboardOpen, setCallSoundboardOpen] = useState(false);
+  const [callEmoteOpen, setCallEmoteOpen] = useState(false);
+  const [remoteCallEmote, setRemoteCallEmote] = useState<any>(null);
 
   // --- LOGS ---
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -576,6 +578,11 @@ export default function Chat() {
 
   // --- DATA FETCHING ---
   const { data: groups = [] } = useQuery<any[]>({ queryKey: ['/api/chat/groups'] });
+  const { data: callEmoteInventory = [] } = useQuery<any[]>({
+    queryKey: ["/api/shop/inventory"],
+    queryFn: async () => { const response = await fetch("/api/shop/inventory", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
+    staleTime: 20000,
+  });
   const { data: userConfig, refetch: refetchConfig } = useQuery({
     queryKey: ['/api/auth/me'],
     queryFn: async () => (await fetch('/api/auth/me')).json()
@@ -1141,6 +1148,22 @@ export default function Chat() {
     }
   };
 
+  const sendCallEmote = async (item:any) => {
+    if (!callIdRef.current) return;
+    let styles:any = {};
+    try { styles = typeof item.cssStyles === "string" ? JSON.parse(item.cssStyles) : (item.cssStyles || {}); } catch {}
+    try {
+      const response = await postVoiceSignal("/api/chat/voice/emote", { callId: callIdRef.current, emoteId: item.id });
+      if (!response || response.success !== true) throw new Error("Could not send emote.");
+      const duration = Math.max(1, Math.min(20, Number(styles.duration) || 3));
+      setRemoteCallEmote({ name: item.name, gifUrl: item.imageUrl, duration });
+      const audio = new Audio(styles.audioUrl);
+      audio.play().catch(() => {});
+      window.setTimeout(() => setRemoteCallEmote((current:any) => current?.name === item.name ? null : current), duration * 1000);
+      setCallEmoteOpen(false);
+    } catch (error:any) { toast({ title: "Emote failed", description: error.message || "Could not send emote.", variant: "destructive" }); }
+  };
+
   const startCall = async (targetId: number, targetName: string, withVideo: boolean) => {
     if (callStateRef.current !== 'idle') return;
     callPeerIdRef.current = targetId;
@@ -1410,6 +1433,12 @@ export default function Chat() {
                 toast({ title: 'Missed call', description: 'The incoming call timed out.' });
               }
             }, 30000);
+          } else if (signal.type === 'emote' && signal.callId === callIdRef.current) {
+            const emote = signal.emote || {};
+            const duration = Math.max(1, Math.min(20, Number(emote.duration) || 3));
+            setRemoteCallEmote({ name: emote.name, gifUrl: emote.gifUrl, duration });
+            if (emote.audioUrl) { const audio = new Audio(emote.audioUrl); audio.play().catch(() => {}); }
+            window.setTimeout(() => setRemoteCallEmote((current:any) => current?.name === emote.name ? null : current), duration * 1000);
           } else if (signal.type === 'accepted' && state === 'requesting' && signal.callId === callIdRef.current) {
             setCallState('connected');
             pushLog('CALL_CONNECTED', 'info');
@@ -1646,6 +1675,7 @@ export default function Chat() {
                 <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
                   <video ref={remoteVideoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
                   <audio ref={remoteAudioRef} autoPlay />
+                  <AnimatePresence>{remoteCallEmote?.gifUrl && <motion.div initial={{opacity:0,scale:.75,y:12}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:.9,y:8}} transition={{type:"spring",stiffness:360,damping:24}} className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-2xl border border-violet-300/50 bg-[#111827]/95 p-3 shadow-2xl"><div className="mb-1 text-center text-xs font-bold text-violet-100">{remoteCallEmote.name}</div><img src={remoteCallEmote.gifUrl} alt={remoteCallEmote.name} className="h-28 w-28 rounded-xl object-contain"/></motion.div>}</AnimatePresence>
                   {!hasRemoteVideo && <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-36 h-36 rounded-full border-2 border-violet-500/30 bg-violet-500/5 flex items-center justify-center">
                       <Ghost className="w-16 h-16 text-violet-200 animate-pulse" />
@@ -1693,6 +1723,7 @@ export default function Chat() {
                 )}
               </AnimatePresence>
 
+              <AnimatePresence>{callEmoteOpen && <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:12}} className="absolute bottom-36 left-1/2 z-40 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-violet-400/30 bg-[#10091b]/95 p-3 shadow-2xl"><div className="mb-2 text-xs font-bold uppercase tracking-widest text-violet-200">Your emotes</div><div className="grid max-h-40 grid-cols-4 gap-2 overflow-y-auto">{callEmoteInventory.filter((item:any)=>item.type==="emote").map((item:any)=><button key={item.id} onClick={()=>sendCallEmote(item)} className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-2 text-center hover:bg-violet-500/25"><img src={item.imageUrl} alt={item.name} className="mx-auto h-12 w-12 object-contain"/><span className="mt-1 block truncate text-[10px] text-violet-100">{item.name}</span></button>)}</div>{!callEmoteInventory.some((item:any)=>item.type==="emote")&&<p className="text-xs text-violet-100/60">Buy emotes in the DihCoins Shop first.</p>}</motion.div>}</AnimatePresence>
               {/* Call controls */}
               <div className="h-32 bg-black border-t border-violet-500/20 flex items-center justify-center gap-6">
                 <button
@@ -1715,6 +1746,13 @@ export default function Chat() {
                   title="Share screen"
                 >
                   <MonitorUp className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={() => setCallEmoteOpen(v => !v)}
+                  className={cn("w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all", callEmoteOpen ? "bg-fuchsia-500/20 border-fuchsia-400" : "border-white/20 hover:border-fuchsia-400")}
+                  title="Emotes"
+                >
+                  <Sparkles className="w-6 h-6" />
                 </button>
                 <button
                   onClick={() => setCallSoundboardOpen(v => !v)}
