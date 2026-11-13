@@ -382,6 +382,7 @@ const TerminalMessage = ({
           <button
             onClick={() => onProfileClick(msg.senderId)}
             className={cn("text-[11px] font-bold uppercase hover:underline", getFontClass(msg.senderUsernameFont))}
+            style={getUsernameGradientStyle(msg.senderUsernameFont)}
             data-testid={`button-profile-${msg.senderId}`}
           >
             {isMe ? "YOU" : displayName}
