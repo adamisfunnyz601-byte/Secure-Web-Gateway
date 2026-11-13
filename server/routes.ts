@@ -1,6 +1,6 @@
 
 import { db } from "./db";
-import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts, moderationLogs } from "@shared/schema";
+import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts, moderationLogs, blockBlastScores, dihhroAwards } from "@shared/schema";
 import { eq, desc, and, or, gt, sql } from "drizzle-orm";
 import type { Express, Request, RequestHandler } from "express";
 import type { Server } from "http";
@@ -664,6 +664,33 @@ export async function registerRoutes(
     res.json({ message: `/${name} recorded for ${target?.username || "the current chat"}.` });
   });
 
+  // DIHHRO membership and Block Blast monthly leaderboard
+  const monthKeyFor = (d = new Date()) => d.getUTCFullYear() + "-" + String(d.getUTCMonth()+1).padStart(2,"0");
+  app.post("/api/admin/dihhro/grant", requireAuth, async (req,res) => {
+    const actor = await storage.getUser(req.session.userId!);
+    if (!actor || !["owner","admin"].includes(String(actor.role).toLowerCase())) return res.status(403).json({message:"Only owners and admins can gift Dihhro."});
+    const targetId = Number(req.body?.userId), months = Math.max(1,Math.min(12,Number(req.body?.months)||1));
+    if (!Number.isInteger(targetId) || targetId < 1) return res.status(400).json({message:"Enter a valid user ID."});
+    const target = await storage.getUser(targetId); if (!target) return res.status(404).json({message:"User not found."});
+    const start = target.dihhroUntil && target.dihhroUntil > new Date() ? target.dihhroUntil : new Date();
+    const expires = new Date(start.getTime()+months*30*86400000);
+    await db.update(users).set({dihhroUntil:expires}).where(eq(users.id,targetId));
+    await db.insert(moderationLogs).values({actorId:req.session.userId!,targetId,action:"dihhro-gift",reason:"Gifted "+months+" month(s) of Dihhro",expiresAt:expires});
+    res.json({success:true,userId:targetId,dihhroUntil:expires});
+  });
+  app.get("/api/dihhro/me", requireAuth, async (req,res) => { const u=await storage.getUser(req.session.userId!); res.json({active:Boolean(u?.dihhroUntil&&u.dihhroUntil>new Date()),expiresAt:u?.dihhroUntil||null}); });
+  app.get("/api/blockblast/leaderboard", requireAuth, async (req,res) => {
+    const month = typeof req.query.month === "string" && /^\\d{4}-\\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
+    const rows = await db.select({userId:blockBlastScores.userId,score:blockBlastScores.score,username:users.username,displayName:users.displayName}).from(blockBlastScores).innerJoin(users,eq(users.id,blockBlastScores.userId)).where(eq(blockBlastScores.monthKey,month)).orderBy(desc(blockBlastScores.score)).limit(100);
+    const best = new Map<number,typeof rows[number]>(); rows.forEach(row=>{const old=best.get(row.userId);if(!old||row.score>old.score)best.set(row.userId,row);});
+    res.json({month,entries:Array.from(best.values()).sort((a,b)=>b.score-a.score).map((row,index)=>({...row,rank:index+1}))});
+  });
+  app.post("/api/blockblast/scores", requireAuth, async (req,res) => {
+    const score=Number(req.body?.score); if(!Number.isSafeInteger(score)||score<0||score>1000000) return res.status(400).json({message:"Invalid score."});
+    const userId=req.session.userId!; const [recent]=await db.select().from(blockBlastScores).where(eq(blockBlastScores.userId,userId)).orderBy(desc(blockBlastScores.createdAt)).limit(1);
+    if(recent?.createdAt && Date.now()-recent.createdAt.getTime()<3000) return res.status(429).json({message:"Please wait before submitting another run."});
+    await db.insert(blockBlastScores).values({userId,score,monthKey:monthKeyFor()}); res.status(201).json({success:true,score,month:monthKeyFor()});
+  });
   // === CHAT ===
   app.get(api.chat.list.path, requireAuth, async (req, res) => {
     const recipientId = req.query.recipientId ? Number(req.query.recipientId) : undefined;
@@ -853,7 +880,7 @@ export async function registerRoutes(
         tagSymbol,
         tagText,
         tagColor,
-      } = req.body;aa
+      } = req.body;
       const update: any = {};
       if (typeof username === 'string' && username.trim().length > 0) update.username = username.trim().slice(0, 32);
       if (nickname !== undefined) update.nickname = nickname ? String(nickname).slice(0, 32) : null;
@@ -866,7 +893,7 @@ export async function registerRoutes(
       if (bannerUrl !== undefined && !isProfileImageProxyUrl(bannerUrl, req.session.userId!, "banner")) {
         update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
       }
-      if (usernameFont !== undefined) update.usernameFont = usernameFont || null;
+      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; if (!fonts.includes(String(usernameFont))) return res.status(400).json({message:"Unsupported font."}); const current = await storage.getUser(req.session.userId!); if (usernameFont === "comic-sans" && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Comic Sans is a Dihhro perk."}); update.usernameFont = usernameFont || null; }\n      if (profileGradient !== undefined) { const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"]; if (!gradients.includes(String(profileGradient))) return res.status(400).json({message:"Invalid profile gradient."}); const current = await storage.getUser(req.session.userId!); if (profileGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a Dihhro perk."}); update.profileGradient = profileGradient === "none" ? null : profileGradient; }
       if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
         if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
           return res.status(400).json({ message: "Tag text must be a string" });
