@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, DoorOpen, Users, Send, Plus, RefreshCw, MessageCircle, Gamepad2, Home, Trees, Waves, Sparkles } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, DoorOpen, Users, Send, Plus, RefreshCw, MessageCircle, Gamepad2, Sparkles } from "lucide-react";
 
 type Player = { id:number; username:string; x:number; y:number; color:string; direction:string };
 type Room = { id:string; name:string; theme:string; players:Player[]; messages:{id:string;username:string;text:string;createdAt:number}[] };
@@ -23,7 +23,6 @@ export default function Hangouts(){
   const [error,setError]=useState("");
   const [busy,setBusy]=useState(false);
   const [position,setPosition]=useState({x:48,y:52});
-  const [mobileControls,setMobileControls]=useState(true);
   const lastMove=useRef(0);
   const playerId=Number(user?.id||0);
   const refreshRooms=useCallback(async()=>{
