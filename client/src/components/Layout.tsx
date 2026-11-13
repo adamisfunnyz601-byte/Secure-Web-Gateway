@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag, Gamepad2, Users } from "lucide-react";
+import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag, Gamepad2, Users, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ProfileModal";
@@ -15,6 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/proxy",   label: "Net Proxy",    icon: Globe },
     { href: "/chat",    label: "Messages",      icon: MessageSquare },
     { href: "/history", label: "History",       icon: History },
+    { href: "/updates", label: "Update Logs",   icon: ScrollText },
     { href: "/settings", label: "Settings",     icon: Settings },
     { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
     { href: "/shop", label: "Shop", icon: ShoppingBag },
