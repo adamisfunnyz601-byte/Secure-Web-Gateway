@@ -492,7 +492,7 @@ export function ProfileModal({
               }}
             >
               <style>{`@keyframes profileGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } @keyframes profileTextGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } .profile-gradient-surface .profile-outline { border-color:var(--profile-border-color)!important; } .profile-gradient-surface .profile-panel { border-color:var(--profile-border-color)!important; }`}</style>
-              {uploadedFontSource && <style>{`@font-face { font-family: 'DIHTROCustom'; src: url("${uploadedFontSource}") format('woff2'); font-display: swap; }`}</style>}
+              {uploadedFontSource && <style>{`@font-face { font-family: 'DIHTROCustom'; src: url("${uploadedFontSource}"); font-display: swap; }`}</style>}
               {isLoading || !profile ? (
                 <div className="text-primary/60 font-mono text-xs text-center py-10">
                   LOADING_PROFILE...
