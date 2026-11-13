@@ -589,7 +589,12 @@ export async function registerRoutes(
     if (!actor) return res.status(401).json({ message: "Session user not found." });
     const aRole = canonicalRole(actor.role);
     const isModCommand = moderationCommandNames.includes(name);
-    if (isModCommand && (roleRank[aRole] ?? 0) < roleRank["trial-moderator"]) return res.status(403).json({ message: "You do not have permission to use moderation commands." });
+    const helperCommands = ["warn","warnings","note","notes","report","reports"];
+    const trialHelperCommands = ["note","report"];
+    const staffAllowed = (roleRank[aRole] ?? 0) >= roleRank["trial-moderator"]
+      || (aRole === "helper" && helperCommands.includes(name))
+      || (aRole === "trial-helper" && trialHelperCommands.includes(name));
+    if (isModCommand && !staffAllowed) return res.status(403).json({ message: "Your staff role does not have permission to use this command." });
     if (!isModCommand && !memberCommandNames.includes(name)) return res.status(400).json({ message: "Unknown command. Use /help." });
 
     if (!isModCommand) {
