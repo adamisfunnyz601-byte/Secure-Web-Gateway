@@ -86,7 +86,7 @@ export default function Hangouts(){
     send();
   },[position,room?.id]);
   useEffect(()=>{refreshRooms();const id=window.setInterval(refreshRooms,2500);return()=>window.clearInterval(id);},[refreshRooms]);
-  useEffect(()=>()=>{if(room)fetch("/api/hangouts/leave",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({roomId:room.id})}).catch(()=>{});},[]);
+  useEffect(()=>{\n    const roomId=room?.id;\n    if(!roomId)return;\n    return ()=>{fetch("/api/hangouts/leave",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({roomId})}).catch(()=>{});};\n  },[room?.id]);
   const sendMessage=async()=>{
     const text=draft.trim();if(!text||!room)return;
     setDraft("");
