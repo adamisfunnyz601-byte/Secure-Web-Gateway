@@ -23,6 +23,10 @@ export const users = pgTable("users", {
   nickname: text("nickname"),
   avatarUrl: text("avatar_url"),
   usernameFont: text("username_font"),
+  // Legacy column retained to preserve existing profile decoration data.
+  profileDecoration: text("profile_decoration"),
+  // Legacy balance column retained; newer shop features use coins.
+  tokens: integer("tokens").notNull().default(100),
   profileGradient: text("profile_gradient"),
   dihhroUntil: timestamp("dihhro_until"),
   tagSymbol: text("tag_symbol"),
@@ -148,6 +152,8 @@ export const messages = pgTable("messages", {
   mediaUrl: text("media_url"),
   mediaType: text("media_type"), // 'image', 'video', 'audio'
   replyToId: integer("reply_to_id"), // ID of message being replied to
+  // Legacy soft-delete flag retained so existing message history is not dropped.
+  isDeleted: boolean("is_deleted").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
