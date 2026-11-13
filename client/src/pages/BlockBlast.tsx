@@ -85,10 +85,10 @@ function BlockBlastGame() {
   const gained=piece.cells.length*10+(lines?lines*100*nextCombo+Math.max(0,lines-1)*50:0);
   const finalScore=score+gained;
   setBoard(next);setScore(finalScore);setStreak(nextStreak);setCombo(nextCombo);playTone(lines?880:420);
-  const remaining=pieces.map((p,i)=>i===selected?null:p);
+  const remaining=pieces.map((p,i)=>i===pieceIndex?null:p);
   const allUsed=remaining.every(p=>p===null);
   const nextSet=allUsed?newPieces():remaining.map(p=>p||randomPiece());
-  setPieces(nextSet);setSelected(0);setClearing([]);setFlash(false);
+  setPieces(nextSet);setSelected(0);window.setTimeout(()=>{setClearing([]);setFlash(false);},360);
   if(!nextSet.some(p=>fitExists(next,p)))finishGame(finalScore);
  };
  const reset=()=>{setBoard(emptyBoard());setPieces(newPieces());setSelected(0);setScore(0);setStreak(0);setCombo(1);setGameOver(false);setClearing([]);setPlacementCells([]);setComboBanner("");};
@@ -160,7 +160,7 @@ function BlockBlastGame() {
      <div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-[.2em] text-slate-400">Puzzle grid</div><div className="mt-1 text-sm text-slate-500">10 × 10 • Fill a row or column to clear it</div></div><div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-300">● LIVE RUN</div></div>
      <div className="relative mx-auto w-full max-w-[620px]">\n      {comboBanner&&<div key={comboBanner+score} className={`pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-2xl border border-cyan-200/40 bg-slate-950/90 px-6 py-3 text-lg font-black tracking-wider text-cyan-200 shadow-[0_0_45px_#22d3ee55] ${comboPulse?"bb-combo-pop":""}`}>{comboBanner}{combo>1?` ×${combo}`:""}</div>}
       <div className="grid aspect-square grid-cols-10 gap-[3px] rounded-2xl border border-white/10 bg-[#080e1b] p-2 sm:gap-1 sm:p-3" role="grid" aria-label="Block Blast 10 by 10 game board" onDragOver={e=>e.preventDefault()}>
-       {board.map((line,r)=>line.map((cell,c)=><button key={r+"-"+c} onClick={()=>place(r,c)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const idx=Number(e.dataTransfer.getData("text/blockblast-index"));if(Number.isInteger(idx)&&pieces[idx]){setSelected(idx);place(r,c);}}} aria-label={`Place at row ${r+1}, column ${c+1}`} className={`relative min-w-0 rounded-[3px] border transition-all duration-150 ${cell?"border-white/10 shadow-[inset_0_2px_0_#ffffff44,0_2px_4px_#0008]":"border-white/[.035] bg-[#1a2740] hover:bg-[#263b5b]"} ${flash&&clearing.includes(r)||flash&&clearing.includes(c+SIZE)?"animate-pulse":""} ${placementCells.includes(r+"-"+c)?"bb-place-pop":""}`} style={cell?{background:cell}:undefined}/>))}
+       {board.map((line,r)=>line.map((cell,c)=><button key={r+"-"+c} onClick={()=>place(r,c)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const idx=Number(e.dataTransfer.getData("text/blockblast-index"));if(Number.isInteger(idx)&&pieces[idx]){setSelected(idx);place(r,c,idx);}}} aria-label={`Place at row ${r+1}, column ${c+1}`} className={`relative min-w-0 rounded-[3px] border transition-all duration-150 ${cell?"border-white/10 shadow-[inset_0_2px_0_#ffffff44,0_2px_4px_#0008]":"border-white/[.035] bg-[#1a2740] hover:bg-[#263b5b]"} ${flash&&clearing.includes(r)||flash&&clearing.includes(c+SIZE)?"animate-pulse":""} ${placementCells.includes(r+"-"+c)?"bb-place-pop":""}`} style={cell?{background:cell}:undefined}/>))}
       </div>
       {gameOver&&<div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#050a14]/90 p-6 text-center backdrop-blur-sm"><div className="max-w-sm"><Trophy className="mx-auto h-12 w-12 text-amber-300"/><div className="mt-3 text-3xl font-black text-white">Run complete</div><p className="mt-2 text-slate-400">No remaining piece can fit. Your score: <b className="text-cyan-300">{score.toLocaleString()}</b></p><button onClick={reset} className="mt-5 rounded-xl bg-cyan-300 px-6 py-3 font-bold text-slate-950">Play again</button></div></div>}
      </div>
