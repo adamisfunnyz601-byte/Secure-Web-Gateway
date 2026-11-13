@@ -6,7 +6,7 @@ import { useAdminKeys } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import {
   ShieldAlert, Plus, Trash2, Key, Star, Upload,
-  CheckCircle2, XCircle, Clock, Smile
+  CheckCircle2, XCircle, Clock, Smile, Copy
 } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -226,7 +226,16 @@ export default function Admin() {
                     <tbody>
                       {keys?.map(key => (
                         <tr key={key.id} className="border-b border-border/40 hover:bg-secondary/30 transition-colors">
-                          <td className="px-4 py-3 font-mono text-primary text-xs">{key.key}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-mono text-primary text-xs">{key.key}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <a className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2" href={`/invite/${encodeURIComponent(key.key)}`} target="_blank" rel="noreferrer">Open invite page</a>
+                              <button type="button" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline" onClick={() => {
+                                const url = `${window.location.origin}/invite/${encodeURIComponent(key.key)}`;
+                                navigator.clipboard.writeText(url).then(() => toast({ title: "Invite link copied", description: "Share this URL with the invited person." })).catch(() => toast({ title: "Copy failed", description: url, variant: "destructive" }));
+                              }}><Copy className="w-3 h-3" /> Copy link</button>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-muted-foreground text-xs">{(key as any).username || "—"}</td>
                           <td className="px-4 py-3">
                             <span className={cn(
