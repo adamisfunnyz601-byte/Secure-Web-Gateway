@@ -176,10 +176,12 @@ export function ProfileModal({
   const [form, setForm] = useState<any>({});
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const [activeProfileEmote, setActiveProfileEmote] = useState<any>(null);
+  const profileEmoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
   const fontFileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
+  useEffect(() => () => { profileEmoteAudioRef.current?.pause(); profileEmoteAudioRef.current = null; }, []);
 
   const showFullImage = (url?: string | null) => {
     if (!url) return;
@@ -365,12 +367,18 @@ export function ProfileModal({
   const playProfileEmote = (item:any) => {
     let settings:any = {};
     try { settings = typeof item.cssStyles === "string" ? JSON.parse(item.cssStyles) : (item.cssStyles || {}); } catch {}
-    const duration = Math.max(1, Math.min(20, Number(settings.duration) || 3));
-    setActiveProfileEmote({ name: item.name, imageUrl: item.imageUrl });
+    if (!settings.audioUrl || !item.imageUrl) return;
+    profileEmoteAudioRef.current?.pause();
     const audio = new Audio(settings.audioUrl);
-    audio.onended = () => setActiveProfileEmote((current:any) => current?.name === item.name ? null : current);
-    audio.play().catch(() => setActiveProfileEmote(null));
-    window.setTimeout(() => setActiveProfileEmote((current:any) => current?.name === item.name ? null : current), duration * 1000);
+    profileEmoteAudioRef.current = audio;
+    setActiveProfileEmote({ name: item.name, imageUrl: item.imageUrl });
+    const finish = () => {
+      setActiveProfileEmote((current:any) => current?.name === item.name ? null : current);
+      if (profileEmoteAudioRef.current === audio) profileEmoteAudioRef.current = null;
+    };
+    audio.onended = finish;
+    audio.onerror = finish;
+    audio.play().catch(finish);
   };
 
 
@@ -471,7 +479,7 @@ export function ProfileModal({
                         title={`View full-size image for ${profile.username}`}
                         className="border-4 border-black ring-2 ring-primary/50"
                       />
-                      {profileDecoration?.imageUrl && <><style>{`@keyframes ${decorationAnimationName}{from{transform:rotate(0deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}to{transform:rotate(${Math.max(-360,Math.min(360,Number(profileDecorationSettings.rotation)||360))}deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}}`}</style><img src={profileDecoration.imageUrl} alt={profileDecoration.name || "Profile decoration"} className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain" style={{animation: `${decorationAnimationName} ${Math.max(1,Math.min(30,Number(profileDecorationSettings.duration)||5))}s linear infinite`}} /></>}
+                      {profileDecoration?.imageUrl && <><style>{`@keyframes ${decorationAnimationName}{from{rotate:0deg}to{rotate:${Math.max(-360,Math.min(360,Number(profileDecorationSettings.rotation)||360))}deg}}`}</style><img src={profileDecoration.imageUrl} alt={profileDecoration.name || "Profile decoration"} className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain" style={{transform: "scale("+Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))+")", animation: `${decorationAnimationName} ${Math.max(1,Math.min(30,Number(profileDecorationSettings.duration)||5))}s linear infinite`}} /></>}
                       <AnimatePresence>{activeProfileEmote?.imageUrl && <motion.div initial={{opacity:0,scale:.75,x:-8}} animate={{opacity:1,scale:1,x:0}} exit={{opacity:0,scale:.85,x:-8}} transition={{type:"spring",stiffness:340,damping:24}} className="absolute left-[calc(100%+10px)] top-0 z-30 flex items-center gap-2 rounded-xl border border-violet-300/50 bg-[#111827]/95 p-2 shadow-xl"><img src={activeProfileEmote.imageUrl} alt={activeProfileEmote.name} className="h-16 w-16 object-contain"/><span className="max-w-24 text-[10px] font-bold text-violet-100">{activeProfileEmote.name}</span></motion.div>}</AnimatePresence>
                       {editing && (
                         <>
