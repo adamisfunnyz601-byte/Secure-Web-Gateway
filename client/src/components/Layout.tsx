@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound } from "lucide-react";
+import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ProfileModal";
@@ -17,6 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/history", label: "History",       icon: History },
     { href: "/settings", label: "Settings",     icon: Settings },
     { href: "/block-blast", label: "Block Blast 💥", icon: Blocks },
+    { href: "/shop", label: "Shop", icon: ShoppingBag },
   ];
 
   if (["owner","admin","trial-admin","moderator","trial-moderator","helper","trial-helper"].includes(String(user?.role || "").toLowerCase().replace(/_/g,"-"))) {
