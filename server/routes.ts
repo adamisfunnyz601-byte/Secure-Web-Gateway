@@ -700,6 +700,32 @@ export async function registerRoutes(
     res.json({success:true,userId:targetId,dihhroUntil:expires});
   });
   app.get("/api/dihhro/me", requireAuth, async (req,res) => { const u=await storage.getUser(req.session.userId!); res.json({active:Boolean(u?.dihhroUntil&&u.dihhroUntil>new Date()),expiresAt:u?.dihhroUntil||null}); });
+  app.post("/api/dihhro/gift-links", requireAuth, async (req,res) => {
+    const actor = await storage.getUser(req.session.userId!);
+    if (!actor || !["owner","admin"].includes(String(actor.role).toLowerCase())) return res.status(403).json({message:"Only owners and admins can create Dihhro gift links."});
+    const code = "DH-" + randomBytes(18).toString("hex");
+    await storage.createAccessKey({key:code,type:"dihhro-gift",createdBy:actor.id});
+    return res.status(201).json({url:"/gift/"+code,code});
+  });
+  app.get("/api/dihhro/gift-links/:code", async (req,res) => {
+    const key = await storage.getAccessKey(String(req.params.code||""));
+    if (!key || key.type !== "dihhro-gift" || key.isUsed) return res.status(410).json({valid:false,message:"This Dihhro gift link is invalid, revoked, or already claimed."});
+    return res.json({valid:true,months:1});
+  });
+  app.post("/api/dihhro/gift-links/:code/claim", requireAuth, async (req,res) => {
+    const key = await storage.getAccessKey(String(req.params.code||""));
+    if (!key || key.type !== "dihhro-gift" || key.isUsed) return res.status(410).json({message:"This Dihhro gift link is invalid, revoked, or already claimed."});
+    const [claimed] = await db.update(accessKeys).set({isUsed:true}).where(and(eq(accessKeys.id,key.id),eq(accessKeys.isUsed,false))).returning({id:accessKeys.id});
+    if (!claimed) return res.status(410).json({message:"This gift has already been claimed."});
+    const target = await storage.getUser(req.session.userId!);
+    if (!target) return res.status(401).json({message:"Sign in to claim this gift."});
+    const start = target.dihhroUntil && target.dihhroUntil > new Date() ? target.dihhroUntil : new Date();
+    const expires = new Date(start.getTime()+30*86400000);
+    await db.update(users).set({dihhroUntil:expires}).where(eq(users.id,target.id));
+    await db.insert(moderationLogs).values({actorId:key.createdBy || target.id,targetId:target.id,action:"dihhro-gift-claimed",reason:"Claimed one month of Dihhro",expiresAt:expires});
+    return res.json({success:true,dihhroUntil:expires});
+  });
+
   app.get("/api/blockblast/leaderboard", requireAuth, async (req,res) => {
     const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : monthKeyFor();
     const now = new Date(); const previousDate = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-1,1)); const previousMonth = monthKeyFor(previousDate);
