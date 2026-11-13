@@ -345,8 +345,8 @@ export class DatabaseStorage implements IStorage {
     // Normalize invisible characters as well as ordinary whitespace before matching.
     const normalizeInviteCode = (value: unknown) => String(value ?? "")
       .normalize("NFKC")
-      .replace(/[\\u200B-\\u200D\\uFEFF]/g, "")
-      .replace(/\\s+/g, "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/\s+/g, "")
       .toUpperCase();
     const normalizedCode = normalizeInviteCode(code);
     if (!normalizedCode) return undefined;
