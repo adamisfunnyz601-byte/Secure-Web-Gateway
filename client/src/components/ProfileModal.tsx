@@ -467,8 +467,9 @@ export function ProfileModal({
                       <div
                         className={cn(
                           "text-lg font-bold leading-none",
-                          getFontClass(profile.usernameFont),
+                          getFontClass(editing ? form.usernameFont : profile.usernameFont),
                         )}
+                        style={getUsernameGradientStyle(editing ? form.usernameFont : profile.usernameFont)}
                         data-testid="text-display-name"
                       >
                         {displayName}
