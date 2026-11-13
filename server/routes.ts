@@ -419,9 +419,9 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Account expired" });
       }
       const [activeBan] = await db.select().from(moderationLogs)
-        .where(and(eq(moderationLogs.targetId, user.id), sql`${moderationLogs.action} IN ('ban','tempban','permban','softban')`))
+        .where(and(eq(moderationLogs.targetId, user.id), sql`${moderationLogs.action} IN ('ban','tempban','permban','softban','unban')`))
         .orderBy(desc(moderationLogs.createdAt)).limit(1);
-      if (activeBan && (!activeBan.expiresAt || activeBan.expiresAt > new Date())) {
+      if (activeBan && activeBan.action !== "unban" && (!activeBan.expiresAt || activeBan.expiresAt > new Date())) {
         return res.status(403).json({ message: "This account is currently banned." });
       }
 
@@ -676,9 +676,9 @@ export async function registerRoutes(
   app.post(api.chat.send.path, requireAuth, async (req, res) => {
     const input = api.chat.send.input.parse(req.body);
     const [activeMute] = await db.select().from(moderationLogs)
-      .where(and(eq(moderationLogs.targetId, req.session.userId!), sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict')`))
+      .where(and(eq(moderationLogs.targetId, req.session.userId!), sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict','unmute','untimeout','unjail','unrestrict')`))
       .orderBy(desc(moderationLogs.createdAt)).limit(1);
-    if (activeMute && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) {
+    if (activeMute && !["unmute","untimeout","unjail","unrestrict"].includes(activeMute.action) && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) {
       return res.status(403).json({ message: "You are currently muted or restricted by moderation." });
     }
     if (input.recipientId && input.groupId) {
