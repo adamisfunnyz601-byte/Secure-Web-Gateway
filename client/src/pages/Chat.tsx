@@ -59,6 +59,7 @@ const ADMIN_COMMANDS_CONFIG = {
   moderationDurations: [
     { value: '1m', label: '1 minute' },
     { value: '1h', label: '1 hour' },
+    { value: '1hrs', label: '1 hour (hrs)' },
     { value: '1d', label: '1 day' },
     { value: '1mo', label: '1 month' },
     { value: '1y', label: '1 year' },
