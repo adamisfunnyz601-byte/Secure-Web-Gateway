@@ -68,6 +68,7 @@ export const USERNAME_FONTS: {
     className:
       "font-mono font-bold bg-gradient-to-r from-pink-500 via-yellow-400 to-cyan-400 bg-clip-text text-transparent",
   },
+  { id: "comic-sans", label: "COMIC SANS", className: "font-comic-sans italic" },
   { id: "ghost", label: "GHOST", className: "font-mono text-white/40" },
   {
     id: "elite",
