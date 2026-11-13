@@ -55,6 +55,7 @@ export default function Hub() {
   const [taskDraft, setTaskDraft] = useState("");
   const [points, setPoints] = useState(Number(saved.points) || 0);
   const [streak, setStreak] = useState(Number(saved.streak) || 0);
+  const [lastVisit, setLastVisit] = useState(String(saved.lastVisit || ""));
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [clicks, setClicks] = useState(0);
   const [reactionState, setReactionState] = useState<"idle" | "wait" | "go" | "done">("idle");
@@ -74,8 +75,8 @@ export default function Hub() {
   const [focusRunning, setFocusRunning] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, notes, points, streak, diceBest }));
-  }, [tasks, notes, points, streak, diceBest]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, notes, points, streak, diceBest, lastVisit }));
+  }, [tasks, notes, points, streak, diceBest, lastVisit]);
 
   useEffect(() => {
     if (!focusRunning) return;
@@ -101,7 +102,7 @@ export default function Hub() {
     const pattern = Array.from({ length: 4 }, () => Math.floor(Math.random() * 9));
     setMemoryPattern(pattern);
     setMemoryInput([]);
-    setMemoryMessage("Pattern: " + pattern.map(value => value + 1).join(" · "));
+    setMemoryMessage("Memorise: " + pattern.map(value => value + 1).join(" · "));\n    window.setTimeout(() => setMemoryMessage("Now repeat the 4-number pattern using the grid."), 1800);
   };
   const addMemoryNumber = (value: number) => {
     const next = [...memoryInput, value];
