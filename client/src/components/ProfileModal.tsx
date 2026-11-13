@@ -659,9 +659,9 @@ export function ProfileModal({
                         </div>
                       </Field>
                       <Field label="CUSTOM PROFILE GRADIENT (DIHHRO)">
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {["none","aurora","sunset","ocean","ember","violet","mint","mono"].map((gradient) => (
-                            <button key={gradient} type="button" disabled={gradient !== "none" && !canUseDihhro} onClick={() => setForm({ ...form, profileGradient: gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", form.profileGradient === gradient ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                          {["none","aurora","sunset","ocean","ember","violet","mint","mono","custom"].map((gradient) => (
+                            <button key={gradient} type="button" disabled={gradient !== "none" && !canUseDihhro} onClick={() => setForm({ ...form, profileGradient: gradient === "custom" ? "custom:" + [form.customProfileStart || "#0ea5e9",form.customProfileMiddle || "#8b5cf6",form.customProfileEnd || "#ec4899"].join(":") : gradient })} className={cn("rounded border px-2 py-2 text-[9px] uppercase", (gradient === "custom" ? form.profileGradient?.startsWith("custom:") : form.profileGradient === gradient) ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>{gradient}</button>
                           ))}
                         </div>
                         <div className="mt-3 rounded-xl border border-white/10 p-3" style={getProfileGradientStyle(form.profileGradient?.startsWith("custom:")?form.profileGradient:"custom:"+form.customProfileStart+":"+form.customProfileMiddle+":"+form.customProfileEnd)}>
@@ -672,6 +672,10 @@ export function ProfileModal({
                         </div>
                       </Field>
                       <Field label="USERNAME TEXT GRADIENT (DIHHRO)">
+                        <div className="mb-2 flex gap-2">
+                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: "custom-gradient|" + (form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] : "default") + "|" + (form.customTextStart || "#22d3ee") + "|" + (form.customTextEnd || "#a78bfa") })} className={cn("rounded border px-3 py-2 text-[9px] uppercase", form.usernameFont?.startsWith("custom-gradient|") ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>Use custom gradient</button>
+                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] || "default" : form.usernameFont || "default" })} className="rounded border border-white/15 px-3 py-2 text-[9px] uppercase text-white/60">Use font only</button>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <label className="text-[9px] text-white/50">START COLOR<input type="color" value={form.customTextStart||"#22d3ee"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextStart:e.target.value,usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+e.target.value+"|"+(form.customTextEnd||"#a78bfa")})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
                           <label className="text-[9px] text-white/50">END COLOR<input type="color" value={form.customTextEnd||"#a78bfa"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextEnd:e.target.value,usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+(form.customTextStart||"#22d3ee")+"|"+e.target.value})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
