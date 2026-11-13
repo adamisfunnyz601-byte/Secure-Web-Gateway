@@ -67,7 +67,7 @@ export default function Shop() {
           </div>
           <div className="cyber-box px-4 py-2 bg-primary/10 flex items-center gap-3">
             <Coins className="w-4 h-4 text-yellow-500" />
-            <span className="font-mono text-primary font-bold">{user?.coins || 0} CR</span>
+            <span className="font-mono text-primary font-bold">{Number(user?.coins || 0)} CR</span>
           </div>
         </div>
 
@@ -102,7 +102,7 @@ export default function Shop() {
                   <CyberButton
                     onClick={() => buyMutation.mutate(item.id)}
                     className="w-full"
-                    disabled={buyMutation.isPending || (user?.coins || 0) < item.price}
+                    disabled={buyMutation.isPending || Number(user?.coins || 0) < item.price}
                   >
                     ACQUIRE_DATA
                   </CyberButton>
