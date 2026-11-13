@@ -98,6 +98,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Router />
+        <GlobalChatHost />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
