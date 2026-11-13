@@ -77,18 +77,11 @@ const isValidModerationDuration = (value: string) =>
   value === 'null' || /^[1-9]\d*(m|h|d|w|mo|y)$/i.test(value.trim());
 
 // Slash-command help and autocomplete. The server still validates and executes commands.
+const MEMBER_COMMAND_NAMES = ["help","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
+const MODERATION_COMMAND_NAMES = ["ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings","softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen","freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset","restrict","unrestrict"] as const;
 const CHAT_COMMANDS = [
-  { name: 'help', usage: '/help', description: 'Show the available chat commands.' },
-  { name: 'me', usage: '/me <action>', description: 'Send an action-style message.', example: '/me waves' },
-  { name: 'shrug', usage: '/shrug', description: 'Send a shrug.' },
-  { name: 'roll', usage: '/roll [dice]', description: 'Roll dice.', example: '/roll d20', options: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', '2d6'] },
-  { name: 'flip', usage: '/flip', description: 'Flip a coin.' },
-  { name: 'nick', usage: '/nick <name>', description: 'Set a nickname, if enabled on this server.', example: '/nick Adam' },
-  { name: 'sfx', usage: '/sfx <sound>', description: 'Send a soundboard effect.', options: DEFAULT_SOUNDS.map(sound => sound.name) },
-  { name: 'capsI', usage: '/capsI <true|false>', description: 'Enable or disable the 1-in-50 lowercase-i-to-uppercase-I message effect.', options: ['true', 'false'] },
-  { name: 'ban', usage: '/ban <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.ban.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
-  { name: 'kick', usage: '/kick <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.kick.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
-  { name: 'mute', usage: '/mute <@user> <duration> [reason]', description: `OWNER ONLY · ${ADMIN_COMMANDS_CONFIG.commands.mute.description}`, ownerOnly: true, options: MODERATION_DURATIONS },
+  ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: `/${name}`, description: "Member utility command." })),
+  ...MODERATION_COMMAND_NAMES.map(name => ({ name, usage: `/${name} <@user> [duration] [reason]`, description: "Staff moderation command.", ownerOnly: true, options: MODERATION_DURATIONS })),
 ] as const;
 
 // Keep ordinary swearing allowed. This blocks explicit sexual content, porn terms,
@@ -515,9 +508,9 @@ export default function Chat() {
     (currentUser as any)?.isOwner || (configUser as any)?.isOwner ||
     isConfiguredOwner || hasConfiguredOwnerRole
   );
-  const canUseAdminCommand = (name: keyof typeof ADMIN_COMMANDS_CONFIG.commands) =>
-    ADMIN_COMMANDS_CONFIG.enabled && ADMIN_COMMANDS_CONFIG.commands[name].enabled &&
-    (!ADMIN_COMMANDS_CONFIG.commands[name].ownerOnly || isOwner);
+  const staffRoles = ['owner','admin','trial-admin','moderator','trial-moderator','helper','trial-helper'];
+  const isStaff = staffRoles.includes(String(currentUserRole || '').toLowerCase().replace(/_/g,'-'));
+  const canUseAdminCommand = (_name: string) => ADMIN_COMMANDS_CONFIG.enabled && isStaff;
   // Treat configured owner IDs and owner-role accounts as immune to automatic chat filtering
   // and to moderation commands. The server MUST enforce the same rule independently.
   const isProtectedOwner = (user: any) => {
@@ -779,8 +772,8 @@ export default function Chat() {
     const commandParts = commandText.match(/^\/(\S+)(?:\s+(.*))?$/);
     const commandName = commandParts?.[1]?.toLowerCase();
     const commandArgs = (commandParts?.[2] || '').trim();
-    if (commandName && ['ban', 'kick', 'mute'].includes(commandName) && !canUseAdminCommand(commandName as keyof typeof ADMIN_COMMANDS_CONFIG.commands)) {
-      toast({ title: 'OWNER ONLY', description: 'Only the server owner can use this command.', variant: 'destructive' });
+    if (commandName && MODERATION_COMMAND_NAMES.includes(commandName as any) && !canUseAdminCommand(commandName as keyof typeof ADMIN_COMMANDS_CONFIG.commands)) {
+      toast({ title: 'OWNER ONLY', description: 'Only staff members can use this command.', variant: 'destructive' });
       return;
     }
     if (commandName === 'capsi') {
@@ -804,7 +797,7 @@ export default function Chat() {
       }
       return;
     }
-    if (commandName === 'ban' || commandName === 'kick' || commandName === 'mute') {
+    if (commandName && MODERATION_COMMAND_NAMES.includes(commandName as any)) {
       const pieces = commandArgs.split(/\s+/).filter(Boolean);
       const targetToken = pieces[0] || '';
       const duration = (pieces[1] || '').toLowerCase();
@@ -861,7 +854,7 @@ export default function Chat() {
         const response = await fetch(ADMIN_COMMANDS_CONFIG.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify((commandName === 'ban' || commandName === 'kick' || commandName === 'mute')
+          body: JSON.stringify((commandName && MODERATION_COMMAND_NAMES.includes(commandName as any))
             ? (() => {
                 const pieces = commandArgs.split(/\s+/).filter(Boolean);
                 const target = findModerationTarget(pieces[0]);
@@ -1419,7 +1412,7 @@ export default function Chat() {
     ? CHAT_COMMANDS.find(command => command.name === typedCommand && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
     : undefined;
   const commandTokens = commandArgument?.trim().split(/\s+/).filter(Boolean) || [];
-  const isModerationCommand = ['ban', 'kick', 'mute'].includes(activeCommand?.name || '');
+  const isModerationCommand = MODERATION_COMMAND_NAMES.includes(activeCommand?.name as any);
   const targetQuery = commandTokens[0] || '';
   const targetTokenComplete = Boolean(commandArgument && /\s$/.test(commandArgument));
   const moderationUserOptions = isModerationCommand && commandArgument !== null &&
