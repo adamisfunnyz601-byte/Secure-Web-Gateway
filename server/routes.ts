@@ -1820,5 +1820,84 @@ export async function registerRoutes(
     res.json({success:true});
   });
 
+  // Lightweight shared 2D hangout rooms. State is process-local and expires when empty.
+  type HangoutPlayer = { id:number; username:string; x:number; y:number; color:string; direction:string; lastSeen:number };
+  type HangoutRoom = { id:string; name:string; theme:string; players:Map<number,HangoutPlayer>; messages:Array<{id:string;username:string;text:string;createdAt:number}>; updatedAt:number };
+  const hangoutRooms = new Map<string,HangoutRoom>();
+  const hangoutColors = ["#8b5cf6","#0ea5e9","#ec4899","#10b981","#f59e0b","#f43f5e","#a855f7","#14b8a6"];
+  const hangoutPublic = (room:HangoutRoom) => ({
+    id:room.id,name:room.name,theme:room.theme,
+    players:Array.from(room.players.values()).map(({lastSeen:_lastSeen,...player})=>player),
+    messages:room.messages.slice(-60),
+  });
+  const cleanupHangouts = () => {
+    const now=Date.now();
+    for(const [id,room] of hangoutRooms){
+      for(const [playerId,player] of room.players) if(now-player.lastSeen>45000) room.players.delete(playerId);
+      if(!room.players.size || now-room.updatedAt>15*60*1000) hangoutRooms.delete(id);
+    }
+  };
+  app.get("/api/hangouts/rooms",requireAuth,(_req,res)=>{
+    cleanupHangouts();
+    res.json(Array.from(hangoutRooms.values()).map(room=>({id:room.id,name:room.name,theme:room.theme,players:Array.from(room.players.values()).map(({lastSeen:_lastSeen,...player})=>player)})));
+  });
+  app.post("/api/hangouts/create",requireAuth,async(req,res)=>{
+    cleanupHangouts();
+    const userId=Number(req.session.userId!),user=await storage.getUser(userId);
+    if(!user) return res.status(401).json({message:"Please sign in again."});
+    if(hangoutRooms.size>=30) return res.status(429).json({message:"There are too many active rooms. Try joining one instead."});
+    const name=String(req.body?.name||"").trim().slice(0,32)||"Chill Hangout";
+    const theme=String(req.body?.theme||"plaza");
+    if(!["plaza","beach","forest","arcade"].includes(theme)) return res.status(400).json({message:"Choose a valid room map."});
+    const id=randomBytes(8).toString("hex");
+    const player:HangoutPlayer={id:userId,username:String(user.username||"Player").slice(0,32),x:48,y:52,color:hangoutColors[userId%hangoutColors.length],direction:"down",lastSeen:Date.now()};
+    const room:HangoutRoom={id,name,theme,players:new Map([[userId,player]]),messages:[],updatedAt:Date.now()};
+    hangoutRooms.set(id,room);
+    res.json(hangoutPublic(room));
+  });
+  app.post("/api/hangouts/join",requireAuth,async(req,res)=>{
+    cleanupHangouts();
+    const userId=Number(req.session.userId!),roomId=String(req.body?.roomId||""),room=hangoutRooms.get(roomId);
+    if(!room) return res.status(404).json({message:"That hangout has closed."});
+    const user=await storage.getUser(userId);
+    if(!user) return res.status(401).json({message:"Please sign in again."});
+    if(!room.players.has(userId)&&room.players.size>=16) return res.status(409).json({message:"This room is full."});
+    if(!room.players.has(userId)) room.players.set(userId,{id:userId,username:String(user.username||"Player").slice(0,32),x:15+Math.random()*70,y:20+Math.random()*60,color:hangoutColors[userId%hangoutColors.length],direction:"down",lastSeen:Date.now()});
+    room.updatedAt=Date.now();
+    res.json(hangoutPublic(room));
+  });
+  app.get("/api/hangouts/state",requireAuth,(req,res)=>{
+    cleanupHangouts();
+    const userId=Number(req.session.userId!),room=hangoutRooms.get(String(req.query.roomId||""));
+    if(!room||!room.players.has(userId)) return res.status(404).json({message:"This hangout has closed or you have left."});
+    const player=room.players.get(userId)!;player.lastSeen=Date.now();room.updatedAt=Date.now();
+    res.json(hangoutPublic(room));
+  });
+  app.post("/api/hangouts/move",requireAuth,(req,res)=>{
+    const userId=Number(req.session.userId!),room=hangoutRooms.get(String(req.body?.roomId||""));
+    if(!room||!room.players.has(userId)) return res.status(404).json({message:"You are no longer in this room."});
+    const player=room.players.get(userId)!;
+    const x=Number(req.body?.x),y=Number(req.body?.y);
+    if(!Number.isFinite(x)||!Number.isFinite(y)) return res.status(400).json({message:"Invalid player position."});
+    player.x=Math.max(5,Math.min(95,x));player.y=Math.max(10,Math.min(90,y));player.lastSeen=Date.now();room.updatedAt=Date.now();
+    res.json({success:true});
+  });
+  app.post("/api/hangouts/chat",requireAuth,async(req,res)=>{
+    const userId=Number(req.session.userId!),room=hangoutRooms.get(String(req.body?.roomId||""));
+    if(!room||!room.players.has(userId)) return res.status(404).json({message:"Join the room before chatting."});
+    const text=String(req.body?.text||"").trim();
+    if(!text||text.length>240) return res.status(400).json({message:"Messages must be between 1 and 240 characters."});
+    const player=room.players.get(userId)!;
+    player.lastSeen=Date.now();room.updatedAt=Date.now();
+    room.messages.push({id:randomBytes(8).toString("hex"),username:player.username,text,createdAt:Date.now()});
+    if(room.messages.length>100) room.messages.splice(0,room.messages.length-100);
+    res.json({success:true});
+  });
+  app.post("/api/hangouts/leave",requireAuth,(req,res)=>{
+    const userId=Number(req.session.userId!),room=hangoutRooms.get(String(req.body?.roomId||""));
+    if(room){room.players.delete(userId);room.updatedAt=Date.now();if(!room.players.size)hangoutRooms.delete(room.id);}
+    res.json({success:true});
+  });
+
   return httpServer;
 }
