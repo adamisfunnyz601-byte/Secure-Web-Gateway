@@ -1347,6 +1347,20 @@ export async function registerRoutes(
     if(!signal||!["offer","answer","ice","left"].includes(signal.type)) return res.status(400).json({message:"Invalid WebRTC signal."});
     const queue=blockBlastSignals.get(to)||[]; queue.push({from,signal,createdAt:Date.now()}); if(queue.length>100)queue.splice(0,queue.length-100); blockBlastSignals.set(to,queue); res.json({success:true});
   });
+  app.post("/api/blockblast/voice/emote", requireAuth, async (req,res) => {
+    const userId=Number(req.session.userId!);
+    if(!blockBlastMembers.has(userId)) return res.status(403).json({message:"Join Block Blast voice first."});
+    const emoteId=Number(req.body?.emoteId);
+    const inventory=await storage.getUserInventory(userId);
+    const item=inventory.find((entry:any)=>entry.id===emoteId&&entry.type==="emote");
+    if(!item) return res.status(403).json({message:"You do not own that emote."});
+    let styles:any={};try{styles=typeof item.cssStyles==="string"?JSON.parse(item.cssStyles):(item.cssStyles||{});}catch{}
+    if(!styles.audioUrl||!item.imageUrl) return res.status(400).json({message:"This emote is incomplete."});
+    const payload={type:"emote",emote:{name:item.name,gifUrl:item.imageUrl,audioUrl:styles.audioUrl,duration:Math.min(20,Number(styles.duration)||3)}};
+    for(const peer of blockBlastMembers.keys()){if(peer===userId)continue;const queue=blockBlastSignals.get(peer)||[];queue.push({from:userId,signal:payload,createdAt:Date.now()});if(queue.length>100)queue.splice(0,queue.length-100);blockBlastSignals.set(peer,queue);}
+    res.json({success:true});
+  });
+
   app.get("/api/blockblast/voice/signals", requireAuth, (req,res) => { const id=Number(req.session.userId!); const queue=blockBlastSignals.get(id)||[]; blockBlastSignals.set(id,[]); res.json(queue.filter(item=>Date.now()-item.createdAt<60000)); });
   app.post("/api/blockblast/voice/leave", requireAuth, (req,res) => {
     const id=Number(req.session.userId!); blockBlastMembers.delete(id);
