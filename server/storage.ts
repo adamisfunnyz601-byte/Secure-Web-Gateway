@@ -341,15 +341,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGroupByCode(code: string): Promise<any> {
-    // Invite codes are user-shared URLs, so tolerate casing and accidental whitespace.
-    // Comparing normalised values in SQL also handles older rows created before
-    // invite-code normalisation was enforced.
-    const normalizedCode = String(code ?? "").trim().toUpperCase();
+    // Invite codes are copied through URLs, chat clients and mobile keyboards.
+    // Normalize invisible characters as well as ordinary whitespace before matching.
+    const normalizeInviteCode = (value: unknown) => String(value ?? "")
+      .normalize("NFKC")
+      .replace(/[\\u200B-\\u200D\\uFEFF]/g, "")
+      .replace(/\\s+/g, "")
+      .toUpperCase();
+    const normalizedCode = normalizeInviteCode(code);
     if (!normalizedCode) return undefined;
-    const [group] = await db.select().from(groupChats)
+
+    // First use an indexed database comparison for the normal case.
+    const [exactMatch] = await db.select().from(groupChats)
       .where(sql`upper(trim(${groupChats.inviteCode})) = ${normalizedCode}`)
       .limit(1);
-    return group;
+    if (exactMatch) return exactMatch;
+
+    // Fallback handles legacy rows containing non-breaking/invisible characters
+    // that SQL trim() does not remove. This reads only group invite records.
+    const groups = await db.select().from(groupChats);
+    return groups.find(group => normalizeInviteCode(group.inviteCode) === normalizedCode);
   }
 
   async getUserGroups(userId: number): Promise<any[]> {
