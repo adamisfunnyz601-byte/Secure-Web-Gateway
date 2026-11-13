@@ -19,7 +19,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { motion, AnimatePresence } from "framer-motion";
-import { ProfileModal, Avatar, getFontClass } from "@/components/ProfileModal";
+import { ProfileModal, Avatar, getFontClass, getUsernameGradientStyle } from "@/components/ProfileModal";
 import { UserProfileTag } from "@/components/UserProfileTag";
 import { EmojiButton } from "@/components/EmojiPicker";
 
@@ -110,6 +110,53 @@ const containsBlockedChatContent = (value: string) => {
 // TYPES
 // ============================================================
 interface SoundEntry { id: string; name: string; url: string; }
+
+function LiveAudioVisualizer({ stream, bars = 44, className = "" }: { stream: MediaStream | null; bars?: number; className?: string }) {
+  const [levels, setLevels] = useState<number[]>(() => Array.from({ length: bars }, () => 4));
+  useEffect(() => {
+    if (!stream || !stream.getAudioTracks().some(track => track.readyState === "live" && track.enabled)) {
+      setLevels(Array.from({ length: bars }, () => 4));
+      return;
+    }
+    let frame = 0;
+    let active = true;
+    let context: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+    try {
+      context = new AudioContext();
+      analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.78;
+      source = context.createMediaStreamSource(stream);
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const draw = () => {
+        if (!active || !analyser) return;
+        analyser.getByteFrequencyData(data);
+        setLevels(Array.from({ length: bars }, (_, index) => {
+          const bucket = Math.floor(index * data.length / bars);
+          return Math.max(3, Math.min(30, 3 + (data[bucket] / 255) * 27));
+        }));
+        frame = window.requestAnimationFrame(draw);
+      };
+      context.resume().catch(() => {});
+      draw();
+    } catch {
+      setLevels(Array.from({ length: bars }, () => 4));
+    }
+    return () => {
+      active = false;
+      if (frame) window.cancelAnimationFrame(frame);
+      source?.disconnect();
+      analyser?.disconnect();
+      context?.close().catch(() => {});
+    };
+  }, [stream, bars]);
+  return <div className={cn("flex items-center justify-center gap-1 overflow-hidden", className)} aria-label="Live audio frequency visualizer">
+    {levels.map((height, index) => <span key={index} className="w-1 rounded-full bg-gradient-to-t from-violet-700 via-violet-400 to-fuchsia-200 transition-[height] duration-75" style={{ height: `${height}px` }} />)}
+  </div>;
+}
 interface MediaPreview { url: string; type: 'image' | 'video' | 'audio'; name: string; }
 interface ForwardTarget { message: any; isOpen: boolean; }
 interface IncomingCall { fromId: number; fromName: string; callId: string; withVideo?: boolean; }
@@ -469,7 +516,7 @@ export default function Chat() {
   const [callTime, setCallTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);\n  const [visualizerStream, setVisualizerStream] = useState<MediaStream | null>(null);\n  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [callTargetName, setCallTargetName] = useState("");
 
@@ -992,7 +1039,7 @@ export default function Chat() {
     pendingIceCandidatesRef.current = [];
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     remoteStreamRef.current?.getTracks().forEach(track => track.stop());
-    localStreamRef.current = null;
+    localStreamRef.current = null;\n    setVisualizerStream(null);
     remoteStreamRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
@@ -1028,7 +1075,7 @@ export default function Chat() {
         setIsVideoOn(false);
         toast({ title: 'Camera unavailable', description: 'Connected with microphone only.' });
       }
-      localStreamRef.current = stream;
+      localStreamRef.current = stream;\n      setVisualizerStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.muted = true;
@@ -1037,7 +1084,7 @@ export default function Chat() {
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
       peer.ontrack = event => {
       const remote = remoteStreamRef.current || new MediaStream();
-      remoteStreamRef.current = remote;
+      remoteStreamRef.current = remote;\n      setVisualizerStream(remote);
       if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
       if (event.track.kind === 'video') setHasRemoteVideo(true);
       if (remoteVideoRef.current) {
@@ -1607,9 +1654,7 @@ export default function Chat() {
                   </div>
                 </div>
               </div>
-              <div className="h-9 shrink-0 flex items-center justify-center gap-1 border-t border-violet-500/15 bg-[#09050f]" aria-label="Call audio visualizer">
-                {Array.from({ length: 44 }, (_, i) => <span key={i} className={cn("w-1 rounded-full bg-gradient-to-t from-violet-700 to-fuchsia-300", callState === 'connected' && "animate-pulse")} style={{ height: `${4 + ((i * 13) % 24)}px`, animationDelay: `${i * 18}ms` }} />)}
-              </div>
+              <div className="h-9 shrink-0 border-t border-violet-500/15 bg-[#09050f]"><LiveAudioVisualizer stream={visualizerStream} bars={44} className="h-full" /></div>
 
               {/* Soundboard in call (collapsible) */}
               <AnimatePresence>
@@ -2003,9 +2048,7 @@ export default function Chat() {
                     {isRecording ? (isRecordingPaused ? 'Recording paused' : 'Recording…') : 'Voice preview'}
                   </span>
                 </div>
-                <div className="flex-1 min-w-[90px] h-7 flex items-center justify-center gap-1 overflow-hidden" aria-label="Audio visualizer">
-                  {Array.from({ length: 28 }, (_, i) => <span key={i} className={cn("w-1 rounded-full bg-gradient-to-t from-violet-600 to-fuchsia-300", isRecording && !isRecordingPaused && "animate-pulse")} style={{ height: `${5 + ((i * 17) % 19)}px`, animationDelay: `${i * 25}ms` }} />)}
-                </div>
+                <LiveAudioVisualizer stream={isRecording ? recordingStream : null} bars={28} className="flex-1 min-w-[90px] h-7" />
                 {isRecording ? (
                   <>
                     <button type="button" onClick={togglePauseVoiceRecord} className="p-2 rounded-lg border border-violet-400/30 text-violet-200 hover:bg-violet-500/15" title={isRecordingPaused ? 'Resume recording' : 'Pause recording'}>
