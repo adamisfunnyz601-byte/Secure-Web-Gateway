@@ -800,10 +800,10 @@ export async function registerRoutes(
     const groupId = await ensureBlockBlastChatRoom(req.session.userId!);
     const created = await storage.createMessage({senderId:req.session.userId!,groupId,content});
     const [row] = await db.select({id:messages.id,content:messages.content,createdAt:messages.createdAt,senderId:messages.senderId,senderName:users.username,senderDisplayName:users.displayName}).from(messages).innerJoin(users,eq(messages.senderId,users.id)).where(eq(messages.id,created.id)).limit(1);
-    const [usage] = await db.select({bytes:sql<number>`COALESCE(SUM(octet_length(${messages.content})),0)`}).from(messages).where(eq(messages.groupId,groupId));
+    const [usage] = await db.select({bytes:sql<number>`COALESCE(SUM(octet_length(${messages.content}) + COALESCE(octet_length(${messages.mediaUrl}),0)),0)`}).from(messages).where(eq(messages.groupId,groupId));
     if (Number(usage?.bytes||0) > 1024*1024*1024) {
       await db.execute(sql`WITH ranked AS (
-        SELECT id, SUM(octet_length(content)) OVER (ORDER BY created_at ASC, id ASC) AS total_bytes
+        SELECT id, SUM(octet_length(content) + COALESCE(octet_length(media_url),0)) OVER (ORDER BY created_at ASC, id ASC) AS total_bytes
         FROM messages WHERE group_id = ${groupId}
       ), purge AS (SELECT id FROM ranked WHERE total_bytes <= 500*1024*1024)
       DELETE FROM messages WHERE id IN (SELECT id FROM purge)`);
