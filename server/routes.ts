@@ -396,7 +396,7 @@ export async function registerRoutes(
       if (serialKey === OWNER_KEY) {
         if (!user) {
           user = await storage.createUser({
-            username: username || "Owner",
+            username: String(username || "Owner").trim().replace(/\s+/g, "_"),
             serialKey,
             role: "owner",
           });
@@ -424,7 +424,7 @@ export async function registerRoutes(
           }
 
           user = await storage.createUser({
-            username: username || `User-${randomBytes(2).toString('hex')}`,
+            username: String(username || `User-${randomBytes(2).toString('hex')}`).trim().replace(/\s+/g, "_"),
             serialKey,
             role: "user",
             expiresAt
@@ -1017,7 +1017,7 @@ export async function registerRoutes(
         tagColor,
       } = req.body;
       const update: any = {};
-      if (typeof username === 'string' && username.trim().length > 0) update.username = username.trim().slice(0, 32);
+      if (typeof username === 'string' && username.trim().length > 0) update.username = username.trim().replace(/\s+/g, '_').slice(0, 32);
       if (nickname !== undefined) update.nickname = nickname ? String(nickname).slice(0, 32) : null;
       if (displayName !== undefined) update.displayName = displayName ? String(displayName).slice(0, 32) : null;
       if (bio !== undefined) update.bio = bio ? String(bio).slice(0, 500) : null;
