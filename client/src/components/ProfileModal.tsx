@@ -80,10 +80,8 @@ export const USERNAME_FONTS: {
 
 export function getFontClass(id?: string | null) {
   if (id?.startsWith("custom-gradient|")) id = id.split("|")[1] || "default";
-  return (
-    USERNAME_FONTS.find((f) => f.id === id)?.className ||
-    USERNAME_FONTS[0].className
-  );
+  if (id?.startsWith("custom-font|")) return USERNAME_FONTS[0].className;
+  return USERNAME_FONTS.find((f) => f.id === id)?.className || USERNAME_FONTS[0].className;
 }
 
 
@@ -134,10 +132,24 @@ export function getProfileGradientStyle(value?: string | null): React.CSSPropert
   };
 }
 export function getUsernameGradientStyle(value?: string | null): React.CSSProperties {
-  if (!value?.startsWith("custom-gradient|")) return {};
-  const [,font,a,b]=value.split("|");
-  if (!/^[a-z-]+$/.test(font||"") || !/^#[0-9a-f]{6}$/i.test(a||"") || !/^#[0-9a-f]{6}$/i.test(b||"")) return {};
-  return {backgroundImage:`linear-gradient(90deg,${a},${b})`,backgroundClip:"text",WebkitBackgroundClip:"text",color:"transparent"};
+  if (!value?.startsWith("custom-gradient|") && !value?.startsWith("custom-font|")) return {};
+  const parts = value.split("|");
+  const isUploadedFont = parts[0] === "custom-font";
+  const font = isUploadedFont ? "default" : parts[1];
+  const a = parts[isUploadedFont ? 2 : 2];
+  const b = parts[isUploadedFont ? 3 : 3];
+  const d = parts[isUploadedFont ? 4 : 4] || b;
+  if (!/^[a-z-]+$/.test(font || "") || !/^#[0-9a-f]{6}$/i.test(a || "") || !/^#[0-9a-f]{6}$/i.test(b || "") || !/^#[0-9a-f]{6}$/i.test(d || "")) return {};
+  return { backgroundImage:`linear-gradient(100deg,${a},${b},${d},${a})`, backgroundSize:"250% 250%", animation:"profileTextGradientFlow 7s ease infinite", backgroundClip:"text", WebkitBackgroundClip:"text", color:"transparent" };
+}
+function getUsernameFontStyle(value?: string | null): React.CSSProperties {
+  if (!value?.startsWith("custom-font|")) return {};
+  return { fontFamily: "'DIHTROCustom', monospace" };
+}
+function getUploadedFontSource(value?: string | null): string | null {
+  if (!value?.startsWith("custom-font|")) return null;
+  const data = value.split("|")[1] || "";
+  return /^data:(?:font\/(?:woff2?|ttf|otf)|application\/octet-stream);base64,[A-Za-z0-9+/=]+$/i.test(data) ? data : null;
 }
 
 export function Avatar({
@@ -233,6 +245,7 @@ export function ProfileModal({
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
+  const fontFileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setEditing(false); setFullImageUrl(null); }, [userId]);
 
   const showFullImage = (url?: string | null) => {
@@ -269,8 +282,9 @@ export function ProfileModal({
         customProfileStart: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[0] : "#0ea5e9",
         customProfileMiddle: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[1] : "#8b5cf6",
         customProfileEnd: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[2] : "#ec4899",
-        customTextStart: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[2] : "#22d3ee",
-        customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
+        customTextStart: profile.usernameFont?.startsWith("custom-gradient|") || profile.usernameFont?.startsWith("custom-font|") ? profile.usernameFont.split("|")[2] : "#22d3ee",
+        customTextMiddle: profile.usernameFont?.startsWith("custom-gradient|") || profile.usernameFont?.startsWith("custom-font|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
+        customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") || profile.usernameFont?.startsWith("custom-font|") ? (profile.usernameFont.split("|")[4] || profile.usernameFont.split("|")[3]) : "#f472b6",
         tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
         tagText: profile.tagText || "",
         tagColor: profile.tagColor || PROFILE_TAG_COLORS[0],
@@ -335,7 +349,7 @@ export function ProfileModal({
         animated: form.profileGradientAnimated !== false,
         orientation: form.profileGradientOrientation === "landscape" ? "landscape" as const : "portrait" as const,
       };
-      const payload = { ...form, profileGradient: saveProfileAppearance(appearance) };
+      const payload = { ...form, nickname: null, displayName: null, profileGradient: saveProfileAppearance(appearance) };
       const r = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -398,7 +412,8 @@ export function ProfileModal({
       toast({ title: "GIFT_FAILED", description: error.message || "Could not gift Dihhro", variant: "destructive" });
     }
   };
-  const displayName = profile?.displayName || profile?.nickname || profile?.username;
+  const displayName = profile?.username || ""; 
+  const uploadedFontSource = getUploadedFontSource(editing ? form.usernameFont : profile?.usernameFont);
 
   return (
     <AnimatePresence>
@@ -466,7 +481,6 @@ export function ProfileModal({
             </div>
 
             <div
-              className="p-5 -mt-10 min-h-[calc(100%-6rem)]"
               className="p-5 -mt-10 min-h-[calc(100%-6rem)] profile-gradient-surface"
               style={{
                 backgroundColor: "#050505",
@@ -477,7 +491,8 @@ export function ProfileModal({
                 ["--profile-border-color" as any]: readProfileAppearance(editing ? saveProfileAppearance({ gradient: form.profileGradient || "none", textColor: form.profileTextColor || "#ffffff", borderColor: form.profileBorderColor || "#ffffff", animated: form.profileGradientAnimated !== false, orientation: form.profileGradientOrientation || "portrait" }) : profile?.profileGradient).borderColor,
               }}
             >
-              <style>{`@keyframes profileGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } .profile-gradient-surface .profile-outline { border-color:var(--profile-border-color)!important; } .profile-gradient-surface .profile-panel { border-color:var(--profile-border-color)!important; }`}</style>
+              <style>{`@keyframes profileGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } @keyframes profileTextGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } .profile-gradient-surface .profile-outline { border-color:var(--profile-border-color)!important; } .profile-gradient-surface .profile-panel { border-color:var(--profile-border-color)!important; }`}</style>
+              {uploadedFontSource && <style>{`@font-face { font-family: 'DIHTROCustom'; src: url("${uploadedFontSource}") format('woff2'); font-display: swap; }`}</style>}
               {isLoading || !profile ? (
                 <div className="text-primary/60 font-mono text-xs text-center py-10">
                   LOADING_PROFILE...
@@ -519,10 +534,10 @@ export function ProfileModal({
                     <div className="flex-1 pb-2">
                       <div
                         className={cn(
-                          "text-lg font-bold leading-none",
+                          "min-w-0 break-words [overflow-wrap:anywhere] text-lg font-bold leading-tight drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]",
                           getFontClass(editing ? form.usernameFont : profile.usernameFont),
                         )}
-                        style={getUsernameGradientStyle(editing ? form.usernameFont : profile.usernameFont)}
+                        style={{ color: "#ffffff", ...getUsernameFontStyle(editing ? form.usernameFont : profile.usernameFont), ...getUsernameGradientStyle(editing ? form.usernameFont : profile.usernameFont) }}
                         data-testid="text-display-name"
                       >
                         {displayName}
@@ -665,26 +680,10 @@ export function ProfileModal({
                         }}
                         onChange={(tag) => setForm((current: any) => ({ ...current, ...tag }))}
                       />
-                      <Field label="NICKNAME (optional display name)">
-                        <input
-                          value={form.nickname}
-                          onChange={(e) =>
-                            setForm({ ...form, nickname: e.target.value })
-                          }
-                          maxLength={32}
-                          className="w-full bg-black border border-primary/30 px-2 py-1.5 text-xs font-mono text-white rounded focus:outline-none focus:border-primary"
-                          data-testid="input-nickname"
-                        />
-                      </Field>
-                      <Field label="DISPLAY NAME">
-                        <input
-                          value={form.displayName}
-                          onChange={e => setForm({ ...form, displayName: e.target.value })}
-                          maxLength={32}
-                          placeholder="What people see first"
-                          className="w-full bg-black border border-primary/30 px-2 py-1.5 text-xs font-mono text-white rounded focus:outline-none focus:border-primary"
-                        />
-                      </Field>
+                      <div className="rounded border border-white/10 bg-black/30 px-3 py-2 text-[10px] font-mono text-white/60">
+                        PROFILE NAME: <span className="font-bold text-white">{form.username || profile?.username}</span>
+                        <div className="mt-1 opacity-70">Your account username is shown as your profile name. Nicknames and alternate display names are disabled.</div>
+                      </div>
                       <Field label="PRONOUNS">
                         <input
                           value={form.pronouns}
@@ -736,16 +735,24 @@ export function ProfileModal({
                         </div>
                         <div className="mt-2 rounded border p-3 text-xs" style={{color:form.profileTextColor||"#fff",borderColor:form.profileBorderColor||"#fff"}}>Preview: bio, pronouns and profile panels</div>
                       </Field>
-                      <Field label="USERNAME TEXT GRADIENT (DIHHRO)">
+                      <Field label="CUSTOM NAME GRADIENT (DIHTRO)">
                         <div className="mb-2 flex gap-2">
-                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: "custom-gradient|" + (form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] : "default") + "|" + (form.customTextStart || "#22d3ee") + "|" + (form.customTextEnd || "#a78bfa") })} className={cn("rounded border px-3 py-2 text-[9px] uppercase", form.usernameFont?.startsWith("custom-gradient|") ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>Use custom gradient</button>
-                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] || "default" : form.usernameFont || "default" })} className="rounded border border-white/15 px-3 py-2 text-[9px] uppercase text-white/60">Use font only</button>
+                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: "custom-gradient|" + (form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] : form.usernameFont?.startsWith("custom-font|") ? "default" : (form.usernameFont || "default")) + "|" + (form.customTextStart || "#22d3ee") + "|" + (form.customTextMiddle || "#a78bfa") + "|" + (form.customTextEnd || "#f472b6") })} className={cn("rounded border px-3 py-2 text-[9px] uppercase", form.usernameFont?.startsWith("custom-gradient|") || form.usernameFont?.startsWith("custom-font|") ? "border-primary bg-primary/20 text-primary" : "border-white/15 text-white/60")}>Use custom gradient</button>
+                          <button type="button" disabled={!canUseDihhro} onClick={() => setForm({ ...form, usernameFont: form.usernameFont?.startsWith("custom-font|") ? form.usernameFont : form.usernameFont?.startsWith("custom-gradient|") ? form.usernameFont.split("|")[1] || "default" : form.usernameFont || "default" })} className="rounded border border-white/15 px-3 py-2 text-[9px] uppercase text-white/60">Use font only</button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="text-[9px] text-white/50">START COLOR<input type="color" value={form.customTextStart||"#22d3ee"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextStart:e.target.value,usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+e.target.value+"|"+(form.customTextEnd||"#a78bfa")})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
-                          <label className="text-[9px] text-white/50">END COLOR<input type="color" value={form.customTextEnd||"#a78bfa"} disabled={!canUseDihhro} onChange={e=>setForm({...form,customTextEnd:e.target.value,usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+(form.customTextStart||"#22d3ee")+"|"+e.target.value})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {["customTextStart","customTextMiddle","customTextEnd"].map((key,i)=><label key={key} className="text-[9px] text-white/50">{["START","MIDDLE","END"][i]}<input type="color" value={form[key]||["#22d3ee","#a78bfa","#f472b6"][i]} disabled={!canUseDihhro} onChange={e=>{const next={...form,[key]:e.target.value};const base= form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:form.usernameFont?.startsWith("custom-font|")?"default":(form.usernameFont||"default");setForm({...next,usernameFont:"custom-gradient|"+base+"|"+(i===0?e.target.value:(form.customTextStart||"#22d3ee"))+"|"+(i===1?e.target.value:(form.customTextMiddle||"#a78bfa"))+"|"+(i===2?e.target.value:(form.customTextEnd||"#f472b6"))})}} className="mt-1 h-9 w-full rounded bg-transparent"/></label>)}
                         </div>
-                        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3 text-center text-xl font-black" style={getUsernameGradientStyle(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+(form.customTextStart||"#22d3ee")+"|"+(form.customTextEnd||"#a78bfa"))}>Your name</div>
+                        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3 text-center text-xl font-black" style={getUsernameGradientStyle(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont:"custom-gradient|"+(form.usernameFont?.startsWith("custom-gradient|")?form.usernameFont.split("|")[1]:(form.usernameFont||"default"))+"|"+(form.customTextStart||"#22d3ee")+"|"+(form.customTextMiddle||"#a78bfa")+"|"+(form.customTextEnd||"#f472b6"))}>Your name</div>
+                      </Field>
+                      <Field label="DIHTRO FONT MAP (UPLOAD YOUR OWN FONT)">
+                        <div className="text-[9px] text-white/50 mb-2">Upload a .WOFF, .WOFF2, .TTF or .OTF font. DIHTRO members only.</div>
+                        <input ref={fontFileRef} type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" className="hidden" onChange={e=>{const file=e.target.files?.[0];if(!file)return;const extension=file.name.split(".").pop()?.toLowerCase();if(!["woff","woff2","ttf","otf"].includes(extension||"")){toast({title:"UNSUPPORTED_FONT",description:"Choose a WOFF, WOFF2, TTF or OTF file.",variant:"destructive"});e.target.value="";return;}if(file.size>256*1024){toast({title:"FONT_TOO_LARGE",description:"Font files must be 256 KB or smaller.",variant:"destructive"});e.target.value="";return;}const reader=new FileReader();reader.onload=()=>{const data=String(reader.result||"");const base=form.usernameFont?.startsWith("custom-font|")?form.usernameFont.split("|")[1]:null;const fontData=data.startsWith("data:application/octet-stream;")?data.replace("data:application/octet-stream;","data:font/"+(extension==="woff2"?"woff2":extension==="woff"?"woff":extension==="ttf"?"ttf":"otf")+";"):data;setForm({...form,usernameFont:"custom-font|"+fontData+"|"+(form.customTextStart||"#22d3ee")+"|"+(form.customTextMiddle||"#a78bfa")+"|"+(form.customTextEnd||"#f472b6")});toast({title:"DIHTRO_FONT_LOADED",description:file.name+" is ready. Save your profile to apply it."});};reader.onerror=()=>toast({title:"FONT_UPLOAD_FAILED",description:"Could not read that font file.",variant:"destructive"});reader.readAsDataURL(file);e.target.value="";}} />
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" disabled={!canUseDihhro} onClick={()=>fontFileRef.current?.click()} className="rounded border border-fuchsia-400/40 bg-fuchsia-400/10 px-3 py-2 text-[9px] font-mono text-fuchsia-200 disabled:opacity-40"><Upload className="mr-1 inline h-3 w-3"/>UPLOAD FONT</button>
+                          {form.usernameFont?.startsWith("custom-font|") && <button type="button" onClick={()=>setForm({...form,usernameFont:"default"})} className="rounded border border-white/20 px-3 py-2 text-[9px] text-white/70">REMOVE UPLOADED FONT</button>}
+                        </div>
+                        <div className="mt-2 rounded-lg border border-white/10 bg-black/30 p-3 text-center text-xl font-black" style={{...getUsernameFontStyle(form.usernameFont),...getUsernameGradientStyle(form.usernameFont)}}>DIHTRO PREVIEW</div>
                       </Field>
                       <Field label="USERNAME FONT">
                         <div className="grid grid-cols-2 gap-1.5">
