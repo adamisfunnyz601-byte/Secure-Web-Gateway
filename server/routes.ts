@@ -1291,11 +1291,23 @@ export async function registerRoutes(
     let styles: any = {};
     try { styles = typeof req.body?.cssStyles === "string" ? JSON.parse(req.body.cssStyles) : (req.body?.cssStyles || {}); } catch { return res.status(400).json({ message: "Invalid item animation settings." }); }
     if (type === "decoration") {
-      const scale = Number(styles.scale);
-      const duration = Number(styles.duration);
-      const rotation = Number(styles.rotation);
-      if (!Number.isFinite(scale) || scale < 0.25 || scale > 2.5 || !Number.isFinite(duration) || duration < 1 || duration > 30 || !Number.isFinite(rotation) || Math.abs(rotation) > 360) return res.status(400).json({ message: "Invalid decoration animation settings." });
-      styles = { kind: "decoration", scale, duration, rotation, keyframes: [{ at: 0, rotate: 0 }, { at: 100, rotate: rotation }] };
+      // Decorations are static transforms now; accept the editor's current
+      // scale/position/rotation fields instead of requiring legacy animation fields.
+      const scale = styles.scale == null ? 1 : Number(styles.scale);
+      const scaleX = styles.scaleX == null ? 1 : Number(styles.scaleX);
+      const scaleY = styles.scaleY == null ? 1 : Number(styles.scaleY);
+      const rotationAngle = styles.rotationAngle == null ? 0 : Number(styles.rotationAngle);
+      const offsetX = styles.offsetX == null ? 0 : Number(styles.offsetX);
+      const offsetY = styles.offsetY == null ? 0 : Number(styles.offsetY);
+      if (
+        !Number.isFinite(scale) || scale < 0.1 || scale > 5 ||
+        !Number.isFinite(scaleX) || scaleX < 0.1 || scaleX > 5 ||
+        !Number.isFinite(scaleY) || scaleY < 0.1 || scaleY > 5 ||
+        !Number.isFinite(rotationAngle) || Math.abs(rotationAngle) > 360 ||
+        !Number.isFinite(offsetX) || Math.abs(offsetX) > 1000 ||
+        !Number.isFinite(offsetY) || Math.abs(offsetY) > 1000
+      ) return res.status(400).json({ message: "Invalid decoration transform settings." });
+      styles = { kind: "decoration", scale, scaleX, scaleY, rotationAngle, offsetX, offsetY };
     } else {
       const audioUrl = String(styles.audioUrl || "");
       if (!/^data:audio\/mpeg;base64,[A-Za-z0-9+/=]+$/i.test(audioUrl) || audioUrl.length > 2 * 1024 * 1024) return res.status(400).json({ message: "Emotes need an MP3 under 1.5 MB." });
