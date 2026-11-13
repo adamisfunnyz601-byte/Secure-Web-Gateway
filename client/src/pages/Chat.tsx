@@ -533,6 +533,97 @@ export default function Chat() {
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [callTargetName, setCallTargetName] = useState("");
 
+
+  // --- GROUP CALL STATE (separate mesh; leaves 1:1 calling untouched) ---
+  const [groupCallId,setGroupCallId]=useState<string|null>(null);
+  const [groupCallParticipants,setGroupCallParticipants]=useState<Array<{userId:number;username:string}>>([]);
+  const [incomingGroupCall,setIncomingGroupCall]=useState<any>(null);
+  const [showGroupCallInvites,setShowGroupCallInvites]=useState(false);
+  const [groupCallWithVideo,setGroupCallWithVideo]=useState(false);
+  const groupPeersRef=useRef<Map<number,RTCPeerConnection>>(new Map());
+  const groupLocalStreamRef=useRef<MediaStream|null>(null);
+  const groupCallIdRef=useRef<string|null>(null);
+  const groupPendingIceRef=useRef<Map<number,RTCIceCandidateInit[]>>(new Map());
+  const groupCallActiveRef=useRef(false);
+
+  const groupVoicePost=async(path:string,body:any)=>{
+    const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),credentials:"same-origin"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(data.message||"Group call request failed.");
+    return data;
+  };
+  const sendGroupPeerSignal=(to:number,signal:any)=>{
+    if(!groupCallIdRef.current)return;
+    groupVoicePost("/api/chat/group-voice/signal",{roomId:groupCallIdRef.current,to,signal}).catch((error:any)=>pushLog("GROUP_SIGNAL_FAILED: "+error.message,"warn"));
+  };
+  const createGroupPeer=async(peerId:number,username:string)=>{
+    const existing=groupPeersRef.current.get(peerId);
+    if(existing)return existing;
+    let stream=groupLocalStreamRef.current;
+    if(!stream){
+      stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:groupCallWithVideo?{facingMode:"user"}:false});
+      groupLocalStreamRef.current=stream;
+    }
+    const peer=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+    stream.getTracks().forEach(track=>peer.addTrack(track,stream!));
+    peer.onicecandidate=event=>{if(event.candidate)sendGroupPeerSignal(peerId,{type:"ice",candidate:event.candidate.toJSON()});};
+    peer.ontrack=event=>{
+      setGroupCallParticipants(current=>current.map(person=>person.userId===peerId?{...person,stream:(person as any).stream||new MediaStream()}:person));
+      const remote=(groupRemoteStreamsRef.current.get(peerId)||new MediaStream());
+      groupRemoteStreamsRef.current.set(peerId,remote);
+      if(!remote.getTracks().some(track=>track.id===event.track.id))remote.addTrack(event.track);
+      setGroupRemoteVersion(v=>v+1);
+    };
+    peer.onconnectionstatechange=()=>{if(peer.connectionState==="failed")pushLog("GROUP_PEER_FAILED: "+username,"warn");};
+    groupPeersRef.current.set(peerId,peer);
+    return peer;
+  };
+  const groupRemoteStreamsRef=useRef<Map<number,MediaStream>>(new Map());
+  const [groupRemoteVersion,setGroupRemoteVersion]=useState(0);
+
+  const startGroupCall=async(withVideo=false)=>{
+    if(!selectedGroupId||callStateRef.current!=="idle"||groupCallIdRef.current)return;
+    try{
+      setGroupCallWithVideo(withVideo);
+      const created=await groupVoicePost("/api/chat/group-voice/start",{groupId:selectedGroupId,withVideo});
+      groupCallIdRef.current=created.roomId;setGroupCallId(created.roomId);groupCallActiveRef.current=true;
+      setGroupCallParticipants([{userId:Number(currentUserId),username:(currentUser as any)?.username||"You"}]);
+      const local=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:withVideo?{facingMode:"user"}:false});
+      groupLocalStreamRef.current=local;setVisualizerStream(local);setCallTime(0);
+      pushLog("GROUP_CALL_STARTED","info");
+    }catch(error:any){toast({title:"GROUP_CALL_FAILED",description:error.message||"Could not start group call.",variant:"destructive"});await leaveGroupCall();}
+  };
+  const joinGroupCall=async(invite:any)=>{
+    try{
+      if(callStateRef.current!=="idle"||groupCallIdRef.current)throw new Error("Finish your current call first.");
+      setGroupCallWithVideo(Boolean(invite.withVideo));
+      const joined=await groupVoicePost("/api/chat/group-voice/join",{roomId:invite.roomId});
+      groupCallIdRef.current=joined.roomId;setGroupCallId(joined.roomId);groupCallActiveRef.current=true;setIncomingGroupCall(null);
+      const local=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:joined.withVideo?{facingMode:"user"}:false});
+      groupLocalStreamRef.current=local;setVisualizerStream(local);
+      setGroupCallParticipants([{userId:Number(currentUserId),username:(currentUser as any)?.username||"You"},...joined.participants]);
+      for(const person of joined.participants){
+        const peer=await createGroupPeer(person.userId,person.username);
+        const offer=await peer.createOffer();await peer.setLocalDescription(offer);
+        sendGroupPeerSignal(person.userId,{type:"offer",offer:peer.localDescription});
+      }
+      pushLog("JOINED_GROUP_CALL","info");
+    }catch(error:any){toast({title:"GROUP_CALL_FAILED",description:error.message||"Could not join.",variant:"destructive"});}
+  };
+  const inviteToGroupCall=async(userId:number)=>{
+    if(!groupCallIdRef.current)return;
+    try{await groupVoicePost("/api/chat/group-voice/invite",{roomId:groupCallIdRef.current,userId});toast({title:"INVITE_SENT"});}
+    catch(error:any){toast({title:"INVITE_FAILED",description:error.message,variant:"destructive"});}
+  };
+  const leaveGroupCall=async()=>{
+    const roomId=groupCallIdRef.current;
+    groupCallActiveRef.current=false;groupCallIdRef.current=null;setGroupCallId(null);
+    if(roomId)groupVoicePost("/api/chat/group-voice/leave",{roomId}).catch(()=>{});
+    groupPeersRef.current.forEach(peer=>peer.close());groupPeersRef.current.clear();groupRemoteStreamsRef.current.clear();groupPendingIceRef.current.clear();
+    groupLocalStreamRef.current?.getTracks().forEach(track=>track.stop());groupLocalStreamRef.current=null;
+    setGroupCallParticipants([]);setGroupRemoteVersion(v=>v+1);setVisualizerStream(null);setShowGroupCallInvites(false);
+  };
+
   // --- SOUNDBOARD STATE ---
   const [customSounds, setCustomSounds] = useState<SoundEntry[]>([]);
   const [sounds, setSounds] = useState<SoundEntry[]>(DEFAULT_SOUNDS);
@@ -1492,6 +1583,56 @@ export default function Chat() {
     return () => clearInterval(interval);
   }, []);
 
+
+  // Group-call invitations and peer-to-peer mesh signalling.
+  useEffect(()=>{
+    let active=true,busy=false;
+    const poll=async()=>{
+      if(busy)return;busy=true;
+      try{
+        const response=await fetch("/api/chat/group-voice/poll",{credentials:"same-origin"});
+        if(!response.ok)return;
+        const events:any[]=await response.json();
+        for(const event of events){
+          if(!active)break;
+          if(event.type==="group-invite"&&!groupCallIdRef.current&&callStateRef.current==="idle"){
+            setIncomingGroupCall(event);
+          }else if(event.type==="group-signal"&&event.roomId===groupCallIdRef.current){
+            const {from,signal}=event;
+            if(signal.type==="left"){
+              groupPeersRef.current.get(from)?.close();groupPeersRef.current.delete(from);groupRemoteStreamsRef.current.delete(from);
+              setGroupCallParticipants(items=>items.filter(person=>person.userId!==from));setGroupRemoteVersion(v=>v+1);
+            }else if(signal.type==="offer"){
+              try{
+                const person=groupCallParticipants.find(item=>item.userId===from);
+                const peer=await createGroupPeer(from,person?.username||("User "+from));
+                await peer.setRemoteDescription(new RTCSessionDescription(signal.offer));
+                for(const candidate of groupPendingIceRef.current.get(from)||[])await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                groupPendingIceRef.current.delete(from);
+                const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
+                sendGroupPeerSignal(from,{type:"answer",answer:peer.localDescription});
+              }catch(error:any){pushLog("GROUP_OFFER_ERROR: "+error.message,"warn");}
+            }else if(signal.type==="answer"){
+              const peer=groupPeersRef.current.get(from);
+              if(peer&&!peer.currentRemoteDescription){
+                await peer.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                for(const candidate of groupPendingIceRef.current.get(from)||[])await peer.addIceCandidate(new RTCIceCandidate(candidate));
+                groupPendingIceRef.current.delete(from);
+              }
+            }else if(signal.type==="ice"){
+              const peer=groupPeersRef.current.get(from);
+              if(peer?.remoteDescription)await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              else groupPendingIceRef.current.set(from,[...(groupPendingIceRef.current.get(from)||[]),signal.candidate]);
+            }
+          }
+        }
+      }catch(error){pushLog("GROUP_POLL_FAILED: "+String(error),"warn");}
+      finally{busy=false;}
+    };
+    const timer=window.setInterval(poll,650);poll();
+    return()=>{active=false;window.clearInterval(timer);};
+  },[groupCallParticipants]);
+
   // ============================================================
   // AUTO-SCROLL
   // ============================================================
@@ -1633,6 +1774,18 @@ export default function Chat() {
   return (
     <Layout>
       <div className="relative isolate flex h-[calc(100vh-140px)] gap-4 overflow-hidden rounded-2xl border border-violet-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(124,58,237,0.13),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(217,70,239,0.08),transparent_40%),#07040d] p-2 shadow-[0_0_50px_rgba(91,33,182,0.10)]">
+
+
+        <AnimatePresence>
+          {incomingGroupCall && !groupCallId && <div className="fixed inset-0 z-[950] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"><motion.div initial={{scale:.92,opacity:0}} animate={{scale:1,opacity:1}} className="w-full max-w-sm rounded-2xl border border-emerald-400/30 bg-[#0c0615] p-6 text-center shadow-2xl"><Phone className="mx-auto mb-4 h-10 w-10 text-emerald-300 animate-pulse"/><h3 className="text-xl font-bold text-emerald-100">Group call invite</h3><p className="mt-2 text-sm text-violet-100/60">{incomingGroupCall.fromName} invited you to a group call</p><div className="mt-6 flex gap-3"><button onClick={()=>joinGroupCall(incomingGroupCall)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 font-bold text-white">JOIN</button><button onClick={()=>setIncomingGroupCall(null)} className="flex-1 rounded-lg border border-white/15 px-4 py-3 text-white/70">DECLINE</button></div></motion.div></div>}
+        </AnimatePresence>
+        <AnimatePresence>
+          {groupCallId && <div className="fixed inset-0 z-[850] flex flex-col bg-[#07040d] text-white"><div className="flex items-center justify-between border-b border-violet-500/20 p-4"><div><div className="font-display text-lg text-violet-100">GROUP CALL</div><div className="text-xs text-violet-200/50">{groupCallParticipants.length} participant{groupCallParticipants.length===1?"":"s"} connected</div></div><button onClick={()=>setShowGroupCallInvites(v=>!v)} className="rounded-lg border border-fuchsia-400/30 px-3 py-2 text-xs text-fuchsia-200"><UserPlus className="mr-2 inline h-4 w-4"/> INVITE</button></div>
+            {showGroupCallInvites&&<div className="max-h-56 overflow-y-auto border-b border-violet-500/20 bg-black/50 p-3"><div className="mb-2 text-xs uppercase tracking-widest text-violet-200/60">Invite group members</div>{users?.filter((u:any)=>u.id!==currentUserId&&!groupCallParticipants.some(p=>p.userId===u.id)).map((u:any)=><div key={u.id} className="flex items-center justify-between border-b border-white/5 py-2"><span className="text-sm text-violet-100">{u.username}</span><button onClick={()=>inviteToGroupCall(u.id)} className="rounded border border-emerald-400/30 px-3 py-1 text-xs text-emerald-200">INVITE</button></div>)}</div>}
+            <div className="grid flex-1 grid-cols-1 content-center gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3">{groupCallParticipants.map(person=><div key={person.userId} className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-violet-400/20 bg-[#120b20]"><video autoPlay playsInline ref={node=>{if(node&&person.userId!==currentUserId){const stream=groupRemoteStreamsRef.current.get(person.userId);if(stream&&node.srcObject!==stream)node.srcObject=stream;}}} className="absolute inset-0 h-full w-full object-cover"/>{person.userId===currentUserId?<div className="text-center text-violet-100"><Mic className="mx-auto mb-2 h-8 w-8"/>{person.username}<div className="text-[10px] text-violet-200/40">YOU</div></div>:<div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs">{person.username}</div>}</div>)}</div>
+            <div className="flex items-center justify-center gap-4 border-t border-violet-500/20 p-5"><button onClick={()=>{groupLocalStreamRef.current?.getAudioTracks().forEach(t=>t.enabled=!t.enabled);}} className="rounded-full border border-white/20 p-4"><Mic className="h-5 w-5"/></button><button onClick={()=>{groupLocalStreamRef.current?.getVideoTracks().forEach(t=>t.enabled=!t.enabled);}} className="rounded-full border border-white/20 p-4"><Video className="h-5 w-5"/></button><button onClick={leaveGroupCall} className="flex items-center gap-2 rounded-full bg-red-700 px-7 py-4 font-bold"><PhoneOff className="h-5 w-5"/> LEAVE</button></div>
+          </div>}
+        </AnimatePresence>
 
         {/* ======================================================
             INCOMING CALL OVERLAY
@@ -2005,6 +2158,12 @@ export default function Chat() {
               )}
               <div className="w-2 h-2 rounded-full bg-violet-500 animate-ping" />
               <h2 className="font-display text-sm tracking-[0.25em] text-violet-200 uppercase">{selectedGroupId ? `${(groups as any[]).find((g: any) => g.id === selectedGroupId)?.icon || '💬'} ${activeChannelName}` : activeChannelName}</h2>
+
+                {selectedGroupId && <div className="flex items-center gap-1">
+                  <button type="button" title="Start group voice call" onClick={()=>startGroupCall(false)} className="rounded-md border border-emerald-400/25 bg-emerald-500/10 p-1.5 text-emerald-200 transition hover:bg-emerald-500/20"><Phone className="h-3.5 w-3.5"/></button>
+                  <button type="button" title="Start group video call" onClick={()=>startGroupCall(true)} className="rounded-md border border-fuchsia-400/25 bg-fuchsia-500/10 p-1.5 text-fuchsia-200 transition hover:bg-fuchsia-500/20"><Video className="h-3.5 w-3.5"/></button>
+                </div>}
+
               {selectedGroupId && <button onClick={() => { const g = (groups as any[]).find((item: any) => item.id === selectedGroupId); setManageGroupName(g?.name || ''); setManageGroupIcon(g?.icon || '💬'); setShowManageGroupModal(true); }} title="Rename group or change icon" className="rounded-md border border-violet-500/20 p-1.5 text-violet-200/60 transition hover:border-fuchsia-400/50 hover:text-fuchsia-200"><Pencil className="h-3.5 w-3.5" /></button>}
               {selectedGroupId && (
                 <span className="text-[8px] font-mono text-violet-200/30 border border-violet-500/20 px-2 py-0.5">
