@@ -585,7 +585,8 @@ export function ProfileModal({
                       <button
                         onClick={() => friendMut.mutate()}
                         disabled={friendMut.isPending || relationship?.blockedMe}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono text-primary border border-primary/40 px-2 py-2 rounded hover:bg-primary/10 disabled:opacity-40"
+                        className="profile-outline flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono px-2 py-2 rounded border bg-black/60 hover:bg-black/80 disabled:opacity-50"
+                        style={{ color: "inherit", borderColor: "var(--profile-border-color, #ffffff)" }}
                       >
                         {relationship?.friendStatus === "accepted" ? <UserCheck className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
                         {relationship?.friendStatus === "accepted" ? "FRIENDS" :
@@ -595,12 +596,8 @@ export function ProfileModal({
                       <button
                         onClick={() => blockMut.mutate()}
                         disabled={blockMut.isPending}
-                        className={cn(
-                          "flex items-center justify-center gap-1.5 text-[10px] font-mono px-3 py-2 rounded border",
-                          relationship?.blockedByMe
-                            ? "text-green-400 border-green-400/40 hover:bg-green-400/10"
-                            : "text-red-400 border-red-400/40 hover:bg-red-400/10"
-                        )}
+                        className="profile-outline flex items-center justify-center gap-1.5 text-[10px] font-mono px-3 py-2 rounded border bg-black/60 hover:bg-black/80"
+                        style={{ color: "inherit", borderColor: "var(--profile-border-color, #ffffff)" }}
                       >
                         {relationship?.blockedByMe ? <ShieldOff className="w-3 h-3" /> : <ShieldBan className="w-3 h-3" />}
                         {relationship?.blockedByMe ? "UNBLOCK" : "BLOCK"}
