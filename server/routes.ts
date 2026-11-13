@@ -769,6 +769,48 @@ export async function registerRoutes(
     const best = new Map<number,typeof rows[number]>(); rows.forEach(row=>{const old=best.get(row.userId);if(!old||row.score>old.score)best.set(row.userId,row);});
     res.json({month,entries:Array.from(best.values()).sort((a,b)=>b.score-a.score).map((row,index)=>({...row,rank:index+1}))});
   });
+  const ensureBlockBlastChatRoom = async (userId:number) => {
+    const inviteCode = "blockblast-public-room";
+    let [room] = await db.select().from(groupChats).where(eq(groupChats.inviteCode,inviteCode)).limit(1);
+    if (!room) {
+      try {
+        [room] = await db.insert(groupChats).values({name:"Block Blast Live Chat",inviteCode,ownerId:userId}).returning();
+      } catch {
+        [room] = await db.select().from(groupChats).where(eq(groupChats.inviteCode,inviteCode)).limit(1);
+      }
+    }
+    if (!room) throw new Error("Could not initialise Block Blast chat");
+    const [membership] = await db.select({id:groupChatMembers.id}).from(groupChatMembers).where(and(eq(groupChatMembers.groupId,room.id),eq(groupChatMembers.userId,userId))).limit(1);
+    if (!membership) await db.insert(groupChatMembers).values({groupId:room.id,userId}).onConflictDoNothing();
+    return room.id;
+  };
+
+  app.get("/api/blockblast/chat", requireAuth, async (req,res) => {
+    const groupId = await ensureBlockBlastChatRoom(req.session.userId!);
+    const rows = await storage.getMessages(req.session.userId!,undefined,groupId);
+    res.setHeader("Cache-Control","no-store");
+    res.json(rows.slice(-100));
+  });
+
+  app.post("/api/blockblast/chat", requireAuth, async (req,res) => {
+    const content = typeof req.body?.content === "string" ? req.body.content.trim().slice(0,300) : "";
+    if (!content) return res.status(400).json({message:"Enter a message first."});
+    const [activeMute] = await db.select().from(moderationLogs).where(and(eq(moderationLogs.targetId,req.session.userId!),sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict')`)).orderBy(desc(moderationLogs.createdAt)).limit(1);
+    if (activeMute && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) return res.status(403).json({message:"You are currently muted or restricted."});
+    const groupId = await ensureBlockBlastChatRoom(req.session.userId!);
+    const created = await storage.createMessage({senderId:req.session.userId!,groupId,content});
+    const [row] = await db.select({id:messages.id,content:messages.content,createdAt:messages.createdAt,senderId:messages.senderId,senderName:users.username,senderDisplayName:users.displayName}).from(messages).innerJoin(users,eq(messages.senderId,users.id)).where(eq(messages.id,created.id)).limit(1);
+    const [usage] = await db.select({bytes:sql<number>`COALESCE(SUM(octet_length(${messages.content})),0)`}).from(messages).where(eq(messages.groupId,groupId));
+    if (Number(usage?.bytes||0) > 1024*1024*1024) {
+      await db.execute(sql`WITH ranked AS (
+        SELECT id, SUM(octet_length(content)) OVER (ORDER BY created_at ASC, id ASC) AS total_bytes
+        FROM messages WHERE group_id = ${groupId}
+      ), purge AS (SELECT id FROM ranked WHERE total_bytes <= 500*1024*1024)
+      DELETE FROM messages WHERE id IN (SELECT id FROM purge)`);
+    }
+    res.status(201).json(row);
+  });
+
   app.get("/api/blockblast/history", requireAuth, async (req,res) => { const rows=await db.select().from(blockBlastScores).where(eq(blockBlastScores.userId,req.session.userId!)).orderBy(desc(blockBlastScores.createdAt)).limit(30); res.json(rows); });
   app.post("/api/blockblast/scores", requireAuth, async (req,res) => {
     const score=Number(req.body?.score); if(!Number.isSafeInteger(score)||score<0||score>1000000) return res.status(400).json({message:"Invalid score."});
