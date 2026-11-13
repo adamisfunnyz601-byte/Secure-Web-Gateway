@@ -510,6 +510,75 @@ export async function registerRoutes(
     });
   });
 
+  // === HUB POINTS WALLET ===
+  const hubPointAwardCooldown = new Map<number, number>();
+  app.get("/api/hub/wallet", requireAuth, async (req, res) => {
+    const [account] = await db.select({ hubPoints: users.hubPoints, tokens: users.tokens })
+      .from(users).where(eq(users.id, req.session.userId!)).limit(1);
+    if (!account) return res.status(404).json({ message: "Account not found." });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ hubPoints: account.hubPoints, tokens: account.tokens });
+  });
+
+  app.post("/api/hub/points/earn", requireAuth, async (req, res) => {
+    const requested = Number(req.body?.amount);
+    if (!Number.isSafeInteger(requested) || requested < 1 || requested > 25) {
+      return res.status(400).json({ message: "A Hub Points reward must be between 1 and 25 points." });
+    }
+    const userId = Number(req.session.userId!);
+    const now = Date.now();
+    if (now - (hubPointAwardCooldown.get(userId) || 0) < 700) {
+      return res.status(429).json({ message: "Please wait before claiming another Hub Points reward." });
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await db.transaction(async tx => {
+      const [account] = await tx.select({
+        hubPoints: users.hubPoints,
+        hubPointsEarnedToday: users.hubPointsEarnedToday,
+        hubPointsDay: users.hubPointsDay
+      }).from(users).where(eq(users.id, userId)).for("update").limit(1);
+      if (!account) return null;
+      const earnedToday = account.hubPointsDay === today ? Number(account.hubPointsEarnedToday || 0) : 0;
+      const awarded = Math.min(requested, Math.max(0, 200 - earnedToday));
+      if (awarded <= 0) return { capped: true, hubPoints: account.hubPoints };
+      const [updated] = await tx.update(users).set({
+        hubPoints: Number(account.hubPoints || 0) + awarded,
+        hubPointsEarnedToday: earnedToday + awarded,
+        hubPointsDay: today
+      }).where(eq(users.id, userId)).returning({ hubPoints: users.hubPoints });
+      return { awarded, hubPoints: updated.hubPoints };
+    });
+    if (!result) return res.status(404).json({ message: "Account not found." });
+    hubPointAwardCooldown.set(userId, now);
+    if ("capped" in result) return res.status(429).json({ message: "You've reached today's 200 Hub Points earning limit.", hubPoints: result.hubPoints });
+    res.json(result);
+  });
+
+  app.post("/api/hub/exchange", requireAuth, async (req, res) => {
+    const points = Number(req.body?.points);
+    if (!Number.isSafeInteger(points) || points < 5 || points % 5 !== 0) {
+      return res.status(400).json({ message: "Exchange Hub Points in multiples of 5." });
+    }
+    const tokensAwarded = points / 5 * 2;
+    const userId = Number(req.session.userId!);
+    const result = await db.transaction(async tx => {
+      const [account] = await tx.select({ hubPoints: users.hubPoints, tokens: users.tokens })
+        .from(users).where(eq(users.id, userId)).for("update").limit(1);
+      if (!account) return null;
+      if (Number(account.hubPoints || 0) < points) return { insufficient: true, hubPoints: account.hubPoints, tokens: account.tokens };
+      if (Number(account.tokens || 0) + tokensAwarded > 2147483647) return { overflow: true };
+      const [updated] = await tx.update(users).set({
+        hubPoints: Number(account.hubPoints) - points,
+        tokens: Number(account.tokens || 0) + tokensAwarded
+      }).where(eq(users.id, userId)).returning({ hubPoints: users.hubPoints, tokens: users.tokens });
+      return { success: true, pointsSpent: points, tokensAwarded, hubPoints: updated.hubPoints, tokens: updated.tokens };
+    });
+    if (!result) return res.status(404).json({ message: "Account not found." });
+    if ("insufficient" in result) return res.status(400).json({ message: "You don't have enough Hub Points to exchange that amount.", hubPoints: result.hubPoints, tokens: result.tokens });
+    if ("overflow" in result) return res.status(400).json({ message: "Your token balance is already too high for this exchange." });
+    res.json(result);
+  });
+
   // === ADMIN ===
   app.post(api.admin.generateKey.path, requireOwner, async (req, res) => {
     const input = api.admin.generateKey.input.parse(req.body);
