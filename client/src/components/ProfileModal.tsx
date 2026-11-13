@@ -148,6 +148,11 @@ function getUsernameFontStyle(value?: string | null): React.CSSProperties {
   if (!value?.startsWith("custom-font|")) return {};
   return { fontFamily: "'DIHTROCustom', monospace" };
 }
+function getUsernameDisplayStyle(value?: string | null): React.CSSProperties {
+  const fontId = value?.startsWith("custom-gradient|") ? value.split("|")[1] : value?.startsWith("custom-font|") ? "default" : (value || "default");
+  const hasBuiltInColor = ["neon","matrix","glitch","fire","ice","rainbow","ghost","elite"].includes(fontId || "");
+  return { ...(hasBuiltInColor ? {} : { color: "#ffffff" }), ...getUsernameFontStyle(value), ...getUsernameGradientStyle(value) };
+}
 function getUploadedFontSource(value?: string | null): string | null {
   if (!value?.startsWith("custom-font|")) return null;
   const data = value.split("|")[1] || "";
@@ -539,7 +544,7 @@ export function ProfileModal({
                           "min-w-0 break-words [overflow-wrap:anywhere] text-lg font-bold leading-tight drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]",
                           getFontClass(editing ? form.usernameFont : profile.usernameFont),
                         )}
-                        style={{ color: "#ffffff", ...getUsernameFontStyle(editing ? form.usernameFont : profile.usernameFont), ...getUsernameGradientStyle(editing ? form.usernameFont : profile.usernameFont) }}
+                        style={getUsernameDisplayStyle(editing ? form.usernameFont : profile.usernameFont)}
                         data-testid="text-display-name"
                       >
                         {displayName}
@@ -749,7 +754,7 @@ export function ProfileModal({
                       </Field>
                       <Field label="DIHTRO FONT MAP (UPLOAD YOUR OWN FONT)">
                         <div className="text-[9px] text-white/50 mb-2">Upload a .WOFF, .WOFF2, .TTF or .OTF font. DIHTRO members only.</div>
-                        <input ref={fontFileRef} type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" className="hidden" onChange={e=>{const file=e.target.files?.[0];if(!file)return;const extension=file.name.split(".").pop()?.toLowerCase();if(!["woff","woff2","ttf","otf"].includes(extension||"")){toast({title:"UNSUPPORTED_FONT",description:"Choose a WOFF, WOFF2, TTF or OTF file.",variant:"destructive"});e.target.value="";return;}if(file.size>256*1024){toast({title:"FONT_TOO_LARGE",description:"Font files must be 256 KB or smaller.",variant:"destructive"});e.target.value="";return;}const reader=new FileReader();reader.onload=()=>{const data=String(reader.result||"");const fontData=data.startsWith("data:application/octet-stream;")?data.replace("data:application/octet-stream;","data:font/"+(extension==="woff2"?"woff2":extension==="woff"?"woff":extension==="ttf"?"ttf":"otf")+";"):data;setForm({...form,usernameFont:"custom-font|"+fontData});toast({title:"DIHTRO_FONT_LOADED",description:file.name+" is ready. Save your profile to apply it."});};reader.onerror=()=>toast({title:"FONT_UPLOAD_FAILED",description:"Could not read that font file.",variant:"destructive"});reader.readAsDataURL(file);e.target.value="";}} />
+                        <input ref={fontFileRef} type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" className="hidden" onChange={e=>{const file=e.target.files?.[0];if(!file)return;const extension=file.name.split(".").pop()?.toLowerCase();if(!["woff","woff2","ttf","otf"].includes(extension||"")){toast({title:"UNSUPPORTED_FONT",description:"Choose a WOFF, WOFF2, TTF or OTF file.",variant:"destructive"});e.target.value="";return;}if(file.size>256*1024){toast({title:"FONT_TOO_LARGE",description:"Font files must be 256 KB or smaller.",variant:"destructive"});e.target.value="";return;}const reader=new FileReader();reader.onload=()=>{const data=String(reader.result||"");const fontData=data.replace(/^data:[^;]+;/,"data:font/"+(extension==="woff2"?"woff2":extension==="woff"?"woff":extension==="ttf"?"ttf":"otf")+";");setForm({...form,usernameFont:"custom-font|"+fontData});toast({title:"DIHTRO_FONT_LOADED",description:file.name+" is ready. Save your profile to apply it."});};reader.onerror=()=>toast({title:"FONT_UPLOAD_FAILED",description:"Could not read that font file.",variant:"destructive"});reader.readAsDataURL(file);e.target.value="";}} />
                         <div className="flex flex-wrap gap-2">
                           <button type="button" disabled={!canUseDihhro} onClick={()=>fontFileRef.current?.click()} className="rounded border border-fuchsia-400/40 bg-fuchsia-400/10 px-3 py-2 text-[9px] font-mono text-fuchsia-200 disabled:opacity-40"><Upload className="mr-1 inline h-3 w-3"/>UPLOAD FONT</button>
                           {form.usernameFont?.startsWith("custom-font|") && <button type="button" onClick={()=>setForm({...form,usernameFont:"default"})} className="rounded border border-white/20 px-3 py-2 text-[9px] text-white/70">REMOVE UPLOADED FONT</button>}
