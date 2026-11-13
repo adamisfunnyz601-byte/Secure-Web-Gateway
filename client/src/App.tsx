@@ -16,6 +16,7 @@ import Shop from "@/pages/Shop";
 import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/Settings";
 import BlockBlast from "@/pages/BlockBlast";
+import Invite from "@/pages/Invite";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -45,6 +46,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Login} />
       <Route path="/signup" component={SignUp} />
+      <Route path="/invite/:code">{params => <Invite code={params.code} />}</Route>
       <Route path="/proxy">
         <ProtectedRoute component={Proxy} />
       </Route>
