@@ -94,7 +94,7 @@ export default function Shop() {
                     className="w-full"
                     variant={(Number(user?.decorationId) === item.id || Number(user?.nameStyleId) === item.id) ? "primary" : "secondary"}
                   >
-                    {(user?.decorationId === item.id || user?.nameStyleId === item.id) ? (
+                    {(Number(user?.decorationId) === item.id || Number(user?.nameStyleId) === item.id) ? (
                       <><Check className="w-4 h-4 mr-2" /> EQUIPPED</>
                     ) : 'EQUIP'}
                   </CyberButton>
