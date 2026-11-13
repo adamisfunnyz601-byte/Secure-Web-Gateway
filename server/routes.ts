@@ -1021,8 +1021,37 @@ export async function registerRoutes(
       if (bannerUrl !== undefined && !isProfileImageProxyUrl(bannerUrl, req.session.userId!, "banner")) {
         update.bannerUrl = typeof bannerUrl === 'string' && bannerUrl.length > 0 ? bannerUrl : null;
       }
-      if (usernameFont !== undefined) { const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"]; const rawFont=String(usernameFont); const customText=/^custom-gradient\|(default|neon|matrix|cyber|glitch|fire|ice|rainbow|ghost|elite|comic-sans)\|#[0-9a-f]{6}\|#[0-9a-f]{6}$/i.test(rawFont); if (!fonts.includes(rawFont) && !customText) return res.status(400).json({message:"Unsupported font or text gradient."}); const current = await storage.getUser(req.session.userId!); const fontName=customText?rawFont.split("|")[1]:rawFont; if ((fontName === "comic-sans" || customText) && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Custom text gradients and Comic Sans are Dihhro perks."}); update.usernameFont = rawFont || null; }
-      if (profileGradient !== undefined) { const rawGradient=String(profileGradient); const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"]; const customProfile=/^custom:#[0-9a-f]{6}:#[0-9a-f]{6}:#[0-9a-f]{6}$/i.test(rawGradient); if (!gradients.includes(rawGradient) && !customProfile) return res.status(400).json({message:"Invalid profile gradient."}); const current = await storage.getUser(req.session.userId!); if (rawGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a Dihhro perk."}); update.profileGradient = rawGradient === "none" ? null : rawGradient; }
+      if (usernameFont !== undefined) {
+        const fonts = ["default","neon","matrix","cyber","glitch","fire","ice","rainbow","ghost","elite","comic-sans"];
+        const rawFont = String(usernameFont);
+        const customText = /^custom-gradient\\|(default|neon|matrix|cyber|glitch|fire|ice|rainbow|ghost|elite|comic-sans)\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}(?:\\|#[0-9a-f]{6})?$/i.test(rawFont);
+        const customFont = /^custom-font\\|data:(?:font\\/(?:woff2?|ttf|otf)|application\\/octet-stream);base64,[A-Za-z0-9+/=]+\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}\\|#[0-9a-f]{6}$/i.test(rawFont);
+        if (customFont && rawFont.length > 400000) return res.status(413).json({ message: "Uploaded fonts must be 256 KB or smaller." });
+        if (!fonts.includes(rawFont) && !customText && !customFont) return res.status(400).json({message:"Unsupported font or text gradient."});
+        const current = await storage.getUser(req.session.userId!);
+        const fontName = customText ? rawFont.split("|")[1] : rawFont;
+        const usesDihhroFont = customText || customFont || fontName === "comic-sans";
+        if (usesDihhroFont && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Custom fonts and text gradients are DIHTRO perks."});
+        update.usernameFont = rawFont || null;
+      }
+      if (profileGradient !== undefined) {
+        const rawGradient = String(profileGradient);
+        const gradients = ["aurora","sunset","ocean","ember","violet","mint","mono","none"];
+        const parts = rawGradient.split("~");
+        const isStyle2 = parts.length === 6 && parts[0] === "style2";
+        const selectedGradient = isStyle2 ? parts[1] : rawGradient;
+        const customProfile = /^custom:#[0-9a-f]{6}:#[0-9a-f]{6}:#[0-9a-f]{6}$/i.test(selectedGradient);
+        const validStyle2 = !isStyle2 || (
+          /^#[0-9a-f]{6}$/i.test(parts[2] || "") &&
+          /^#[0-9a-f]{6}$/i.test(parts[3] || "") &&
+          ["0","1"].includes(parts[4]) &&
+          ["portrait","landscape"].includes(parts[5])
+        );
+        if ((!gradients.includes(selectedGradient) && !customProfile) || !validStyle2) return res.status(400).json({message:"Invalid profile gradient settings."});
+        const current = await storage.getUser(req.session.userId!);
+        if (selectedGradient !== "none" && !["owner","admin"].includes(current?.role || "") && !(current?.dihhroUntil && current.dihhroUntil > new Date())) return res.status(403).json({message:"Profile gradients are a DIHTRO perk."});
+        update.profileGradient = selectedGradient === "none" && !isStyle2 ? null : rawGradient;
+      }
       if (tagSymbol !== undefined || tagText !== undefined || tagColor !== undefined) {
         if (tagText !== undefined && tagText !== null && typeof tagText !== "string") {
           return res.status(400).json({ message: "Tag text must be a string" });
