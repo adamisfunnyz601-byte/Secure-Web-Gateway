@@ -38,8 +38,9 @@ export function useChat({ recipientId = null, groupId = null }: ChatChannel = {}
           : message;
       });
     },
-    refetchInterval: 4000,
-    staleTime: 1500,
+    refetchInterval: 900,
+    refetchIntervalInBackground: true,
+    staleTime: 250,
   });
 
   const { data: users, isLoading: isLoadingUsers } = useQuery({
