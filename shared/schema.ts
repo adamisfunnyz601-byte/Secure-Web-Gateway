@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   ringtoneUrl: text("ringtone_url"),
   muteNotifications: boolean("mute_notifications").default(false),
-  coins: integer("coins").notNull().default(0),
+  coins: text("coins").notNull().default("0"),
   decorationId: integer("decoration_id"),
   nameStyleId: integer("name_style_id"),
   bio: text("bio"),
