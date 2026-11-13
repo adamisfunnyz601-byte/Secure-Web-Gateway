@@ -329,7 +329,7 @@ export async function registerRoutes(
 
   const safeUser = (user: any) => {
     if (!user) return user;
-    const { serialKey: _serialKey, ...safe } = user;
+    const { serialKey: _serialKey, passwordHash: _passwordHash, ...safe } = user;
     return {
       ...safe,
       avatarUrl: profileImageUrl(safe.id, "avatar", safe.avatarUrl),
