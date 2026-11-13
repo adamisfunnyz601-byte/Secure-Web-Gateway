@@ -451,9 +451,9 @@ export function ProfileModal({
                         <span className="text-[10px] text-white/50 capitalize">{profile.presenceStatus || "offline"}</span>
                         {profile.pronouns && <span className="text-[10px] text-white/40">• {profile.pronouns}</span>}
                       </div>
-                      {(profile.role === "owner" || (profile.dihhroUntil && new Date(profile.dihhroUntil) > new Date())) && (
+                      {(["owner","admin"].includes(profile.role) || (profile.dihhroUntil && new Date(profile.dihhroUntil) > new Date())) && (
                         <div className="inline-flex items-center gap-1 mt-1 text-[9px] text-fuchsia-400 font-mono border border-fuchsia-500/40 px-1.5 py-0.5 rounded">
-                          <Sparkles className="w-2.5 h-2.5" /> {profile.role === "owner" ? "OWNER" : "DIHHRO"}
+                          <Sparkles className="w-2.5 h-2.5" /> {profile.role === "owner" ? "OWNER" : ["admin"].includes(profile.role) ? "ADMIN · DIHHRO" : "DIHHRO"}
                         </div>
                       )}
                     </div>
