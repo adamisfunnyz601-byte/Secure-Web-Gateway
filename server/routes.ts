@@ -450,6 +450,7 @@ export async function registerRoutes(
       if (!key || key.length > 128) return res.status(400).json({ valid: false, message: "Invalid invitation link." });
       const invite = await storage.getAccessKey(key);
       if (!invite) return res.status(404).json({ valid: false, message: "This invitation link is invalid or has been revoked." });
+      if (invite.isUsed) return res.status(410).json({ valid: false, message: "This invitation has already been used or revoked and is no longer available." });
       return res.json({
         valid: true,
         type: invite.type,
