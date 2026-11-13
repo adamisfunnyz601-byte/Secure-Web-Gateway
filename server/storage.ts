@@ -225,10 +225,10 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     
     if (!item || !user) throw new Error("Item or User not found");
-    if (user.coins < item.price) throw new Error("Insufficient coins");
+    if (Number(user.coins) < item.price) throw new Error("Insufficient coins");
 
     await db.transaction(async (tx) => {
-      await tx.update(users).set({ coins: user.coins - item.price }).where(eq(users.id, userId));
+      await tx.update(users).set({ coins: String(Number(user.coins) - item.price) }).where(eq(users.id, userId));
       await tx.insert(userInventory).values({ userId, itemId });
     });
   }
