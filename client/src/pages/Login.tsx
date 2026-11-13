@@ -238,9 +238,6 @@ export default function Login() {
     setRequestError("");
 
     if (!requestTurnstileToken) {
-                  reqName.trim().length < 3 ||
-                  reqPassword.length < 8 ||
-                  reqMessage.trim().length < 5 ||
       setRequestError(
         "Please complete Cloudflare verification first."
       );
@@ -576,7 +573,10 @@ export default function Login() {
                   isLoading={isSendingRequest}
                   disabled={
                     isSendingRequest ||
-                    !requestTurnstileToken
+                    !requestTurnstileToken ||
+                    reqName.trim().length < 3 ||
+                    reqPassword.length < 8 ||
+                    reqMessage.trim().length < 5
                   }
                 >
                   <Send className="w-4 h-4" />
