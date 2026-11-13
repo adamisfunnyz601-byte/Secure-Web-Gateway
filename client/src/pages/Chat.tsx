@@ -1082,6 +1082,9 @@ export default function Chat() {
       const peer = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
       });
+      // Reserve a negotiated video sender even for audio-first calls so enabling
+      // the camera later does not require an unsupported renegotiation.
+      if (!isVideoOn) peer.addTransceiver("video", { direction: "sendrecv" });
       peerConnectionRef.current = peer;
       let stream: MediaStream;
       try {
@@ -1241,9 +1244,10 @@ export default function Chat() {
       const videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       const track = videoStream.getVideoTracks()[0];
       const peer = peerConnectionRef.current;
-      const existingSender = peer?.getSenders().find(sender => sender.track?.kind === 'video');
+      const videoTransceiver = peer?.getTransceivers().find(transceiver => transceiver.receiver.track.kind === "video");
+      const existingSender = videoTransceiver?.sender || peer?.getSenders().find(sender => sender.track?.kind === "video");
       if (existingSender) await existingSender.replaceTrack(track);
-      else if (peer) peer.addTrack(track, videoStream);
+      else if (peer) peer.addTransceiver(track, { direction: "sendrecv" });
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
       localStreamRef.current.addTrack(track);
       if (localVideoRef.current) {
