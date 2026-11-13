@@ -64,10 +64,22 @@ export default function Shop() {
       await queryClient.invalidateQueries({queryKey:["/api/shop/inventory"]});await queryClient.invalidateQueries({queryKey:["/api/auth/me"]});toast({title:"Purchase successful",description:"Added to your inventory."});
     }catch(e:any){toast({title:"Purchase failed",description:e.message,variant:"destructive"});}
   };
-  const equip = async (item:any) => {
-    const res=await fetch("/api/shop/equip",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({decorationId:item.type==="decoration"?item.id:null,nameStyleId:item.type==="name_style"?item.id:null})});
-    if(!res.ok){toast({title:"Could not equip decoration",variant:"destructive"});return;}
-    await queryClient.invalidateQueries({queryKey:["/api/auth/me"]});toast({title:"Profile decoration equipped"});
+  const updateEquippedItem = async (item:any, unequip=false) => {
+    const decorationId = item.type === "decoration"
+      ? (unequip ? null : item.id)
+      : (user?.decorationId ? Number(user.decorationId) : null);
+    const nameStyleId = item.type === "name_style"
+      ? (unequip ? null : item.id)
+      : (user?.nameStyleId ? Number(user.nameStyleId) : null);
+    try {
+      const res=await fetch("/api/shop/equip",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({decorationId,nameStyleId})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.message || "Could not update equipped item.");
+      await queryClient.invalidateQueries({queryKey:["/api/auth/me"]});
+      toast({title:unequip?"Decoration unequipped":"Profile decoration equipped"});
+    } catch(error:any) {
+      toast({title:"Could not update decoration",description:error.message,variant:"destructive"});
+    }
   };
 
   return <Layout><div className="mx-auto max-w-6xl space-y-7 p-6">
@@ -89,7 +101,7 @@ export default function Shop() {
     </section>
     <section><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-bold">Community marketplace</h2><span className="text-xs text-muted-foreground">{items.length} items</span></div><div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item:any)=>{const owned=isPurchased(item.id);const styles=getStyles(item);return <CyberCard key={item.id} className="overflow-hidden"><div className="flex h-36 items-center justify-center bg-black/20 p-4"><img src={item.imageUrl} alt={item.name} className="max-h-full max-w-full object-contain"/></div><div className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><div><h3 className="font-bold">{item.name}</h3><p className="mt-1 text-xs text-muted-foreground">{item.description}</p></div><span className="shrink-0 rounded-full bg-amber-400/10 px-2 py-1 text-xs font-bold text-amber-200">{item.price} DC</span></div>
-        {owned?(item.type==="emote"?<button onClick={()=>playEmote(item)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2 text-sm font-bold"><Play className="h-4 w-4"/> Play emote</button>:<button onClick={()=>equip(item)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-bold"><Check className="h-4 w-4"/> {Number(item.type==="name_style"?user?.nameStyleId:user?.decorationId)===item.id?"Equipped":item.type==="name_style"?"Equip name style":"Equip decoration"}</button>):<CyberButton onClick={()=>buy(item.id)} className="w-full" disabled={Number(user?.coins||0)<item.price}>Buy for {item.price} DihCoins</CyberButton>}
+        {owned?(item.type==="emote"?<button onClick={()=>playEmote(item)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2 text-sm font-bold"><Play className="h-4 w-4"/> Play emote</button>:<div className="space-y-2"><button onClick={()=>updateEquippedItem(item)} disabled={Number(item.type==="name_style"?user?.nameStyleId:user?.decorationId)===item.id} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-bold disabled:cursor-default disabled:opacity-60"><Check className="h-4 w-4"/> {Number(item.type==="name_style"?user?.nameStyleId:user?.decorationId)===item.id?"Equipped":item.type==="name_style"?"Equip name style":"Equip decoration"}</button>{Number(item.type==="name_style"?user?.nameStyleId:user?.decorationId)===item.id&&<button onClick={()=>updateEquippedItem(item,true)} className="w-full rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive/20">Unequip</button>}</div>):<CyberButton onClick={()=>buy(item.id)} className="w-full" disabled={Number(user?.coins||0)<item.price}>Buy for {item.price} DihCoins</CyberButton>}
         {item.type==="emote"&&<p className="text-[10px] text-muted-foreground">Animated GIF + MP3 · {Number(styles.duration||0).toFixed(1)}s</p>}</div></CyberCard>;})}
       {!items.length&&<div className="col-span-full rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">No shop items yet. Create the first one above!</div>}
     </div></section>
