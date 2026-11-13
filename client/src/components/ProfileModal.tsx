@@ -96,13 +96,42 @@ const PROFILE_GRADIENTS: Record<string,string> = {
   mint:"linear-gradient(120deg,#065f46,#10b981,#a7f3d0)",
   mono:"linear-gradient(120deg,#111827,#4b5563,#9ca3af)",
 };
-export function getProfileGradientStyle(value?: string | null): React.CSSProperties {
-  if (!value || value === "none") return {};
-  if (value.startsWith("custom:")) {
-    const colors=value.slice(7).split(":");
-    if (colors.length===3 && colors.every(color=>/^#[0-9a-f]{6}$/i.test(color))) return {backgroundImage:`linear-gradient(120deg,${colors.join(",")})`};
+type ProfileAppearance = { gradient: string; textColor: string; borderColor: string; animated: boolean; orientation: "portrait" | "landscape" };
+function readProfileAppearance(value?: string | null): ProfileAppearance {
+  const defaults: ProfileAppearance = { gradient: "none", textColor: "#ffffff", borderColor: "#ffffff", animated: true, orientation: "portrait" };
+  if (!value) return defaults;
+  if (value.startsWith("style2~")) {
+    const [, gradient, textColor, borderColor, animated, orientation] = value.split("~");
+    return {
+      gradient: gradient || "none",
+      textColor: /^#[0-9a-f]{6}$/i.test(textColor || "") ? textColor : defaults.textColor,
+      borderColor: /^#[0-9a-f]{6}$/i.test(borderColor || "") ? borderColor : defaults.borderColor,
+      animated: animated !== "0",
+      orientation: orientation === "landscape" ? "landscape" : "portrait",
+    };
   }
-  return PROFILE_GRADIENTS[value] ? {backgroundImage:PROFILE_GRADIENTS[value]} : {};
+  return { ...defaults, gradient: value };
+}
+function saveProfileAppearance(settings: ProfileAppearance) {
+  return ["style2", settings.gradient, settings.textColor, settings.borderColor, settings.animated ? "1" : "0", settings.orientation].join("~");
+}
+export function getProfileGradientStyle(value?: string | null): React.CSSProperties {
+  const settings = readProfileAppearance(value);
+  const gradient = settings.gradient;
+  let backgroundImage: string | undefined;
+  const angle = settings.orientation === "landscape" ? "90deg" : "180deg";
+  if (gradient.startsWith("custom:")) {
+    const colors = gradient.slice(7).split(":");
+    if (colors.length === 3 && colors.every(color => /^#[0-9a-f]{6}$/i.test(color))) backgroundImage = `linear-gradient(${angle},${colors.join(",")})`;
+  } else if (PROFILE_GRADIENTS[gradient]) {
+    backgroundImage = PROFILE_GRADIENTS[gradient].replace(/120deg/, angle);
+  }
+  if (!backgroundImage) return {};
+  return {
+    backgroundImage,
+    backgroundSize: settings.animated ? "300% 300%" : "100% 100%",
+    animation: settings.animated ? "profileGradientFlow 12s ease infinite" : "none",
+  };
 }
 export function getUsernameGradientStyle(value?: string | null): React.CSSProperties {
   if (!value?.startsWith("custom-gradient|")) return {};
@@ -232,10 +261,14 @@ export function ProfileModal({
         avatarUrl: profile.avatarUrl || "",
         bannerUrl: profile.bannerUrl || "",
         usernameFont: profile.usernameFont || "default",
-        profileGradient: profile.profileGradient || "none",
-        customProfileStart: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[0] : "#0ea5e9",
-        customProfileMiddle: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[1] : "#8b5cf6",
-        customProfileEnd: profile.profileGradient?.startsWith("custom:") ? profile.profileGradient.slice(7).split(":")[2] : "#ec4899",
+        profileGradient: readProfileAppearance(profile.profileGradient).gradient,
+        profileTextColor: readProfileAppearance(profile.profileGradient).textColor,
+        profileBorderColor: readProfileAppearance(profile.profileGradient).borderColor,
+        profileGradientAnimated: readProfileAppearance(profile.profileGradient).animated,
+        profileGradientOrientation: readProfileAppearance(profile.profileGradient).orientation,
+        customProfileStart: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[0] : "#0ea5e9",
+        customProfileMiddle: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[1] : "#8b5cf6",
+        customProfileEnd: readProfileAppearance(profile.profileGradient).gradient.startsWith("custom:") ? readProfileAppearance(profile.profileGradient).gradient.slice(7).split(":")[2] : "#ec4899",
         customTextStart: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[2] : "#22d3ee",
         customTextEnd: profile.usernameFont?.startsWith("custom-gradient|") ? profile.usernameFont.split("|")[3] : "#a78bfa",
         tagSymbol: profile.tagSymbol || PROFILE_TAG_SYMBOLS[0],
@@ -295,10 +328,18 @@ export function ProfileModal({
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      const appearance = {
+        gradient: form.profileGradient || "none",
+        textColor: form.profileTextColor || "#ffffff",
+        borderColor: form.profileBorderColor || "#ffffff",
+        animated: form.profileGradientAnimated !== false,
+        orientation: form.profileGradientOrientation === "landscape" ? "landscape" as const : "portrait" as const,
+      };
+      const payload = { ...form, profileGradient: saveProfileAppearance(appearance) };
       const r = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
@@ -426,11 +467,17 @@ export function ProfileModal({
 
             <div
               className="p-5 -mt-10 min-h-[calc(100%-6rem)]"
+              className="p-5 -mt-10 min-h-[calc(100%-6rem)] profile-gradient-surface"
               style={{
                 backgroundColor: "#050505",
-                ...getProfileGradientStyle(editing ? form.profileGradient : profile?.profileGradient),
+                ...getProfileGradientStyle(editing
+                  ? saveProfileAppearance({ gradient: form.profileGradient || "none", textColor: form.profileTextColor || "#ffffff", borderColor: form.profileBorderColor || "#ffffff", animated: form.profileGradientAnimated !== false, orientation: form.profileGradientOrientation || "portrait" })
+                  : profile?.profileGradient),
+                color: readProfileAppearance(editing ? saveProfileAppearance({ gradient: form.profileGradient || "none", textColor: form.profileTextColor || "#ffffff", borderColor: form.profileBorderColor || "#ffffff", animated: form.profileGradientAnimated !== false, orientation: form.profileGradientOrientation || "portrait" }) : profile?.profileGradient).textColor,
+                ["--profile-border-color" as any]: readProfileAppearance(editing ? saveProfileAppearance({ gradient: form.profileGradient || "none", textColor: form.profileTextColor || "#ffffff", borderColor: form.profileBorderColor || "#ffffff", animated: form.profileGradientAnimated !== false, orientation: form.profileGradientOrientation || "portrait" }) : profile?.profileGradient).borderColor,
               }}
             >
+              <style>{`@keyframes profileGradientFlow { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} } .profile-gradient-surface .profile-outline { border-color:var(--profile-border-color)!important; } .profile-gradient-surface .profile-panel { border-color:var(--profile-border-color)!important; }`}</style>
               {isLoading || !profile ? (
                 <div className="text-primary/60 font-mono text-xs text-center py-10">
                   LOADING_PROFILE...
@@ -498,8 +545,8 @@ export function ProfileModal({
                           profile.presenceStatus === "idle" ? "bg-yellow-400" :
                           profile.presenceStatus === "dnd" ? "bg-red-400" : "bg-gray-500"
                         )} />
-                        <span className="text-[10px] text-white/50 capitalize">{profile.presenceStatus || "offline"}</span>
-                        {profile.pronouns && <span className="text-[10px] text-white/40">• {profile.pronouns}</span>}
+                        <span className="text-[10px] opacity-70 capitalize">{profile.presenceStatus || "offline"}</span>
+                        {profile.pronouns && <span className="text-[10px] opacity-80">• {profile.pronouns}</span>}
                       </div>
                       {(() => {
                         const role = String(profile.role || "user").toLowerCase().replace(/_/g,"-");
@@ -563,21 +610,21 @@ export function ProfileModal({
 
                   {!editing || !canEditProfile ? (
                     <>
-                      <div className="border border-primary/20 rounded p-3 mb-3 bg-primary/5">
-                        <div className="text-[9px] text-primary/50 font-mono uppercase mb-1">
+                      <div className="profile-panel border border-primary/20 rounded p-3 mb-3 bg-black/20">
+                        <div className="text-[9px] opacity-75 font-mono uppercase mb-1">
                           BIO
                         </div>
-                        <div className="text-xs text-white/80 font-mono whitespace-pre-wrap">
+                        <div className="text-xs opacity-95 font-mono whitespace-pre-wrap">
                           {profile.bio || (
-                            <span className="text-white/30 italic">
+                            <span className="opacity-50 italic">
                               No bio set.
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="border border-accent/20 rounded p-3 bg-accent/5">
-                        <div className="flex items-center gap-1 text-[9px] text-accent/70 font-mono uppercase mb-2">
+                      <div className="profile-panel border border-accent/20 rounded p-3 bg-black/20">
+                        <div className="flex items-center gap-1 text-[9px] opacity-80 font-mono uppercase mb-2">
                           <UsersIcon className="w-3 h-3" /> MUTUAL_GROUPS (
                           {profile.mutualGroups?.length || 0})
                         </div>
@@ -586,7 +633,7 @@ export function ProfileModal({
                             {profile.mutualGroups.map((g: any) => (
                               <div
                                 key={g.id}
-                                className="text-[11px] font-mono text-white/70 px-2 py-1 bg-black/40 rounded border border-accent/10"
+                                className="profile-outline text-[11px] font-mono opacity-90 px-2 py-1 bg-black/40 rounded border border-accent/10"
                                 data-testid={`mutual-group-${g.id}`}
                               >
                                 # {g.name}
@@ -594,7 +641,7 @@ export function ProfileModal({
                             ))}
                           </div>
                         ) : (
-                          <div className="text-[11px] text-white/30 italic font-mono">
+                          <div className="text-[11px] opacity-50 italic font-mono">
                             No shared groups.
                           </div>
                         )}
@@ -677,6 +724,20 @@ export function ProfileModal({
                         <div className="mt-2 grid grid-cols-3 gap-2">
                           {["customProfileStart","customProfileMiddle","customProfileEnd"].map((key,i)=><label key={key} className="text-[9px] text-white/50">{["START","MIDDLE","END"][i]}<input type="color" value={form[key]||["#0ea5e9","#8b5cf6","#ec4899"][i]} disabled={!canUseDihhro} onChange={e=>setForm({...form,[key]:e.target.value,profileGradient:"custom:"+[form.customProfileStart||"#0ea5e9",form.customProfileMiddle||"#8b5cf6",form.customProfileEnd||"#ec4899"].map((v,j)=>j===i?e.target.value:v).join(":")})} className="mt-1 h-9 w-full cursor-pointer rounded bg-transparent"/></label>)}
                         </div>
+                      </Field>
+                      <Field label="PROFILE TEXT & OUTLINE COLORS">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-[9px] text-white/60">PROFILE TEXT<input type="color" value={form.profileTextColor || "#ffffff"} onChange={e=>setForm({...form,profileTextColor:e.target.value})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
+                          <label className="text-[9px] text-white/60">BOX OUTLINES<input type="color" value={form.profileBorderColor || "#ffffff"} onChange={e=>setForm({...form,profileBorderColor:e.target.value})} className="mt-1 h-9 w-full rounded bg-transparent"/></label>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <label className="flex items-center gap-2 text-[9px] text-white/60"><input type="checkbox" checked={form.profileGradientAnimated !== false} onChange={e=>setForm({...form,profileGradientAnimated:e.target.checked})}/> ANIMATE GRADIENT</label>
+                          <select value={form.profileGradientOrientation || "portrait"} onChange={e=>setForm({...form,profileGradientOrientation:e.target.value})} className="rounded border border-white/20 bg-black px-2 py-1 text-[9px] text-white">
+                            <option value="portrait">PORTRAIT GRADIENT</option>
+                            <option value="landscape">LANDSCAPE GRADIENT</option>
+                          </select>
+                        </div>
+                        <div className="mt-2 rounded border p-3 text-xs" style={{color:form.profileTextColor||"#fff",borderColor:form.profileBorderColor||"#fff"}}>Preview: bio, pronouns and profile panels</div>
                       </Field>
                       <Field label="USERNAME TEXT GRADIENT (DIHHRO)">
                         <div className="mb-2 flex gap-2">
