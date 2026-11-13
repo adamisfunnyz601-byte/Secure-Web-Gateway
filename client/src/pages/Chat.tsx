@@ -113,39 +113,48 @@ const containsBlockedChatContent = (value: string) => {
 interface SoundEntry { id: string; name: string; url: string; }
 
 function LiveAudioVisualizer({ stream, bars = 44, className = "" }: { stream: MediaStream | null; bars?: number; className?: string }) {
-  const [levels, setLevels] = useState<number[]>(() => Array.from({ length: bars }, () => 4));
+  const [levels, setLevels] = useState<number[]>(() => Array.from({ length: bars }, () => 3));
   useEffect(() => {
-    if (!stream || !stream.getAudioTracks().some(track => track.readyState === "live" && track.enabled)) {
-      setLevels(Array.from({ length: bars }, () => 4));
-      return;
-    }
+    const track = stream?.getAudioTracks().find(item => item.readyState === "live");
+    if (!stream || !track) { setLevels(Array.from({ length: bars }, () => 3)); return; }
     let frame = 0;
     let active = true;
     let context: AudioContext | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
     let analyser: AnalyserNode | null = null;
     try {
-      context = new AudioContext();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      context = new AudioContextClass();
       analyser = context.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.78;
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.68;
       source = context.createMediaStreamSource(stream);
       source.connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
+      const frequency = new Uint8Array(analyser.frequencyBinCount);
+      const waveform = new Uint8Array(analyser.fftSize);
       const draw = () => {
         if (!active || !analyser) return;
-        analyser.getByteFrequencyData(data);
-        setLevels(Array.from({ length: bars }, (_, index) => {
-          const bucket = Math.floor(index * data.length / bars);
-          return Math.max(3, Math.min(30, 3 + (data[bucket] / 255) * 27));
-        }));
+        analyser.getByteFrequencyData(frequency);
+        analyser.getByteTimeDomainData(waveform);
+        let energy = 0;
+        for (let i = 0; i < waveform.length; i++) { const sample = (waveform[i] - 128) / 128; energy += sample * sample; }
+        const rms = Math.sqrt(energy / waveform.length);
+        const gain = Math.min(2.8, 1.15 + rms * 9);
+        const next = Array.from({ length: bars }, (_, index) => {
+          const low = Math.max(1, Math.floor(Math.pow(index / bars, 2.15) * frequency.length));
+          const high = Math.max(low + 1, Math.floor(Math.pow((index + 1) / bars, 2.15) * frequency.length));
+          let peak = 0;
+          for (let bin = low; bin < Math.min(frequency.length, high); bin++) peak = Math.max(peak, frequency[bin]);
+          const normalized = Math.max(0, (peak - 24) / 190) * gain;
+          const waveformLift = rms > 0.012 ? Math.min(0.55, rms * 3.5) : 0;
+          return Math.max(3, Math.min(34, 3 + (normalized + waveformLift) * 30));
+        });
+        setLevels(next);
         frame = window.requestAnimationFrame(draw);
       };
-      context.resume().catch(() => {});
+      if (context.state === "suspended") context.resume().catch(() => {});
       draw();
-    } catch {
-      setLevels(Array.from({ length: bars }, () => 4));
-    }
+    } catch { setLevels(Array.from({ length: bars }, () => 3)); }
     return () => {
       active = false;
       if (frame) window.cancelAnimationFrame(frame);
@@ -154,8 +163,8 @@ function LiveAudioVisualizer({ stream, bars = 44, className = "" }: { stream: Me
       context?.close().catch(() => {});
     };
   }, [stream, bars]);
-  return <div className={cn("flex items-center justify-center gap-1 overflow-hidden", className)} aria-label="Live audio frequency visualizer">
-    {levels.map((height, index) => <span key={index} className="w-1 rounded-full bg-gradient-to-t from-violet-700 via-violet-400 to-fuchsia-200 transition-[height] duration-75" style={{ height: `${height}px` }} />)}
+  return <div className={cn("flex items-center justify-center gap-[3px] overflow-hidden", className)} aria-label="Live microphone frequency visualizer">
+    {levels.map((height, index) => <span key={index} className="w-[3px] shrink-0 rounded-full bg-gradient-to-t from-violet-700 via-violet-400 to-fuchsia-200 transition-[height] duration-75" style={{ height: height + "px", opacity: height > 5 ? 1 : .45 }} />)}
   </div>;
 }
 interface MediaPreview { url: string; type: 'image' | 'video' | 'audio'; name: string; }
@@ -1091,7 +1100,7 @@ export default function Chat() {
       peer.ontrack = event => {
       const remote = remoteStreamRef.current || new MediaStream();
       remoteStreamRef.current = remote;
-      setVisualizerStream(remote);
+      // Keep the live visualizer attached to this user's microphone stream.
       if (!remote.getTracks().some(track => track.id === event.track.id)) remote.addTrack(event.track);
       if (event.track.kind === 'video') setHasRemoteVideo(true);
       if (remoteVideoRef.current) {
