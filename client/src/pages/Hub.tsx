@@ -6,7 +6,7 @@ import {
   Gamepad2, Trophy, Target, Flame, Zap, Clock3, StickyNote, CheckSquare,
   Dices, Coins, Brain, MousePointer2, Swords, Sparkles, ArrowRight,
   RotateCcw, Play, Pause, Plus, Trash2, Star, Shield, Users, ShoppingBag,
-  MessageSquare, Blocks, Users, Timer, Lightbulb, Shuffle, Hash, Type, Palette
+  MessageSquare, Blocks, Timer, Lightbulb, Shuffle, Hash, Type, Palette
 } from "lucide-react";
 
 type Task = { id: number; text: string; done: boolean };
@@ -113,7 +113,8 @@ export default function Hub() {
     const pattern = Array.from({ length: 4 }, () => Math.floor(Math.random() * 9));
     setMemoryPattern(pattern);
     setMemoryInput([]);
-    setMemoryMessage("Memorise: " + pattern.map(value => value + 1).join(" · "));\n    window.setTimeout(() => setMemoryMessage("Now repeat the 4-number pattern using the grid."), 1800);
+    setMemoryMessage("Memorise: " + pattern.map(value => value + 1).join(" · "));
+    window.setTimeout(() => setMemoryMessage("Now repeat the 4-number pattern using the grid."), 1800);
   };
   const addMemoryNumber = (value: number) => {
     const next = [...memoryInput, value];
