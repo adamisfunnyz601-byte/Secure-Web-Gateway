@@ -1837,10 +1837,10 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
 
 
         <AnimatePresence>
-          {incomingGroupCall && !groupCallId && <div className="fixed inset-0 z-[950] flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"><motion.div initial={{scale:.92,opacity:0}} animate={{scale:1,opacity:1}} className="w-full max-w-sm rounded-2xl border border-emerald-400/30 bg-[#0c0615] p-6 text-center shadow-2xl"><Phone className="mx-auto mb-4 h-10 w-10 text-emerald-300 animate-pulse"/><h3 className="text-xl font-bold text-emerald-100">Group call invite</h3><p className="mt-2 text-sm text-violet-100/60">{incomingGroupCall.fromName} invited you to a group call</p><div className="mt-6 flex gap-3"><button onClick={()=>joinGroupCall(incomingGroupCall)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 font-bold text-white">JOIN</button><button onClick={()=>setIncomingGroupCall(null)} className="flex-1 rounded-lg border border-white/15 px-4 py-3 text-white/70">DECLINE</button></div></motion.div></div>}
+          {incomingGroupCall && !groupCallId && <div className="fixed inset-0 z-[950] !visible pointer-events-auto flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"><motion.div initial={{scale:.92,opacity:0}} animate={{scale:1,opacity:1}} className="w-full max-w-sm rounded-2xl border border-emerald-400/30 bg-[#0c0615] p-6 text-center shadow-2xl"><Phone className="mx-auto mb-4 h-10 w-10 text-emerald-300 animate-pulse"/><h3 className="text-xl font-bold text-emerald-100">Group call invite</h3><p className="mt-2 text-sm text-violet-100/60">{incomingGroupCall.fromName} invited you to a group call</p><div className="mt-6 flex gap-3"><button onClick={()=>joinGroupCall(incomingGroupCall)} className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 font-bold text-white">JOIN</button><button onClick={()=>setIncomingGroupCall(null)} className="flex-1 rounded-lg border border-white/15 px-4 py-3 text-white/70">DECLINE</button></div></motion.div></div>}
         </AnimatePresence>
         <AnimatePresence>
-          {groupCallId && <div className="fixed inset-0 z-[850] flex flex-col bg-[#07040d] text-white"><div className="flex items-center justify-between border-b border-violet-500/20 p-4"><div><div className="font-display text-lg text-violet-100">GROUP CALL</div><div className="text-xs text-violet-200/50">{groupCallParticipants.length} participant{groupCallParticipants.length===1?"":"s"} connected</div></div><button onClick={openGroupInvitePicker} className="rounded-lg border border-fuchsia-400/30 px-3 py-2 text-xs text-fuchsia-200"><UserPlus className="mr-2 inline h-4 w-4"/> INVITE</button></div>
+          {groupCallId && <div className="fixed inset-0 z-[850] !visible pointer-events-auto flex flex-col bg-[#07040d] text-white"><div className="flex items-center justify-between border-b border-violet-500/20 p-4"><div><div className="font-display text-lg text-violet-100">GROUP CALL</div><div className="text-xs text-violet-200/50">{groupCallParticipants.length} participant{groupCallParticipants.length===1?"":"s"} connected</div></div><button onClick={openGroupInvitePicker} className="rounded-lg border border-fuchsia-400/30 px-3 py-2 text-xs text-fuchsia-200"><UserPlus className="mr-2 inline h-4 w-4"/> INVITE</button></div>
             {showGroupCallInvites&&<div className="max-h-56 overflow-y-auto border-b border-violet-500/20 bg-black/50 p-3"><div className="mb-2 text-xs uppercase tracking-widest text-violet-200/60">Invite group members</div>{groupInviteUsers.filter(u=>Number(u.userId)!==Number(currentUserId)&&!groupCallParticipants.some(p=>p.userId===u.userId)).map(u=><div key={u.userId} className="flex items-center justify-between border-b border-white/5 py-2"><span className="text-sm text-violet-100">{u.username}</span><button onClick={()=>inviteToGroupCall(u.userId)} className="rounded border border-emerald-400/30 px-3 py-1 text-xs text-emerald-200">INVITE</button></div>)}</div>}
             <div className="flex min-h-0 flex-1 flex-col p-4">
               <div className="mb-3 flex gap-2 overflow-x-auto border-b border-violet-400/15 pb-2">{groupCallParticipants.map(person=><button key={person.userId} onClick={()=>setActiveGroupCallTab(person.userId)} className={`shrink-0 rounded-t-lg border px-4 py-2 text-xs font-semibold transition ${activeGroupCallTab===person.userId?"border-violet-400/60 bg-violet-500/20 text-violet-100":"border-white/10 bg-white/5 text-white/55 hover:bg-white/10"}`}>{person.userId===Number(currentUserId)?"You":person.username}{person.userId!==Number(currentUserId)&&groupPeersRef.current.get(person.userId)?.connectionState==="connected"?" •":""}</button>)}</div>
@@ -1862,7 +1862,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
             ====================================================== */}
         <AnimatePresence>
           {callState === 'incoming' && incomingCall && (
-            <div className="fixed inset-0 z-[900] flex items-center justify-center bg-[#08040f]/90 backdrop-blur-xl backdrop-blur-sm">
+            <div className="fixed inset-0 z-[900] !visible pointer-events-auto flex items-center justify-center bg-[#08040f]/90 backdrop-blur-xl backdrop-blur-sm">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -1895,7 +1895,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black z-[800] flex flex-col"
+              className="fixed inset-0 !visible pointer-events-auto bg-black z-[800] flex flex-col"
             >
               <div className="flex-1 flex">
                 {/* Remote participant is the main video; your own camera stays picture-in-picture. */}
