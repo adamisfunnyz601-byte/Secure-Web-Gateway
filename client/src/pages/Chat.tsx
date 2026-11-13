@@ -19,7 +19,8 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { motion, AnimatePresence } from "framer-motion";
-import { ProfileModal, Avatar, getFontClass, getUsernameGradientStyle } from "@/components/ProfileModal";
+import { ProfileModal, Avatar } from "@/components/ProfileModal";
+import { getFontClass, getUsernameGradientStyle } from "@/components/ProfileTextStyle";
 import { UserProfileTag } from "@/components/UserProfileTag";
 import { EmojiButton } from "@/components/EmojiPicker";
 
