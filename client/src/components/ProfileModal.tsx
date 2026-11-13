@@ -175,6 +175,7 @@ export function ProfileModal({
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
   const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
+  const [activeProfileEmote, setActiveProfileEmote] = useState<any>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
   const fontFileRef = useRef<HTMLInputElement>(null);
@@ -227,6 +228,11 @@ export function ProfileModal({
     queryKey: ["/api/shop/items"],
     queryFn: async () => { const response = await fetch("/api/shop/items", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
     staleTime: 30000,
+  });
+  const { data: profileInventory = [] } = useQuery<any[]>({
+    queryKey: ["/api/shop/inventory"],
+    queryFn: async () => { const response = await fetch("/api/shop/inventory", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
+    staleTime: 20000,
   });
   const { data: viewer } = useQuery<any>({ queryKey: ["/api/auth/me"], queryFn: async () => { const r = await fetch("/api/auth/me", { credentials: "same-origin" }); if (!r.ok) return null; return r.json(); } });
   const { data: relationship, refetch: refetchRelationship } = useQuery<any>({
@@ -355,6 +361,17 @@ export function ProfileModal({
   let profileDecorationSettings:any = {};
   try { profileDecorationSettings = typeof profileDecoration?.cssStyles === "string" ? JSON.parse(profileDecoration.cssStyles) : (profileDecoration?.cssStyles || {}); } catch { profileDecorationSettings = {}; }
   const decorationAnimationName = "profileDecorationSpin" + String(profileDecoration?.id || "none").replace(/[^a-z0-9]/gi, "");
+  const profileEmotes = profileInventory.filter((item:any) => item.type === "emote");
+  const playProfileEmote = (item:any) => {
+    let settings:any = {};
+    try { settings = typeof item.cssStyles === "string" ? JSON.parse(item.cssStyles) : (item.cssStyles || {}); } catch {}
+    const duration = Math.max(1, Math.min(20, Number(settings.duration) || 3));
+    setActiveProfileEmote({ name: item.name, imageUrl: item.imageUrl });
+    const audio = new Audio(settings.audioUrl);
+    audio.onended = () => setActiveProfileEmote((current:any) => current?.name === item.name ? null : current);
+    audio.play().catch(() => setActiveProfileEmote(null));
+    window.setTimeout(() => setActiveProfileEmote((current:any) => current?.name === item.name ? null : current), duration * 1000);
+  };
 
 
   return (
@@ -455,6 +472,7 @@ export function ProfileModal({
                         className="border-4 border-black ring-2 ring-primary/50"
                       />
                       {profileDecoration?.imageUrl && <><style>{`@keyframes ${decorationAnimationName}{from{transform:rotate(0deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}to{transform:rotate(${Math.max(-360,Math.min(360,Number(profileDecorationSettings.rotation)||360))}deg) scale(${Math.max(.25,Math.min(2.5,Number(profileDecorationSettings.scale)||1))})}}`}</style><img src={profileDecoration.imageUrl} alt={profileDecoration.name || "Profile decoration"} className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain" style={{animation: `${decorationAnimationName} ${Math.max(1,Math.min(30,Number(profileDecorationSettings.duration)||5))}s linear infinite`}} /></>}
+                      <AnimatePresence>{activeProfileEmote?.imageUrl && <motion.div initial={{opacity:0,scale:.75,x:-8}} animate={{opacity:1,scale:1,x:0}} exit={{opacity:0,scale:.85,x:-8}} transition={{type:"spring",stiffness:340,damping:24}} className="absolute left-[calc(100%+10px)] top-0 z-30 flex items-center gap-2 rounded-xl border border-violet-300/50 bg-[#111827]/95 p-2 shadow-xl"><img src={activeProfileEmote.imageUrl} alt={activeProfileEmote.name} className="h-16 w-16 object-contain"/><span className="max-w-24 text-[10px] font-bold text-violet-100">{activeProfileEmote.name}</span></motion.div>}</AnimatePresence>
                       {editing && (
                         <>
                           <button
@@ -505,6 +523,8 @@ export function ProfileModal({
                         )} />
                         <span className="text-[10px] opacity-70 capitalize">{profile.presenceStatus || "offline"}</span>
                         {profile.pronouns && <span className="text-[10px] opacity-80">• {profile.pronouns}</span>}
+                      </div>
+                      {isOwn && profileEmotes.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{profileEmotes.map((item:any)=><button key={item.id} type="button" onClick={()=>playProfileEmote(item)} title={"Play "+item.name} className="rounded-md border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[9px] font-semibold text-violet-200 hover:bg-violet-500/20">{item.name}</button>)}</div>}
                       </div>
                       {(() => {
                         const role = String(profile.role || "user").toLowerCase().replace(/_/g,"-");
