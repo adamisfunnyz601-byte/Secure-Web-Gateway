@@ -1362,7 +1362,8 @@ export async function registerRoutes(
     if(!item) return res.status(403).json({message:"You do not own that emote."});
     let styles:any={};try{styles=typeof item.cssStyles==="string"?JSON.parse(item.cssStyles):(item.cssStyles||{});}catch{}
     if(!styles.audioUrl||!item.imageUrl) return res.status(400).json({message:"This emote is incomplete."});
-    const payload={type:"emote",emote:{name:item.name,gifUrl:item.imageUrl,audioUrl:styles.audioUrl,duration:Math.min(20,Number(styles.duration)||3)}};
+    const sender=await storage.getUser(userId);
+    const payload={type:"emote",emote:{name:item.name,gifUrl:item.imageUrl,audioUrl:styles.audioUrl,duration:Math.min(20,Number(styles.duration)||3),fromName:sender?.username||"Player"}};
     for(const peer of blockBlastMembers.keys()){if(peer===userId)continue;const queue=blockBlastSignals.get(peer)||[];queue.push({from:userId,signal:payload,createdAt:Date.now()});if(queue.length>100)queue.splice(0,queue.length-100);blockBlastSignals.set(peer,queue);}
     res.json({success:true});
   });
