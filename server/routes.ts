@@ -1251,7 +1251,20 @@ export async function registerRoutes(
   });
 
   app.post("/api/shop/equip", requireAuth, async (req, res) => {
-    const { decorationId, nameStyleId } = req.body;
+    const parseOptionalId = (value: unknown) => value == null || value === "" ? null : Number(value);
+    const decorationId = parseOptionalId(req.body?.decorationId);
+    const nameStyleId = parseOptionalId(req.body?.nameStyleId);
+    if ((decorationId !== null && (!Number.isSafeInteger(decorationId) || decorationId < 1)) ||
+        (nameStyleId !== null && (!Number.isSafeInteger(nameStyleId) || nameStyleId < 1))) {
+      return res.status(400).json({ message: "Invalid shop item." });
+    }
+    const inventory = await storage.getUserInventory(req.session.userId!);
+    if (decorationId !== null && !inventory.some((item:any) => item.id === decorationId && item.type === "decoration")) {
+      return res.status(403).json({ message: "You do not own that decoration." });
+    }
+    if (nameStyleId !== null && !inventory.some((item:any) => item.id === nameStyleId && item.type === "name_style")) {
+      return res.status(403).json({ message: "You do not own that name style." });
+    }
     await storage.updateUserDecoration(req.session.userId!, decorationId, nameStyleId);
     res.json({ success: true });
   });
