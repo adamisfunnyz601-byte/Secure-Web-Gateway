@@ -16,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import SettingsPage from "@/pages/Settings";
 import BlockBlast from "@/pages/BlockBlast";
 import Hub from "@/pages/Hub";
+import Hangouts from "@/pages/Hangouts";
 import Invite from "@/pages/Invite";
 import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
@@ -75,6 +76,9 @@ function Router() {
       </Route>
       <Route path="/hub">
         <ProtectedRoute component={Hub} />
+      </Route>
+      <Route path="/hangouts">
+        <ProtectedRoute component={Hangouts} />
       </Route>
       <Route component={NotFound} />
     </Switch>
