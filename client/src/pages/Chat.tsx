@@ -378,6 +378,17 @@ const TerminalMessage = ({
   const chatEmoteMatch = typeof displayContent === "string" ? displayContent.match(/^\[CHAT_EMOTE:(\d+)\]$/) : null;
   let chatEmoteStyles:any = {};
   try { chatEmoteStyles = typeof emoteItem?.cssStyles === "string" ? JSON.parse(emoteItem.cssStyles) : (emoteItem?.cssStyles || {}); } catch {}
+  const playedChatEmoteRef = useRef(false);
+  useEffect(() => {
+    if (!chatEmoteMatch || !chatEmoteStyles.audioUrl || playedChatEmoteRef.current) return;
+    playedChatEmoteRef.current = true;
+    const audio = new Audio(chatEmoteStyles.audioUrl);
+    audio.volume = 1;
+    audio.play().catch(() => {
+      // Browsers may block sound until the recipient has interacted with the page.
+    });
+    return () => { audio.pause(); audio.currentTime = 0; };
+  }, [msg.id, chatEmoteMatch?.[1], chatEmoteStyles.audioUrl]);
   const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
@@ -440,7 +451,7 @@ const TerminalMessage = ({
             </div>
           </div>
         )}
-        {chatEmoteMatch ? <div className="mt-1 flex max-w-[240px] flex-col items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-500/10 p-3">{emoteItem?.imageUrl ? <img src={emoteItem.imageUrl} alt={emoteItem.name || "Chat emote"} className="max-h-36 max-w-full object-contain"/> : <span className="text-xs text-violet-200/60">Loading emote…</span>}<span className="text-[10px] font-bold text-violet-100">{emoteItem?.name || "Emote"}</span><button type="button" disabled={!chatEmoteStyles.audioUrl} onClick={() => { const audio = new Audio(chatEmoteStyles.audioUrl); audio.play().catch(() => {}); }} className="flex items-center gap-1.5 rounded-lg border border-violet-300/30 bg-violet-400/15 px-3 py-1.5 text-[10px] font-bold text-violet-100 hover:bg-violet-400/25 disabled:opacity-40"><Play className="h-3 w-3"/> Play emote</button></div> : displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
+        {chatEmoteMatch ? <div className="mt-1 flex max-w-[240px] flex-col items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-500/10 p-3">{emoteItem?.imageUrl ? <img src={emoteItem.imageUrl} alt={emoteItem.name || "Chat emote"} className="max-h-36 max-w-full object-contain"/> : <span className="text-xs text-violet-200/60">Loading emote…</span>}<span className="text-[10px] font-bold text-violet-100">{emoteItem?.name || "Emote"}</span></div> : displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
         {dihhroGiftMatch && <a href={dihhroGiftMatch[0]} target="_blank" rel="noreferrer" className="mt-3 block max-w-sm rounded-xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/10 p-3 no-underline transition hover:border-fuchsia-300/60"><div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-fuchsia-200"><Gift className="h-4 w-4"/> NEXUS DIHHRO GIFT</div><div className="mt-1 text-sm font-bold text-white">Claim Dihhro for 1 month!</div><div className="mt-1 text-[10px] text-fuchsia-100/60">Single-use gift · Open to claim</div></a>}
         {getMediaSection()}
 
