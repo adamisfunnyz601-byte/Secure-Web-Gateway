@@ -25,12 +25,12 @@ const fitExists = (board:string[][], piece:Piece) => { for(let r=0;r<SIZE;r++) f
 const newPieces = () => [randomPiece(),randomPiece(),randomPiece()];
 const readHistory = (): ScoreEntry[] => { try { return JSON.parse(localStorage.getItem("bb-score-history") || "[]"); } catch { return []; } };
 
-function PiecePreview({piece,selected,onClick,onDragStart}:{piece:Piece|null;selected:boolean;onClick:()=>void;onDragStart:(event:any)=>void}) {
- if(!piece) return <div className="h-[86px] rounded-xl border border-dashed border-white/10 opacity-30"/>;
+function PiecePreview({piece,selected,onClick,onPointerDown}:{piece:Piece|null;selected:boolean;onClick:()=>void;onPointerDown:(event:any)=>void}) {
+ if(!piece) return <div className="h-[86px] opacity-20"/>;
  const maxY=Math.max(...piece.cells.map(c=>c[0]))+1, maxX=Math.max(...piece.cells.map(c=>c[1]))+1;
- return <button draggable onDragStart={onDragStart} onClick={onClick} aria-label="Select or drag block piece" className={`h-[86px] rounded-xl border transition-all flex items-center justify-center ${selected?"border-cyan-300/70 bg-cyan-300/10 -translate-y-1 shadow-[0_8px_30px_#22d3ee22]":"border-white/10 bg-white/[.025] hover:bg-white/[.06]"}`}>
-  <div style={{display:"grid",gridTemplateColumns:`repeat(${maxX},13px)`,gridTemplateRows:`repeat(${maxY},13px)`,gap:3}}>
-   {Array.from({length:maxY},(_,y)=>Array.from({length:maxX},(_,x)=>{const active=piece.cells.some(([cy,cx])=>cy===y&&cx===x);return <span key={y+"-"+x} style={{width:13,height:13,borderRadius:3,background:active?piece.color:"transparent",boxShadow:active?"inset 0 2px 0 #ffffff55,0 2px 5px #0008":"none"}}/>;}))}
+ return <button type="button" onPointerDown={onPointerDown} onClick={onClick} aria-label="Select or drag block piece" className={`h-[86px] touch-none select-none transition-all flex items-center justify-center ${selected?"-translate-y-1":"hover:-translate-y-1"}`}>
+  <div style={{display:"grid",gridTemplateColumns:`repeat(${maxX},15px)`,gridTemplateRows:`repeat(${maxY},15px)`,gap:3}}>
+   {Array.from({length:maxY},(_,y)=>Array.from({length:maxX},(_,x)=>{const active=piece.cells.some(([cy,cx])=>cy===y&&cx===x);return <span key={y+"-"+x} style={{width:15,height:15,borderRadius:3,background:active?piece.color:"transparent",boxShadow:active?"inset 0 2px 0 #ffffff66,0 3px 6px #0009":"none"}}/>;}))}
   </div>
  </button>;
 }
@@ -54,6 +54,8 @@ function BlockBlastGame() {
  const [placementCells,setPlacementCells]=useState<string[]>([]);
  const [comboBanner,setComboBanner]=useState("");
  const [comboPulse,setComboPulse]=useState(false);
+ const [drag,setDrag]=useState<{index:number;x:number;y:number}|null>(null);
+ const boardRef=useRef<HTMLDivElement|null>(null);
 
  const [message,setMessage]=useState("");
  const [roomStatus,setRoomStatus]=useState("Shared public chat feed");
@@ -96,7 +98,28 @@ function BlockBlastGame() {
   setPieces(nextSet);setSelected(0);window.setTimeout(()=>{setClearing([]);setFlash(false);},360);
   if(!nextSet.some(p=>fitExists(next,p)))finishGame(finalScore);
  };
- const reset=()=>{setBoard(emptyBoard());setPieces(newPieces());setSelected(0);setScore(0);setStreak(0);setCombo(1);setGameOver(false);setClearing([]);setPlacementCells([]);setComboBanner("");};
+ const reset=()=>{setDrag(null);setBoard(emptyBoard());setPieces(newPieces());setSelected(0);setScore(0);setStreak(0);setCombo(1);setGameOver(false);setClearing([]);setPlacementCells([]);setComboBanner("");};
+ useEffect(()=>{
+  if(!drag)return;
+  const move=(event:PointerEvent)=>setDrag(current=>current?({...current,x:event.clientX,y:event.clientY}):null);
+  const up=(event:PointerEvent)=>{
+   const rect=boardRef.current?.getBoundingClientRect();
+   const piece=pieces[drag.index];
+   if(rect&&piece&&event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom){
+    const pitchX=rect.width/SIZE,pitchY=rect.height/SIZE;
+    const maxX=Math.max(...piece.cells.map(cell=>cell[1]))+1;
+    const maxY=Math.max(...piece.cells.map(cell=>cell[0]))+1;
+    const col=Math.floor((event.clientX-rect.left)/pitchX-Math.floor(maxX/2));
+    const row=Math.floor((event.clientY-rect.top)/pitchY-Math.floor(maxY/2));
+    place(row,col,drag.index);
+   }
+   setDrag(null);
+  };
+  window.addEventListener("pointermove",move);
+  window.addEventListener("pointerup",up);
+  window.addEventListener("pointercancel",up);
+  return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);};
+ },[drag,pieces,place]);
  const sendVoiceSignal=async(to:number,signal:any)=>{await fetch("/api/blockblast/voice/signal",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({to,signal})});};
  const joinVoice=async()=>{
   if(!navigator.mediaDevices?.getUserMedia||!window.RTCPeerConnection){setVoiceStatus("This browser does not support WebRTC microphone rooms.");return;}
@@ -152,6 +175,7 @@ function BlockBlastGame() {
  const sendMessage=()=>{if(!message.trim())return;sendRoomMessage.mutate({content:message.trim().slice(0,300)});setMessage("");setRoomStatus("Connected to the shared public chat feed");};
  const maxScore=Math.max(best,score);
  return <Layout><style>{`@keyframes bb-place-pop{0%{transform:scale(.45);filter:brightness(2.2)}65%{transform:scale(1.13);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}@keyframes bb-combo-pop{0%{opacity:0;transform:translate(-50%,-35%) scale(.55)}55%{opacity:1;transform:translate(-50%,-55%) scale(1.12)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}.bb-place-pop{animation:bb-place-pop .38s cubic-bezier(.2,.8,.2,1);z-index:1}.bb-combo-pop{animation:bb-combo-pop .55s cubic-bezier(.2,.8,.2,1)}`}</style>
+  {overlay}
   <div className="mx-auto max-w-[1500px] space-y-5">
    <div className="flex flex-wrap items-end justify-between gap-4">
     <div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.28em] text-cyan-300"><Sparkles className="h-4 w-4"/> Arcade / Daily challenge</div><h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">Block Blast <span className="text-cyan-300">💥</span></h1><p className="mt-1 text-sm text-slate-400">Place. Clear. Chain combos. Beat your best.</p></div>
@@ -165,12 +189,12 @@ function BlockBlastGame() {
      <div className="mb-4 flex items-center justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-[.2em] text-slate-400">Puzzle grid</div><div className="mt-1 text-sm text-slate-500">10 × 10 • Fill a row or column to clear it</div></div><div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-300">● LIVE RUN</div></div>
      <div className="relative mx-auto w-full max-w-[620px]">
       {comboBanner&&<div key={comboBanner+score} className={`pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-2xl border border-cyan-200/40 bg-slate-950/90 px-6 py-3 text-lg font-black tracking-wider text-cyan-200 shadow-[0_0_45px_#22d3ee55] ${comboPulse?"bb-combo-pop":""}`}>{comboBanner}{combo>1?` ×${combo}`:""}</div>}
-      <div className="grid aspect-square grid-cols-10 gap-[3px] rounded-2xl border border-white/10 bg-[#080e1b] p-2 sm:gap-1 sm:p-3" role="grid" aria-label="Block Blast 10 by 10 game board" onDragOver={e=>e.preventDefault()}>
-       {board.map((line,r)=>line.map((cell,c)=><button key={r+"-"+c} onClick={()=>place(r,c)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const idx=Number(e.dataTransfer.getData("text/blockblast-index"));if(Number.isInteger(idx)&&pieces[idx]){setSelected(idx);place(r,c,idx);}}} aria-label={`Place at row ${r+1}, column ${c+1}`} className={`relative min-w-0 rounded-[3px] border transition-all duration-150 ${cell?"border-white/10 shadow-[inset_0_2px_0_#ffffff44,0_2px_4px_#0008]":"border-white/[.035] bg-[#1a2740] hover:bg-[#263b5b]"} ${flash&&clearing.includes(r)||flash&&clearing.includes(c+SIZE)?"animate-pulse":""} ${placementCells.includes(r+"-"+c)?"bb-place-pop":""}`} style={cell?{background:cell}:undefined}/>))}
+      <div ref={boardRef} className="grid aspect-square grid-cols-10 gap-[3px] bg-transparent p-0 sm:gap-1" role="grid" aria-label="Block Blast 10 by 10 game board">
+       {board.map((line,r)=>line.map((cell,c)=><button key={r+"-"+c} onClick={()=>place(r,c)} aria-label={`Place at row ${r+1}, column ${c+1}`} className={`relative min-w-0 rounded-[3px] border transition-all duration-150 ${cell?"border-white/10 shadow-[inset_0_2px_0_#ffffff44,0_2px_4px_#0008]":"border-white/[.035] bg-[#1a2740] hover:bg-[#263b5b]"} ${flash&&clearing.includes(r)||flash&&clearing.includes(c+SIZE)?"animate-pulse":""} ${placementCells.includes(r+"-"+c)?"bb-place-pop":""}`} style={cell?{background:cell}:undefined}/>))}
       </div>
       {gameOver&&<div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-[#050a14]/90 p-6 text-center backdrop-blur-sm"><div className="max-w-sm"><Trophy className="mx-auto h-12 w-12 text-amber-300"/><div className="mt-3 text-3xl font-black text-white">Run complete</div><p className="mt-2 text-slate-400">No remaining piece can fit. Your score: <b className="text-cyan-300">{score.toLocaleString()}</b></p><button onClick={reset} className="mt-5 rounded-xl bg-cyan-300 px-6 py-3 font-bold text-slate-950">Play again</button></div></div>}
      </div>
-     <div className="mx-auto mt-5 grid max-w-[620px] grid-cols-3 gap-3"><div className="col-span-3 flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-[.2em] text-slate-400">Your blocks</span><span className="text-[11px] text-slate-500">Drag a piece onto the grid, or tap a piece then tap a cell</span></div>{pieces.map((piece,i)=><PiecePreview key={piece?.id||i} piece={piece} selected={selected===i} onClick={()=>setSelected(i)} onDragStart={e=>{setSelected(i);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/blockblast-index",String(i));}}/>)}</div>
+     <div className="mx-auto mt-5 grid max-w-[620px] grid-cols-3 gap-3"><div className="col-span-3 flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-[.2em] text-slate-400">Your blocks</span><span className="text-[11px] text-slate-500">Drag a piece onto the grid, or tap a piece then tap a cell</span></div>{pieces.map((piece,i)=><PiecePreview key={piece?.id||i} piece={piece} selected={selected===i} onClick={()=>setSelected(i)} onPointerDown={e=>{if(!piece||gameOver)return;e.preventDefault();setSelected(i);setDrag({index:i,x:e.clientX,y:e.clientY});}}/>)}</div>
      <p className="mx-auto mt-3 max-w-[620px] text-center text-[11px] text-slate-500">Tip: clear multiple lines together for bigger combo bonuses.</p>
     </section>
     <aside className="space-y-5">
