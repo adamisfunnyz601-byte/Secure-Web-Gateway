@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useChat } from "@/hooks/use-chat";
@@ -60,6 +60,9 @@ function BlockBlastGame() {
  const [voiceJoined,setVoiceJoined]=useState(false);
  const [muted,setMuted]=useState(true);
  const [stream,setStream]=useState<MediaStream|null>(null);
+ const [voiceParticipants,setVoiceParticipants]=useState<any[]>([]);
+ const peersRef=useRef<Map<number,RTCPeerConnection>>(new Map());
+ const remoteAudioRef=useRef<Map<number,HTMLAudioElement>>(new Map());
 
  useEffect(()=>{localStorage.setItem("bb-personal-best",String(best));},[best]);
  useEffect(()=>{let alive=true;const load=()=>fetch("/api/blockblast/leaderboard",{credentials:"same-origin"}).then(r=>r.ok?r.json():null).then(d=>{if(alive&&d?.entries)setGlobalScores(d.entries);}).catch(()=>{});load();const timer=setInterval(load,30000);return()=>{alive=false;clearInterval(timer);};},[]);
@@ -91,9 +94,57 @@ function BlockBlastGame() {
  };
  const reset=()=>{setBoard(emptyBoard());setPieces(newPieces());setSelected(0);setScore(0);setStreak(0);setCombo(1);setGameOver(false);setClearing([]);};
  const leaderboard=useMemo(()=>[...history].sort((a,b)=>b.score-a.score).slice(0,5),[history]);
- const joinVoice=async()=>{if(!navigator.mediaDevices?.getUserMedia){setVoiceStatus("Your browser does not support microphone access.");return;}try{const media=await navigator.mediaDevices.getUserMedia({audio:true});media.getAudioTracks().forEach(t=>t.enabled=false);setStream(media);setVoiceJoined(true);setMuted(true);setVoiceStatus("Microphone permission granted. No signalling server is configured, so nobody else can hear you.");}catch{setVoiceStatus("Microphone permission was denied or unavailable.");}};
- const leaveVoice=()=>{stream?.getTracks().forEach(t=>t.stop());setStream(null);setVoiceJoined(false);setMuted(true);setVoiceStatus("Voice signalling is not configured on this server");};
+ const sendVoiceSignal=async(to:number,signal:any)=>{await fetch("/api/blockblast/voice/signal",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({to,signal})});};
+ const joinVoice=async()=>{
+  if(!navigator.mediaDevices?.getUserMedia||!window.RTCPeerConnection){setVoiceStatus("This browser does not support WebRTC microphone rooms.");return;}
+  try{
+   const media=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+   media.getAudioTracks().forEach(t=>t.enabled=false);
+   const joined=await fetch("/api/blockblast/voice/join",{method:"POST",credentials:"same-origin"});
+   if(!joined.ok)throw new Error("Could not join the voice room.");
+   const data=await joined.json();setVoiceParticipants(data.participants||[]);setStream(media);setVoiceJoined(true);setMuted(true);setVoiceStatus("Connected to the Block Blast voice room. You are muted.");
+  }catch(error:any){setVoiceStatus(error?.name==="NotAllowedError"?"Microphone permission was denied. Allow microphone access and try again.":error.message||"Could not join voice.");}
+ };
+ const leaveVoice=()=>{
+  fetch("/api/blockblast/voice/leave",{method:"POST",credentials:"same-origin"}).catch(()=>{});
+  peersRef.current.forEach(pc=>pc.close());peersRef.current.clear();
+  remoteAudioRef.current.forEach(audio=>{audio.pause();audio.srcObject=null;audio.remove();});remoteAudioRef.current.clear();
+  stream?.getTracks().forEach(t=>t.stop());setStream(null);setVoiceJoined(false);setVoiceParticipants([]);setMuted(true);setVoiceStatus("You left the voice room.");
+ };
  const toggleMute=()=>{if(!stream)return;const next=!muted;stream.getAudioTracks().forEach(t=>t.enabled=next);setMuted(!next);};
+ useEffect(()=>{
+  if(!voiceJoined||!stream||!user?.id)return;
+  let alive=true;
+  const makePeer=(peerId:number)=>{let pc=peersRef.current.get(peerId);if(pc)return pc;
+   pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+   stream.getTracks().forEach(track=>pc!.addTrack(track,stream));
+   pc.onicecandidate=e=>{if(e.candidate)sendVoiceSignal(peerId,{type:"ice",candidate:e.candidate.toJSON()}).catch(()=>{});};
+   pc.ontrack=e=>{let audio=remoteAudioRef.current.get(peerId);if(!audio){audio=new Audio();audio.autoplay=true;audio.playsInline=true;remoteAudioRef.current.set(peerId,audio);}audio.srcObject=e.streams[0];audio.play().catch(()=>{});};
+   pc.onconnectionstatechange=()=>{if(pc!.connectionState==="failed"||pc!.connectionState==="closed"||pc!.connectionState==="disconnected"){pc!.close();peersRef.current.delete(peerId);}};
+   peersRef.current.set(peerId,pc);return pc;
+  };
+  const poll=async()=>{
+   try{
+    const [participantsResponse,signalsResponse]=await Promise.all([
+     fetch("/api/blockblast/voice/participants",{credentials:"same-origin"}),
+     fetch("/api/blockblast/voice/signals",{credentials:"same-origin"})
+    ]);
+    if(!participantsResponse.ok||!signalsResponse.ok)return;
+    const participants=await participantsResponse.json();const signals=await signalsResponse.json();
+    if(!alive)return;setVoiceParticipants(participants);
+    for(const participant of participants){if(Number(user.id)<Number(participant.userId)&&!peersRef.current.has(Number(participant.userId))){
+      const pc=makePeer(Number(participant.userId));const offer=await pc.createOffer();await pc.setLocalDescription(offer);await sendVoiceSignal(Number(participant.userId),{type:"offer",description:pc.localDescription});
+    }}
+    for(const item of signals){const peerId=Number(item.from);if(item.signal.type==="left"){peersRef.current.get(peerId)?.close();peersRef.current.delete(peerId);const audio=remoteAudioRef.current.get(peerId);audio?.remove();remoteAudioRef.current.delete(peerId);continue;}
+     if(item.signal.type==="offer"){const pc=makePeer(peerId);await pc.setRemoteDescription(new RTCSessionDescription(item.signal.description));const answer=await pc.createAnswer();await pc.setLocalDescription(answer);await sendVoiceSignal(peerId,{type:"answer",description:pc.localDescription});}
+     else if(item.signal.type==="answer"){const pc=peersRef.current.get(peerId);if(pc&&pc.signalingState==="have-local-offer")await pc.setRemoteDescription(new RTCSessionDescription(item.signal.description));}
+     else if(item.signal.type==="ice"){const pc=peersRef.current.get(peerId);if(pc&&item.signal.candidate)await pc.addIceCandidate(new RTCIceCandidate(item.signal.candidate)).catch(()=>{});}
+    }
+   }catch{}
+  };
+  poll();const timer=window.setInterval(poll,1000);
+  return()=>{alive=false;window.clearInterval(timer);};
+ },[voiceJoined,stream,user?.id]);
  const sendMessage=()=>{if(!message.trim())return;sendRoomMessage.mutate({content:message.trim().slice(0,300)});setMessage("");setRoomStatus("Connected to the shared public chat feed");};
  const maxScore=Math.max(best,score);
  return <Layout>
@@ -118,7 +169,7 @@ function BlockBlastGame() {
      <p className="mx-auto mt-3 max-w-[620px] text-center text-[11px] text-slate-500">Tip: clear multiple lines together for bigger combo bonuses.</p>
     </section>
     <aside className="space-y-5">
-     <section className="rounded-2xl border border-white/10 bg-[#111a2b] p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-white"><Mic size={17} className="text-cyan-300"/> Voice room</div><span className="rounded-full bg-amber-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-300">Not connected</span></div><div className="mt-3 rounded-xl border border-white/5 bg-black/20 p-3 text-xs leading-relaxed text-slate-400">{voiceStatus}</div><div className="mt-3 flex gap-2">{!voiceJoined?<button onClick={joinVoice} className="flex-1 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950"><Mic size={14} className="mr-1 inline"/> Allow mic</button>:<><button onClick={toggleMute} className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">{muted?<MicOff size={14} className="mr-1 inline"/>:<Mic size={14} className="mr-1 inline"/>}{muted?"Unmute":"Mute"}</button><button onClick={leaveVoice} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Leave</button></>}</div><div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500"><Users size={14}/> 0 remote participants • WebRTC signalling unavailable</div></section>
+     <section className="rounded-2xl border border-white/10 bg-[#111a2b] p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-white"><Mic size={17} className="text-cyan-300"/> Voice room</div><span className="rounded-full bg-amber-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-300">Not connected</span></div><div className="mt-3 rounded-xl border border-white/5 bg-black/20 p-3 text-xs leading-relaxed text-slate-400">{voiceStatus}</div><div className="mt-3 flex gap-2">{!voiceJoined?<button onClick={joinVoice} className="flex-1 rounded-lg bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950"><Mic size={14} className="mr-1 inline"/> Allow mic</button>:<><button onClick={toggleMute} className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">{muted?<MicOff size={14} className="mr-1 inline"/>:<Mic size={14} className="mr-1 inline"/>}{muted?"Unmute":"Mute"}</button><button onClick={leaveVoice} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">Leave</button></>}</div><div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500"><Users size={14}/> {voiceParticipants.length} other participant(s) • WebRTC mesh</div></section>
      <section className="flex min-h-[320px] flex-col rounded-2xl border border-white/10 bg-[#111a2b] p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold text-white"><MessageCircle size={17} className="text-cyan-300"/> Room chat</div><span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Preview</span></div><div className="mt-2 text-[10px] text-amber-300/80">{roomStatus}</div><div className="mt-3 flex-1 space-y-3 overflow-y-auto">{sharedMessages?.length?sharedMessages.slice(-40).map((m:any)=><div key={m.id}><div className="flex justify-between text-[10px]"><b className="text-cyan-200">{m.senderDisplayName||m.senderNickname||m.senderName}</b><span className="text-slate-600">{new Date(m.createdAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span></div><p className="mt-1 break-words text-xs text-slate-300">{m.content}</p></div>):<div className="flex h-36 flex-col items-center justify-center text-center text-xs text-slate-500"><MessageCircle className="mb-2 h-7 w-7 opacity-40"/>No messages yet</div>}</div><form onSubmit={e=>{e.preventDefault();sendMessage();}} className="mt-3 flex gap-2"><input value={message} onChange={e=>setMessage(e.target.value)} maxLength={300} placeholder="Write a message..." className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-cyan-300/50"/><button aria-label="Send message" className="rounded-lg bg-cyan-300 p-2 text-slate-950"><Send size={15}/></button></form></section>
      <section className="rounded-2xl border border-white/10 bg-[#111a2b] p-4"><div className="flex items-center gap-2 font-bold text-white"><Trophy size={17} className="text-amber-300"/> Your best runs</div><div className="mt-3 space-y-2">{globalScores.length?globalScores.slice(0,5).map((entry:any,i:number)=><div key={entry.userId} className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2"><div className="flex items-center gap-2 text-xs text-slate-400"><span className={i===0?"text-amber-300":"text-slate-600"}>#{entry.rank}</span>{entry.displayName||entry.username}</div><b className="text-sm tabular-nums text-white">{entry.score.toLocaleString()}</b></div>):<p className="py-4 text-center text-xs text-slate-500">No submitted scores this month yet.</p>}</div><p className="mt-3 text-[10px] leading-relaxed text-slate-600">Monthly server-stored scores. Top player earns one month of Dihhro after the month closes.</p></section>
     </aside>
