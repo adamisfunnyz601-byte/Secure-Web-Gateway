@@ -1002,19 +1002,20 @@ export async function registerRoutes(
     if (activeMute && !["unmute","untimeout","unjail","unrestrict"].includes(activeMute.action) && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) {
       return res.status(403).json({ message: "You are currently muted or restricted." });
     }
-    const apiKey = process.env.OLLAMA_API_KEY;
-    if (!apiKey) return res.status(503).json({ message: "NEXUS AI is not configured yet. Add OLLAMA_API_KEY to Replit Secrets." });
+    // Free local Ollama mode: no API key and no cloud endpoint.
+    // Set OLLAMA_BASE_URL only when the Ollama server is reachable from this app server.
+    const ollamaBaseUrl = String(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").trim().replace(/\/+$/, "");
     const visibleMessages = await storage.getMessages(req.session.userId!, recipientId, groupId);
     const history = visibleMessages.slice(0, 14).reverse().map((message: any) => ({
       role: message.senderRole === "bot" ? "assistant" : "user",
       content: `${message.senderName || "Member"}: ${String(message.content || "").slice(0, 1200)}`,
     }));
-    const model = String(process.env.OLLAMA_MODEL || "deepseek-v4.1-flash").trim().slice(0, 100);
+    const model = String(process.env.OLLAMA_MODEL || "qwen2.5:3b").trim().slice(0, 100);
     let answer = "";
     try {
-      const ollamaResponse = await fetch("https://ollama.com/api/chat", {
+      const ollamaResponse = await fetch(`${ollamaBaseUrl}/api/chat`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           stream: false,
@@ -1032,7 +1033,7 @@ export async function registerRoutes(
       if (!answer) throw new Error("The model returned an empty reply.");
     } catch (error: any) {
       console.error("[chat-ai] Ollama request failed:", error?.message || error);
-      return res.status(502).json({ message: error?.message || "NEXUS AI could not reach Ollama. Try again shortly." });
+      return res.status(502).json({ message: "Could not reach local Ollama at " + ollamaBaseUrl + ". Start Ollama and make sure the model '" + model + "' is installed. If this app is hosted on Replit, localhost means the Replit server, not your PC. Details: " + (error?.message || "connection failed") });
     }
     try {
       const bot = await getNexusAiBot();
