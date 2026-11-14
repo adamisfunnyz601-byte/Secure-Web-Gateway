@@ -10,8 +10,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "desktop": "electron .",
-    "desktop:dist": "node ./node_modules/electron-builder/cli.js --win nsis --publish never",
-    "desktop:dir": "node ./node_modules/electron-builder/cli.js --win dir --publish never"
+    "desktop:dist": "node ./node_modules/electron-builder/cli.js --win nsis",
+    "desktop:dir": "node ./node_modules/electron-builder/cli.js --win dir"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
