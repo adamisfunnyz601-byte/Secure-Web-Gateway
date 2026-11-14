@@ -52,7 +52,7 @@ export default function SettingsPage() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto space-y-5">
+      <div className="nexus-page nexus-page-settings max-w-3xl mx-auto space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <SettingsIcon className="w-6 h-6 text-primary" /> Settings
