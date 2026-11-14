@@ -33,7 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="nexus-shell min-h-screen flex flex-col md:flex-row">
-      <header className="nexus-mobilebar md:hidden">
+      <header className="nexus-mobilebar flex md:hidden">
         <button className="nexus-brand-mark" onClick={() => setIsMobileMenuOpen(v => !v)} aria-label="Toggle navigation">
           {isMobileMenuOpen ? <X size={19}/> : <Menu size={19}/>}
         </button>
@@ -44,9 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <AnimatePresence>
         {isMobileMenuOpen && <motion.button aria-label="Close navigation" className="nexus-mobile-scrim md:hidden" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={closeMenu}/>}
       </AnimatePresence>
-      <motion.aside
-        initial={false}
-        animate={{ x: isMobileMenuOpen ? 0 : 0 }}
+      <aside
         className={cn("nexus-sidebar fixed inset-y-0 left-0 z-[60] flex w-[278px] flex-col md:relative md:translate-x-0", isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0")}
       >
         <div className="nexus-brand">
@@ -97,7 +95,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link href="/profile" onClick={closeMenu} className={cn("nexus-profile-link", location === "/profile" && "is-active")}><UserRound size={15}/> Open my profile <span>↗</span></Link>
           <div className="nexus-footer-meta"><span>● ALL SYSTEMS NOMINAL</span><span>SECURE SESSION</span></div>
         </div>
-      </motion.aside>
+      </aside>
 
       <main className="nexus-main flex min-w-0 flex-1 flex-col">
         <header className="nexus-topbar hidden h-[58px] shrink-0 items-center justify-between px-7 md:flex">
