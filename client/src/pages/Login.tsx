@@ -294,13 +294,13 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="nexus-auth-screen min-h-screen flex items-center justify-center p-4"
       style={{
         background:
           "linear-gradient(135deg, hsl(228 7% 13%) 0%, hsl(261 30% 12%) 50%, hsl(228 7% 13%) 100%)"
       }}
     >
-      <div className="w-full max-w-md">
+      <div className="nexus-auth-card w-full max-w-md">
 
         {/* Logo */}
         <div className="text-center mb-8">
