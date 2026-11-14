@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag, Gamepad2, Users, ScrollText } from "lucide-react";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./ProfileModal";
 import { UserProfileTag } from "./UserProfileTag";
@@ -35,7 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col md:flex-row" style={{ background: "hsl(var(--background))" }}>
       {/* Mobile header */}
       <div className="md:hidden border-b border-border p-3 flex justify-between items-center"
-        style={{ background: "hsl(225 7% 17%)" }}>
+        style={{ background: "hsl(var(--sidebar-bg) / .94)", borderRight: "1px solid hsl(var(--border) / .7)", backdropFilter: "blur(18px)" }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
             <Cpu className="w-4 h-4 text-primary" />
@@ -89,7 +90,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User panel */}
-        <div className="p-3 border-t border-border/60" style={{ background: "hsl(220 8% 13%)" }}>
+        <div className="p-3 border-t border-border/60" style={{ background: "hsl(var(--sidebar-dark) / .72)" }}>
           <div className="flex items-center gap-3 px-1 mb-3">
             <Avatar
               url={user?.avatarUrl}
@@ -141,7 +142,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-hidden relative flex flex-col h-[calc(100vh-57px)] md:h-screen">
         {/* Top bar */}
         <header className="h-12 border-b border-border/60 flex items-center px-5 justify-between shrink-0"
-          style={{ background: "hsl(228 7% 20%)" }}>
+          style={{ background: "hsl(var(--surface-1) / .72)", backdropFilter: "blur(18px)" }}>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full status-online" />
             <span className="text-xs font-medium text-muted-foreground">System Online</span>
