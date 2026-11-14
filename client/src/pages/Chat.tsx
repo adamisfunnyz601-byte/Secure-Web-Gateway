@@ -471,7 +471,7 @@ const TerminalMessage = ({
         {dihhroGiftMatch && <a href={dihhroGiftMatch[0]} target="_blank" rel="noreferrer" className="mt-3 block max-w-sm rounded-xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/10 p-3 no-underline transition hover:border-fuchsia-300/60"><div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-fuchsia-200"><Gift className="h-4 w-4"/> NEXUS DIHHRO GIFT</div><div className="mt-1 text-sm font-bold text-white">Claim Dihhro for 1 month!</div><div className="mt-1 text-[10px] text-fuchsia-100/60">Single-use gift · Open to claim</div></a>}
         {getMediaSection()}
         {msg.mediaType === "poll" && poll && <ChatPollCard poll={poll} onVote={onVote}/>}
-        {Number(msg.id)>0 && <div className="chat-reactions mt-2 flex flex-wrap items-center gap-1.5">
+        {Number(msg.id)>0 && reactions.length > 0 && <div className="chat-reactions mt-1.5 flex flex-wrap items-center gap-1.5">
           {reactions.map((reaction:any)=><button key={reaction.emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),reaction.emoji)} title={reaction.userIds?.length ? `Reacted by ${reaction.userIds.length} member(s)` : "React"} className={cn("rounded-full border px-2 py-1 text-[11px] transition-all hover:-translate-y-0.5",reaction.userIds?.includes?.(currentUserId)?"border-violet-300/50 bg-violet-400/15 text-violet-100":"border-white/10 bg-black/20 text-white/65 hover:border-violet-300/30")}>{reaction.emoji} <span className="ml-1 text-[9px]">{reaction.count}</span></button>)}
         </div>}
 
@@ -740,7 +740,17 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   const hasInitializedSfxRef = useRef(false);
 
   // --- DATA FETCHING ---
-  const { data: groups = [] } = useQuery<any[]>({ queryKey: ['/api/chat/groups'] });
+  const { data: groups = [] } = useQuery<any[]>({
+    queryKey: ['/api/chat/groups'],
+    queryFn: async () => {
+      const response = await fetch('/api/chat/groups', { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not load your group chats');
+      return response.json();
+    },
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
   const { data: callEmoteInventory = [] } = useQuery<any[]>({
     queryKey: ["/api/shop/inventory"],
     queryFn: async () => { const response = await fetch("/api/shop/inventory", { credentials: "same-origin" }); return response.ok ? response.json() : []; },
