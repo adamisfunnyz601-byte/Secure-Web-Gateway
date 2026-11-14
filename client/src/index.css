@@ -509,10 +509,10 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
 .nexus-page input:focus,.nexus-page textarea:focus,.nexus-page select:focus {transform:translateY(-1px)}
 .nexus-page img:not([data-no-hover]) {transition:filter .25s,transform .3s cubic-bezier(.2,.8,.2,1)}
 .nexus-page button:hover img {transform:scale(1.035)}
-.nexus-page [class*="grid"] > * {animation:nexus-card-enter .42s cubic-bezier(.2,.8,.2,1) both}
-.nexus-page [class*="grid"] > *:nth-child(2n){animation-delay:35ms}
-.nexus-page [class*="grid"] > *:nth-child(3n){animation-delay:70ms}
-.nexus-page [class*="grid"] > *:nth-child(4n){animation-delay:105ms}
+.nexus-page:not(.nexus-page-arcade) [class*="grid"] > * {animation:nexus-card-enter .42s cubic-bezier(.2,.8,.2,1) both}
+.nexus-page:not(.nexus-page-arcade) [class*="grid"] > *:nth-child(2n){animation-delay:35ms}
+.nexus-page:not(.nexus-page-arcade) [class*="grid"] > *:nth-child(3n){animation-delay:70ms}
+.nexus-page:not(.nexus-page-arcade) [class*="grid"] > *:nth-child(4n){animation-delay:105ms}
 .nexus-page [class*="divide-y"] > * {animation:nexus-row-in .32s ease both}
 .nexus-page [class*="flex-wrap"] > button,.nexus-page [class*="gap-2"] > button {transition:transform .2s,filter .2s,box-shadow .2s}
 .nexus-page [class*="flex-wrap"] > button:hover {transform:translateY(-2px)}
@@ -550,7 +550,7 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
 .nexus-page .animate-ping {animation:nexus-soft-pulse 1.3s ease-out infinite}
 .nexus-page .nexus-btn--glow:hover,.nexus-page .nexus-btn--mint:hover {filter:saturate(1.2) brightness(1.1)}
 @media(prefers-reduced-motion:reduce){
- .nexus-page > *, .nexus-page section, .nexus-page [class*="grid"] > *, .nexus-page [class*="divide-y"] > *,
+ .nexus-page > *, .nexus-page section, .nexus-page:not(.nexus-page-arcade) [class*="grid"] > *, .nexus-page [class*="divide-y"] > *,
  .nexus-page .rounded-full[class*="border"],.nexus-page:before {animation:none!important}
  .nexus-page * {scroll-behavior:auto!important;transition:none!important}
 }
