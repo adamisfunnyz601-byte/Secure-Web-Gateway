@@ -2549,7 +2549,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
               className="w-full max-w-2xl max-h-[82vh] overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[#10091b]/95 shadow-[0_20px_80px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)] flex flex-col"
             >
               <div className="flex items-center justify-between border-b border-violet-400/15 px-5 py-4">
-                <div className="flex items-center gap-2"><Film className="w-5 h-5 text-fuchsia-300" /><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">GIF LIBRARY</div><div className="mt-1 text-[10px] text-violet-100/45">Search public GIF files from Wikimedia Commons.</div></div></div>
+                <div className="flex items-center gap-2"><Film className="w-5 h-5 text-fuchsia-300" /><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">GIF LIBRARY</div><div className="mt-1 text-[10px] text-violet-100/45">Search animated reactions with GIPHY.</div></div></div>
                 <button onClick={() => setShowGifPicker(false)} className="rounded-lg p-2 text-violet-200/60 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
               </div>
               <form onSubmit={e => { e.preventDefault(); searchGifs(); }} className="flex gap-2 p-4 border-b border-violet-400/10">
