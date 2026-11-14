@@ -310,7 +310,7 @@ export async function registerRoutes(
     }
     next();
   };
-  const chatAiRateLimit = rateLimit({ windowMs: 60_000, limit: 5, keyGenerator: (req: Request) => String(req.session.userId || req.ip), standardHeaders: true, legacyHeaders: false, message: { message: "The chat AI is busy. Please wait a minute before asking again." } });
+  const chatAiRateLimit = rateLimit({ windowMs: 60_000, limit: 5, keyGenerator: (req: Request) => String(req.session.userId), standardHeaders: true, legacyHeaders: false, message: { message: "The chat AI is busy. Please wait a minute before asking again." } });
   let nexusAiBotPromise: Promise<any> | null = null;
   const getNexusAiBot = async () => {
     if (!nexusAiBotPromise) {
