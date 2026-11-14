@@ -12,7 +12,7 @@ export default function MyProfile() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-3xl">
+      <div className="nexus-page nexus-page-profile mx-auto max-w-3xl">
         <div className="mb-4">
           <h1 className="text-xl font-bold text-foreground">My Profile</h1>
           <p className="text-sm text-muted-foreground">View and edit your public profile, appearance and badges.</p>
