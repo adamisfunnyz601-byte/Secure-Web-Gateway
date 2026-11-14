@@ -116,7 +116,7 @@ export default function Hangouts(){
     if(!response.ok){const data=await response.json().catch(()=>({}));setError(data.message||"Message could not be sent.");}
   };
   const currentTheme=themes.find(item=>item.id===room?.theme)||themes[0];
-  return <Layout><div className="mx-auto max-w-7xl space-y-5">
+  return <Layout><div className="nexus-page nexus-page-hangouts mx-auto max-w-7xl space-y-5">
     <header className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-950 via-slate-950 to-cyan-950 p-5 md:p-7">
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-violet-300"><Gamepad2 className="h-4 w-4"/> NEXUS SOCIAL WORLDS</div>
       <h1 className="mt-2 text-3xl font-black text-white md:text-4xl">Hang out together.</h1>
