@@ -315,8 +315,21 @@ export async function registerRoutes(
   const getNexusAiBot = async () => {
     if (!nexusAiBotPromise) {
       nexusAiBotPromise = (async () => {
-        const [existing] = await db.select().from(users).where(and(eq(users.username, "nexus_ai_system"), eq(users.role, "bot"))).limit(1);
-        if (existing) return existing;
+        // Reuse the reserved AI username even if an earlier deployment created it
+        // with the default "user" role; otherwise the client hides it from the AI DM list.
+        const [existing] = await db.select().from(users).where(eq(users.username, "nexus_ai_system")).limit(1);
+        if (existing) {
+          if (existing.role !== "bot" || existing.displayName !== "NEXUS AI") {
+            const [updated] = await db.update(users).set({
+              role: "bot",
+              displayName: "NEXUS AI",
+              bio: "The public NEXUS chat assistant.",
+              presenceStatus: "online",
+            }).where(eq(users.id, existing.id)).returning();
+            return updated;
+          }
+          return existing;
+        }
         const [created] = await db.insert(users).values({
           username: "nexus_ai_system",
           serialKey: "NEXUS_AI_SYSTEM_" + randomBytes(24).toString("hex"),
@@ -1140,7 +1153,7 @@ export async function registerRoutes(
   app.post("/api/chat/messages/:id/reactions", requireAuth, async (req, res) => {
     const messageId = Number(req.params.id);
     const emoji = typeof req.body?.emoji === "string" ? req.body.emoji : "";
-    const allowedEmojis = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "😭", "💀"];
+    const allowedEmojis = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "😭", "💀", "😍", "🥳", "🤔", "👏", "😮", "😢", "💯", "🙏"];
     if (!Number.isInteger(messageId) || messageId <= 0 || !allowedEmojis.includes(emoji)) return res.status(400).json({ message: "Choose a valid reaction." });
     const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
     if (!message) return res.status(404).json({ message: "Message not found." });
@@ -1451,8 +1464,15 @@ export async function registerRoutes(
   app.get(api.chat.users.path, requireAuth, async (req, res) => {
     // Ensure the NEXUS AI bot account exists before the client builds its DM list.
     await getNexusAiBot();
+    const bot = await getNexusAiBot();
     const usersList = await storage.getAllUsers();
-    res.json(usersList.map(safeUser));
+    // Guarantee the AI member is present in the response even if a stale user query
+    // or a concurrent account-creation request briefly returned an older list.
+    const withBot = usersList.some((user: any) => user.id === bot.id)
+      ? usersList
+      : [...usersList, bot];
+    res.setHeader("Cache-Control", "no-store");
+    res.json(withBot.map(safeUser));
   });
 
   // === FRIENDS & BLOCKS ===
