@@ -391,7 +391,7 @@ const TerminalMessage = ({
   const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
-    <div className={cn("flex mb-5 group gap-2", isMe ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("flex mb-5 group gap-2 message-motion", `message-motion-${Math.abs(Number(msg.id) || 0) % 120}`, isMe ? "flex-row-reverse" : "flex-row")}>
       <Avatar
         url={msg.senderAvatarUrl}
         name={msg.senderName}
