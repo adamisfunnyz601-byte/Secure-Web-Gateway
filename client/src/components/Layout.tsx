@@ -15,7 +15,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/proxy",   label: "Net Proxy",    icon: Globe },
-    { href: "/chat",    label: "Messages",      icon: MessageSquare },\n    { href: "/servers", label: "Servers", icon: Server },
+    { href: "/chat",    label: "Messages",      icon: MessageSquare },
+    { href: "/servers", label: "Servers", icon: Server },
     { href: "/history", label: "History",       icon: History },
     { href: "/updates", label: "Update Logs",   icon: ScrollText },
     { href: "/settings", label: "Settings",     icon: Settings },
@@ -153,9 +154,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <motion.div className="flex-1 overflow-y-auto p-4 md:p-6" variants={motionPresets.page.variants} initial="hidden" animate="visible" transition={motionPresets.page.transition}>
           {children}
-        </div>
+        </motion.div>
       </main>
 
       {/* Mobile overlay */}
