@@ -29,9 +29,7 @@ import { EmojiButton } from "@/components/EmojiPicker";
 // ============================================================
 const SESSION_CRYPT = "X-256-CHA-CHA-POLY";
 
-// Wikimedia Commons public media search. No API key required; GIFs are served
-// from Commons file URLs rather than the previous GifCities endpoint.
-const GIF_API_BASE = "https://commons.wikimedia.org/w/api.php";
+// GIF search is proxied through the server so the GIPHY API key stays private.
 
 const DEFAULT_SOUNDS = [
   { id: 'S1', name: 'Neural ping', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
@@ -930,8 +928,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   };
 
   // ============================================================
-  // GIF PICKER (Wikimedia Commons public media API)
-  // Searches openly licensed/publicly hosted GIF files without an API key.
+  // GIF PICKER (GIPHY API via authenticated server proxy)
   // ============================================================
   const searchGifs = async (query = gifSearch) => {
     const term = query.trim() || "reaction";
@@ -942,45 +939,20 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     setGifError("");
     setGifResults([]);
     try {
-      const params = new URLSearchParams({
-        action: "query",
-        format: "json",
-        origin: "*",
-        generator: "search",
-        gsrnamespace: "6",
-        gsrlimit: "30",
-        gsrsearch: `${term} filemime:image/gif`,
-        prop: "imageinfo",
-        iiprop: "url|mime",
-        iiurlwidth: "480",
-      });
-      const response = await fetch(`${GIF_API_BASE}?${params.toString()}`, {
-        method: "GET",
+      const params = new URLSearchParams({ q: term, limit: "24" });
+      const response = await fetch(`/api/gifs/search?${params.toString()}`, {
+        credentials: "same-origin",
         headers: { Accept: "application/json" },
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`GIF search failed (HTTP ${response.status}). Please try again.`);
-      const payload = await response.json();
-      if (payload?.error) throw new Error(payload.error.info || "The GIF provider returned an error.");
-      const pages = Object.values(payload?.query?.pages || {}) as any[];
-      const results = pages.map((page: any) => {
-        const info = page?.imageinfo?.[0];
-        const url = info?.url;
-        if (!url || info?.mime !== "image/gif" || !/^https:\/\//i.test(url)) return null;
-        return {
-          id: String(page.pageid || url),
-          title: String(page.title || "Wikimedia Commons GIF").replace(/^File:/, ""),
-          url,
-          previewUrl: info.thumburl || url,
-          sourceUrl: page.descriptionurl || "https://commons.wikimedia.org/",
-          license: "Wikimedia Commons · check file licence",
-        };
-      }).filter(Boolean);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.message || `GIF search failed (HTTP ${response.status}).`);
+      const results = Array.isArray(payload?.data) ? payload.data : [];
       setGifResults(results);
-      if (!results.length) setGifError("No matching GIFs found. Try a shorter search such as cat, dance, reaction or funny.");
+      if (!results.length) setGifError("No matching GIFs found. Try another search.");
     } catch (error: any) {
       if (error?.name !== "AbortError") {
-        setGifError(error?.message || "Couldn't reach Wikimedia Commons. Try again shortly.");
+        setGifError(error?.message || "Couldn't reach GIPHY. Please try again.");
       }
     } finally {
       if (gifSearchAbortRef.current === controller) {
@@ -2601,7 +2573,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                   </div>
                 </div>
               )}
-              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by Wikimedia Commons · Public media API, no API key required.</div>
+              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by GIPHY.</div>
             </motion.div>
           </motion.div>
         )}
