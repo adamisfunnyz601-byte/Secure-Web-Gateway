@@ -1839,7 +1839,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   // ============================================================
   return (
     <Layout>
-      <div className="relative isolate flex h-[calc(100vh-140px)] gap-4 overflow-hidden rounded-2xl border border-violet-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(124,58,237,0.13),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(217,70,239,0.08),transparent_40%),#07040d] p-2 shadow-[0_0_50px_rgba(91,33,182,0.10)]">
+      <div className="nexus-page nexus-page-chat relative isolate flex h-[calc(100vh-140px)] gap-4 overflow-hidden rounded-2xl border border-violet-500/15 bg-[radial-gradient(ellipse_at_top_left,rgba(124,58,237,0.13),transparent_45%),radial-gradient(ellipse_at_bottom_right,rgba(217,70,239,0.08),transparent_40%),#07040d] p-2 shadow-[0_0_50px_rgba(91,33,182,0.10)]">
 
 
         <AnimatePresence>
