@@ -558,3 +558,21 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
  .nexus-page section,.nexus-page .app-surface,.nexus-page .discord-card {border-radius:15px}
  .nexus-page h1 {font-size:clamp(1.55rem,7vw,2.1rem)}
 }
+
+/* Auth, profile and staff surfaces share the same NEXUS finish. */
+.nexus-auth-screen {position:relative;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,rgba(137,108,255,.2),transparent 48%),radial-gradient(ellipse at 85% 85%,rgba(48,204,190,.09),transparent 38%),#0b0d17!important}
+.nexus-auth-screen:before,.nexus-auth-screen:after {content:"";position:absolute;z-index:-1;pointer-events:none;border:1px solid rgba(169,148,255,.12);border-radius:50%;animation:nexus-ring 34s linear infinite}
+.nexus-auth-screen:before {width:min(75vw,760px);aspect-ratio:1;top:-45%;left:-15%;box-shadow:0 0 100px rgba(131,103,255,.08),inset 0 0 80px rgba(131,103,255,.04)}
+.nexus-auth-screen:after {width:min(55vw,560px);aspect-ratio:1;right:-12%;bottom:-40%;animation-direction:reverse;border-color:rgba(69,211,190,.12)}
+.nexus-auth-card {position:relative;padding:clamp(22px,4vw,34px);border:1px solid rgba(174,155,255,.18);border-radius:24px;background:linear-gradient(145deg,rgba(25,26,45,.94),rgba(12,15,27,.97));box-shadow:0 28px 90px rgba(0,0,0,.42),0 0 55px rgba(127,99,255,.1),inset 0 1px rgba(255,255,255,.06);backdrop-filter:blur(24px);animation:nexus-pop-in .6s cubic-bezier(.2,.8,.2,1) both}
+.nexus-auth-card:before {content:"";position:absolute;inset:0 18% auto;height:1px;background:linear-gradient(90deg,transparent,rgba(192,174,255,.7),transparent)}
+.nexus-auth-screen button {transition:transform .2s,filter .2s,box-shadow .2s}
+.nexus-auth-screen button:hover:not(:disabled) {transform:translateY(-2px);filter:brightness(1.1)}
+.nexus-auth-screen input:focus {box-shadow:0 0 0 3px rgba(151,126,255,.15),0 0 22px rgba(151,126,255,.1)}
+.nexus-page-admin {--page-accent:251,113,133}
+.nexus-page-profile {--page-accent:139,92,246}
+.nexus-page-admin [role="tablist"],.nexus-page-settings [role="tablist"] {padding:4px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.025)}
+.nexus-page-admin [role="tab"],.nexus-page-settings [role="tab"] {border-radius:9px;transition:background .2s,color .2s,box-shadow .2s}
+.nexus-page-admin [role="tab"][data-state="active"],.nexus-page-settings [role="tab"][data-state="active"] {background:rgba(143,116,255,.16);box-shadow:inset 0 0 0 1px rgba(173,151,255,.15)}
+.nexus-page-profile [role="dialog"] {border-color:rgba(170,147,255,.22);box-shadow:0 28px 80px rgba(0,0,0,.45),0 0 40px rgba(131,103,255,.08)}
+@media(prefers-reduced-motion:reduce){.nexus-auth-screen:before,.nexus-auth-screen:after,.nexus-auth-card{animation:none!important}}
