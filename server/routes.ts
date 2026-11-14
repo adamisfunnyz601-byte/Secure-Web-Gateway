@@ -2023,5 +2023,151 @@ export async function registerRoutes(
     res.json({success:true});
   });
 
+
+  // === COMMUNITY SERVERS (separate from legacy group chats) ===
+  const serverAccess = async (serverId: number, userId: number) => {
+    const [server] = await db.select().from(communityServers).where(eq(communityServers.id, serverId)).limit(1);
+    if (!server) return { server: null, member: null };
+    const [member] = await db.select().from(communityServerMembers).where(and(eq(communityServerMembers.serverId, serverId), eq(communityServerMembers.userId, userId))).limit(1);
+    return { server, member: member || null };
+  };
+  const canManageServer = (server: any, member: any) => Boolean(member && (server.ownerId === member.userId || ["owner", "admin"].includes(member.role)));
+
+  app.get("/api/servers", requireAuth, async (req, res) => {
+    const userId = Number(req.session.userId);
+    const rows = await db.select({
+      id: communityServers.id, name: communityServers.name, description: communityServers.description,
+      visibility: communityServers.visibility, inviteCode: communityServers.inviteCode,
+      ownerId: communityServers.ownerId, role: communityServerMembers.role,
+    }).from(communityServers).leftJoin(communityServerMembers, and(eq(communityServerMembers.serverId, communityServers.id), eq(communityServerMembers.userId, userId)))
+      .where(or(eq(communityServers.visibility, "public"), eq(communityServerMembers.userId, userId))).orderBy(desc(communityServers.createdAt));
+    res.set("Cache-Control", "private, no-store");
+    res.json(rows);
+  });
+
+  app.post("/api/servers", requireAuth, async (req, res) => {
+    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const description = typeof req.body?.description === "string" ? req.body.description.trim().slice(0, 500) : "";
+    const visibility = req.body?.visibility === "public" ? "public" : "private";
+    if (name.length < 2 || name.length > 48) return res.status(400).json({ message: "Server names must be 2–48 characters." });
+    const ownerId = Number(req.session.userId);
+    try {
+      const created = await db.transaction(async (tx) => {
+        const [server] = await tx.insert(communityServers).values({ name, description, visibility, ownerId, inviteCode: randomBytes(5).toString("hex").toUpperCase() }).returning();
+        await tx.insert(communityServerMembers).values({ serverId: server.id, userId: ownerId, role: "owner" });
+        const [category] = await tx.insert(communityServerCategories).values({ serverId: server.id, name: "GENERAL", position: 0 }).returning();
+        await tx.insert(communityServerChannels).values({ serverId: server.id, categoryId: category.id, name: "general", type: "text", position: 0 });
+        return server;
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("[servers] create failed:", error);
+      res.status(500).json({ message: "Could not create the server. Please try again." });
+    }
+  });
+
+  app.get("/api/servers/:id", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id);
+    if (!Number.isInteger(serverId) || serverId < 1) return res.status(400).json({ message: "Invalid server." });
+    const { server, member } = await serverAccess(serverId, Number(req.session.userId));
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (server.visibility !== "public" && !member) return res.status(403).json({ message: "Join this private server to view it." });
+    const categories = await db.select().from(communityServerCategories).where(eq(communityServerCategories.serverId, serverId)).orderBy(communityServerCategories.position);
+    const channels = await db.select().from(communityServerChannels).where(eq(communityServerChannels.serverId, serverId)).orderBy(communityServerChannels.position);
+    const members = await db.select({
+      userId: communityServerMembers.userId, role: communityServerMembers.role,
+      username: users.username, avatarUrl: users.avatarUrl, presenceStatus: users.presenceStatus,
+    }).from(communityServerMembers).innerJoin(users, eq(users.id, communityServerMembers.userId)).where(eq(communityServerMembers.serverId, serverId));
+    res.set("Cache-Control", "private, no-store");
+    res.json({ server, member, categories, channels, members });
+  });
+
+  app.post("/api/servers/join", requireAuth, async (req, res) => {
+    const code = typeof req.body?.inviteCode === "string" ? req.body.inviteCode.trim().toUpperCase() : "";
+    if (!/^[A-F0-9]{10}$/.test(code)) return res.status(400).json({ message: "Enter a valid server invite code." });
+    const [server] = await db.select().from(communityServers).where(eq(communityServers.inviteCode, code)).limit(1);
+    if (!server) return res.status(404).json({ message: "That server invite was not found." });
+    await db.insert(communityServerMembers).values({ serverId: server.id, userId: Number(req.session.userId), role: "member" }).onConflictDoNothing();
+    res.json({ success: true, serverId: server.id });
+  });
+
+  app.post("/api/servers/:id/join", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id);
+    if (!Number.isInteger(serverId) || serverId < 1) return res.status(400).json({ message: "Invalid server." });
+    const [server] = await db.select().from(communityServers).where(eq(communityServers.id, serverId)).limit(1);
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (server.visibility !== "public") return res.status(403).json({ message: "This server requires an invite code." });
+    await db.insert(communityServerMembers).values({ serverId, userId: Number(req.session.userId), role: "member" }).onConflictDoNothing();
+    res.json({ success: true, serverId });
+  });
+
+  app.post("/api/servers/:id/leave", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id), userId = Number(req.session.userId);
+    const { server, member } = await serverAccess(serverId, userId);
+    if (!server || !member) return res.status(404).json({ message: "Server membership not found." });
+    if (server.ownerId === userId) return res.status(400).json({ message: "Transfer ownership or delete the server before leaving." });
+    await db.delete(communityServerMembers).where(and(eq(communityServerMembers.serverId, serverId), eq(communityServerMembers.userId, userId)));
+    res.json({ success: true });
+  });
+
+  app.patch("/api/servers/:id", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id);
+    const { server, member } = await serverAccess(serverId, Number(req.session.userId));
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (!canManageServer(server, member)) return res.status(403).json({ message: "You cannot manage this server." });
+    const changes: { name?: string; description?: string; visibility?: string } = {};
+    if (typeof req.body?.name === "string") {
+      const name = req.body.name.trim();
+      if (name.length < 2 || name.length > 48) return res.status(400).json({ message: "Server names must be 2–48 characters." });
+      changes.name = name;
+    }
+    if (typeof req.body?.description === "string") changes.description = req.body.description.trim().slice(0, 500);
+    if (["public", "private"].includes(req.body?.visibility)) changes.visibility = req.body.visibility;
+    if (!Object.keys(changes).length) return res.status(400).json({ message: "No valid server settings supplied." });
+    const [updated] = await db.update(communityServers).set(changes).where(eq(communityServers.id, serverId)).returning();
+    res.json(updated);
+  });
+
+  app.delete("/api/servers/:id", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id), userId = Number(req.session.userId);
+    const { server } = await serverAccess(serverId, userId);
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (server.ownerId !== userId) return res.status(403).json({ message: "Only the server owner can delete it." });
+    await db.delete(communityServers).where(eq(communityServers.id, serverId));
+    res.json({ success: true });
+  });
+
+  app.post("/api/servers/:id/categories", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id);
+    const { server, member } = await serverAccess(serverId, Number(req.session.userId));
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (!canManageServer(server, member)) return res.status(403).json({ message: "You cannot manage channels." });
+    const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 40) : "";
+    if (!name) return res.status(400).json({ message: "Category name is required." });
+    const [category] = await db.insert(communityServerCategories).values({ serverId, name, position: Date.now() % 100000000 }).returning();
+    res.status(201).json(category);
+  });
+
+  app.post("/api/servers/:id/channels", requireAuth, async (req, res) => {
+    const serverId = Number(req.params.id);
+    const { server, member } = await serverAccess(serverId, Number(req.session.userId));
+    if (!server) return res.status(404).json({ message: "Server not found." });
+    if (!canManageServer(server, member)) return res.status(403).json({ message: "You cannot manage channels." });
+    const name = typeof req.body?.name === "string" ? req.body.name.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 48) : "";
+    const type = ["text", "voice", "announcement", "forum", "media"].includes(req.body?.type) ? req.body.type : "text";
+    const categoryId = req.body?.categoryId == null ? null : Number(req.body.categoryId);
+    if (!name) return res.status(400).json({ message: "Channel name is required." });
+    if (categoryId !== null) {
+      const [category] = await db.select({ id: communityServerCategories.id }).from(communityServerCategories).where(and(eq(communityServerCategories.id, categoryId), eq(communityServerCategories.serverId, serverId))).limit(1);
+      if (!category) return res.status(400).json({ message: "Choose a category from this server." });
+    }
+    const [channel] = await db.insert(communityServerChannels).values({
+      serverId, categoryId, name, type,
+      topic: typeof req.body?.topic === "string" ? req.body.topic.trim().slice(0, 160) : "",
+      position: Date.now() % 100000000,
+    }).returning();
+    res.status(201).json(channel);
+  });
+
   return httpServer;
 }
