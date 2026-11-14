@@ -630,3 +630,14 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
 .nexus-page-chat .chat-reply-composer>div{animation:chat-reply-pulse 3.4s ease-in-out infinite}
 @media(max-width:767px){.nexus-page-chat{height:calc(100dvh - 76px)!important;min-height:420px}.nexus-page-chat .chat-composer{padding:9px}.nexus-page-chat .chat-composer form{gap:5px}.nexus-page-chat .chat-composer form>button{flex-shrink:0}.nexus-page-chat .chat-message-bubble{max-width:min(84vw,34rem)}}
 @media(prefers-reduced-motion:reduce){.nexus-page-chat .chat-reply-composer>div,.nexus-page-chat .chat-command-menu{animation:none!important}}
+
+/* Interactive chat polls and reaction chips */
+.nexus-page-chat .chat-reactions{min-height:25px;opacity:.82;transition:opacity .2s}
+.nexus-page-chat .chat-message-row:hover .chat-reactions{opacity:1}
+.nexus-page-chat .chat-reactions button{transform:translateY(0);transition:transform .18s cubic-bezier(.2,.8,.2,1),background .18s,border-color .18s,box-shadow .18s}
+.nexus-page-chat .chat-reactions button:active{transform:scale(.9)}
+.nexus-page-chat .chat-poll-card{box-shadow:inset 0 1px rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.16);animation:chat-menu-in .25s ease both}
+.nexus-page-chat .chat-poll-card button:hover{box-shadow:0 5px 18px rgba(139,92,246,.1)}
+.nexus-page-chat .chat-command-menu{max-height:min(64vh,520px);overflow:hidden}
+.nexus-page-chat .chat-command-menu kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(prefers-reduced-motion:reduce){.nexus-page-chat .chat-poll-card{animation:none!important}}
