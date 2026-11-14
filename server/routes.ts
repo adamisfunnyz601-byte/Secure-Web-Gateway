@@ -989,10 +989,8 @@ export async function registerRoutes(
     const recipientId = req.body?.recipientId == null ? undefined : Number(req.body.recipientId);
     const groupId = req.body?.groupId == null ? undefined : Number(req.body.groupId);
     if (!prompt) return res.status(400).json({ message: "Write a question for NEXUS AI first." });
-    if (recipientId && groupId) return res.status(400).json({ message: "Choose one chat channel." });
-    if (recipientId !== undefined && (!Number.isInteger(recipientId) || recipientId <= 0 || recipientId === req.session.userId)) return res.status(400).json({ message: "Invalid DM recipient." });
+    if (recipientId !== undefined) return res.status(400).json({ message: "NEXUS AI is available in Global Chat and group chats, not private DMs." });
     if (groupId !== undefined && (!Number.isInteger(groupId) || groupId <= 0)) return res.status(400).json({ message: "Invalid group." });
-    if (recipientId && await blockedEitherWay(req.session.userId!, recipientId)) return res.status(403).json({ message: "Messaging is unavailable for this user." });
     if (groupId) {
       const [membership] = await db.select({ id: groupChatMembers.id }).from(groupChatMembers)
         .where(and(eq(groupChatMembers.groupId, groupId), eq(groupChatMembers.userId, req.session.userId!))).limit(1);
