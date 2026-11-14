@@ -136,7 +136,43 @@ export const groupChatMembers = pgTable("group_chat_members", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
-// OAuth identities are kept separate from usernames and legacy access-key accounts.
+
+/* Persistent community servers. Kept separate from legacy group chats. */
+export const communityServers = pgTable("community_servers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  visibility: text("visibility").notNull().default("private"),
+  inviteCode: text("invite_code").notNull().unique(),
+  ownerId: integer("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const communityServerMembers = pgTable("community_server_members", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull().references(() => communityServers.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+}, (table) => ({
+  serverMemberUnique: uniqueIndex("community_server_member_unique").on(table.serverId, table.userId),
+}));
+export const communityServerCategories = pgTable("community_server_categories", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull().references(() => communityServers.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+});
+export const communityServerChannels = pgTable("community_server_channels", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull().references(() => communityServers.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id").references(() => communityServerCategories.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("text"),
+  topic: text("topic").notNull().default(""),
+  position: integer("position").notNull().default(0),
+  isLocked: boolean("is_locked").notNull().default(false),
+});
+\n// OAuth identities are kept separate from usernames and legacy access-key accounts.
 export const oauthAccounts = pgTable("oauth_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
