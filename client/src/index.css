@@ -6,20 +6,20 @@
 
 :root {
   /* Discord-inspired palette with rich variety */
-  --background: 228 7% 20%;        /* #2f3136 Discord main bg */
-  --sidebar-bg: 225 7% 17%;        /* #2b2d31 sidebar */
-  --sidebar-dark: 220 8% 13%;      /* #1e1f22 darkest sidebar */
+  --background: 232 24% 9%;        /* deep graphite */
+  --sidebar-bg: 232 23% 11%;
+  --sidebar-dark: 234 26% 7%;
 
-  --foreground: 220 13% 88%;       /* #dcddde Discord text */
+  --foreground: 225 24% 94%;
 
-  --primary: 261 80% 68%;          /* #8b5cf6 violet / indigo */
+  --primary: 258 88% 70%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 228 8% 26%;         /* #3c3f45 elevated surface */
+  --secondary: 232 19% 16%;
   --secondary-foreground: 220 13% 78%;
 
-  --muted: 228 7% 30%;
-  --muted-foreground: 220 7% 58%;  /* #949ba4 muted text */
+  --muted: 232 16% 20%;
+  --muted-foreground: 224 12% 62%;
 
   --accent: 175 66% 47%;           /* #26c0a5 teal / emerald accent */
   --accent-foreground: 0 0% 100%;
@@ -33,11 +33,11 @@
   --destructive: 0 80% 58%;        /* #e84040 red */
   --destructive-foreground: 0 0% 100%;
 
-  --border: 225 6% 28%;
-  --input: 228 8% 15%;
+  --border: 230 18% 23%;
+  --input: 232 22% 12%;
   --ring: 261 80% 68%;
 
-  --radius: 6px;
+  --radius: 12px;
 
   --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Inter', sans-serif;
@@ -157,3 +157,48 @@
 }
 
 .font-comic-sans { font-family: 'Comic Sans MS', 'Comic Sans', cursive !important; }
+
+
+/* NEXUS interface foundation — layered surfaces, restrained colour and motion. */
+:root {
+  color-scheme: dark;
+  --surface-1: 232 22% 12%;
+  --surface-2: 232 20% 15%;
+  --surface-3: 232 18% 19%;
+  --surface-glass: 232 24% 12%;
+  --app-shadow: 0 18px 60px hsl(240 40% 2% / .28);
+}
+html { scroll-behavior: smooth; }
+body {
+  background-image:
+    radial-gradient(ellipse at 12% -10%, hsl(var(--primary) / .12), transparent 38rem),
+    radial-gradient(ellipse at 92% 4%, hsl(var(--accent) / .07), transparent 34rem);
+  background-attachment: fixed;
+}
+::selection { background: hsl(var(--primary) / .35); color: hsl(var(--foreground)); }
+.app-glass {
+  background: hsl(var(--surface-glass) / .78);
+  border: 1px solid hsl(var(--border) / .82);
+  box-shadow: var(--app-shadow);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+.app-surface {
+  background: linear-gradient(145deg, hsl(var(--surface-2) / .96), hsl(var(--surface-1) / .96));
+  border: 1px solid hsl(var(--border) / .78);
+  box-shadow: 0 10px 32px hsl(240 40% 2% / .16);
+}
+.app-interactive {
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), background-color 180ms ease,
+    border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+.app-interactive:hover { transform: translateY(-1px); }
+.app-interactive:active { transform: translateY(0) scale(.985); }
+:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
