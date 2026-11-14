@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag, Gamepad2, Users, ScrollText } from "lucide-react";
+import { Globe, MessageSquare, History, ShieldAlert, LogOut, Menu, X, Cpu, Settings, Blocks, UserRound, ShoppingBag, Gamepad2, Users, ScrollText, Server } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/proxy",   label: "Net Proxy",    icon: Globe },
-    { href: "/chat",    label: "Messages",      icon: MessageSquare },
+    { href: "/chat",    label: "Messages",      icon: MessageSquare },\n    { href: "/servers", label: "Servers", icon: Server },
     { href: "/history", label: "History",       icon: History },
     { href: "/updates", label: "Update Logs",   icon: ScrollText },
     { href: "/settings", label: "Settings",     icon: Settings },
