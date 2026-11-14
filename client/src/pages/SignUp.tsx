@@ -30,7 +30,7 @@ export default function SignUp() {
           "linear-gradient(135deg, hsl(228 7% 13%) 0%, hsl(261 30% 12%) 50%, hsl(228 7% 13%) 100%)",
       }}
     >
-      <section className="w-full max-w-md">
+      <section className="nexus-auth-card w-full max-w-md">
         <header className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 border border-primary/30 mb-4">
             <UserRoundPlus className="w-7 h-7 text-primary" aria-hidden="true" />
