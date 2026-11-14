@@ -24,7 +24,7 @@ export default function SignUp() {
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center p-4"
+      className="nexus-auth-screen min-h-screen flex items-center justify-center p-4"
       style={{
         background:
           "linear-gradient(135deg, hsl(228 7% 13%) 0%, hsl(261 30% 12%) 50%, hsl(228 7% 13%) 100%)",
