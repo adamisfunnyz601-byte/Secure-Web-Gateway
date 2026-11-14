@@ -448,3 +448,113 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
 [role="dialog"],.app-surface,.discord-card,.cyber-box{transition:border-color .2s,box-shadow .2s}
 .app-surface:hover{border-color:hsl(var(--primary)/.23)}
 @media(prefers-reduced-motion:reduce){.nexus-btn,.nexus-btn:after{animation:none!important;transition:none!important}}
+
+/* ═══════════════ NEXUS FULL-APP MOTION & PAGE DESIGN ═══════════════ */
+.nexus-page { position:relative; isolation:isolate; }
+.nexus-page > * { animation:nexus-section-in .52s cubic-bezier(.2,.8,.2,1) both; }
+.nexus-page > *:nth-child(1){animation-delay:0ms}
+.nexus-page > *:nth-child(2){animation-delay:45ms}
+.nexus-page > *:nth-child(3){animation-delay:90ms}
+.nexus-page > *:nth-child(4){animation-delay:135ms}
+.nexus-page > *:nth-child(5){animation-delay:180ms}
+.nexus-page > *:nth-child(6){animation-delay:225ms}
+.nexus-page > *:nth-child(7){animation-delay:270ms}
+.nexus-page > *:nth-child(n+8){animation-delay:300ms}
+@keyframes nexus-section-in{from{opacity:0;transform:translate3d(0,17px,0) scale(.992);filter:blur(3px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
+@keyframes nexus-card-hover{0%{transform:translateY(0)}100%{transform:translateY(-4px)}}
+@keyframes nexus-card-enter{0%{opacity:0;transform:translateY(12px) scale(.985)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes nexus-border-glow{0%,100%{box-shadow:0 0 0 rgba(145,120,255,0)}50%{box-shadow:0 0 24px rgba(145,120,255,.13)}}
+@keyframes nexus-title-shine{0%{background-position:100% 50%}100%{background-position:-100% 50%}}
+@keyframes nexus-icon-float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-3px) rotate(-4deg)}}
+@keyframes nexus-tap{0%{transform:scale(1)}45%{transform:scale(.94)}100%{transform:scale(1)}}
+@keyframes nexus-soft-pulse{0%,100%{box-shadow:0 0 0 0 rgba(150,125,255,0)}50%{box-shadow:0 0 0 5px rgba(150,125,255,.07)}}
+@keyframes nexus-sheen{from{transform:translateX(-130%) skewX(-18deg)}to{transform:translateX(230%) skewX(-18deg)}}
+@keyframes nexus-row-in{from{opacity:0;transform:translateX(-9px)}to{opacity:1;transform:translateX(0)}}
+@keyframes nexus-chip-in{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}
+@keyframes nexus-glow-drift{0%,100%{opacity:.38;transform:translate3d(0,0,0) scale(1)}50%{opacity:.7;transform:translate3d(2%,-3%,0) scale(1.08)}}
+@keyframes nexus-ring{to{transform:rotate(360deg)}}
+@keyframes nexus-pop-in{0%{opacity:0;transform:scale(.86) translateY(8px)}70%{opacity:1;transform:scale(1.025) translateY(-1px)}100%{transform:scale(1) translateY(0)}}
+@keyframes nexus-slide-in-left{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes nexus-slide-in-right{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes nexus-flip-in{from{opacity:0;transform:perspective(700px) rotateX(-9deg) translateY(8px)}to{opacity:1;transform:perspective(700px) rotateX(0) translateY(0)}}
+@keyframes nexus-tilt-in{from{opacity:0;transform:rotate(-1.5deg) translateY(8px)}to{opacity:1;transform:rotate(0) translateY(0)}}
+@keyframes nexus-blur-in{from{opacity:0;filter:blur(10px)}to{opacity:1;filter:blur(0)}}
+@keyframes nexus-zoom-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes nexus-wave{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+
+/* Consistent surface treatment across all existing page components. */
+.nexus-page .app-surface,.nexus-page .discord-card,.nexus-page .cyber-box,
+.nexus-page [class*="rounded-xl"][class*="border"],
+.nexus-page [class*="rounded-2xl"][class*="border"] {
+  position:relative;transition:transform .24s cubic-bezier(.2,.8,.2,1),border-color .22s,box-shadow .24s,background-color .22s;
+}
+.nexus-page .app-surface:hover,.nexus-page .discord-card:hover,.nexus-page .cyber-box:hover,
+.nexus-page [class*="rounded-xl"][class*="border"]:hover,
+.nexus-page [class*="rounded-2xl"][class*="border"]:hover {
+  border-color:rgba(166,145,255,.25);
+  box-shadow:0 12px 32px rgba(0,0,0,.16),0 0 22px rgba(131,103,255,.055);
+}
+.nexus-page section { animation:nexus-card-enter .48s cubic-bezier(.2,.8,.2,1) both; }
+.nexus-page section:nth-of-type(2){animation-delay:55ms}
+.nexus-page section:nth-of-type(3){animation-delay:105ms}
+.nexus-page section:nth-of-type(4){animation-delay:155ms}
+.nexus-page h1 {text-wrap:balance;letter-spacing:-.035em}
+.nexus-page h1:not(.text-white) {background:linear-gradient(100deg,hsl(var(--foreground)),hsl(var(--primary)),hsl(var(--foreground)));background-size:220% auto;-webkit-background-clip:text;background-clip:text}
+.nexus-page h2 {text-wrap:balance}
+.nexus-page button:not(:disabled) {transform-origin:center;transition:transform .18s cubic-bezier(.2,.8,.2,1),filter .18s,box-shadow .2s,border-color .2s,background .2s}
+.nexus-page button:not(:disabled):hover {filter:brightness(1.09)}
+.nexus-page button:not(:disabled):active {animation:nexus-tap .2s ease}
+.nexus-page button:focus-visible,.nexus-page a:focus-visible {outline:2px solid hsl(var(--primary)/.8);outline-offset:3px}
+.nexus-page input,.nexus-page textarea,.nexus-page select {transition:border-color .2s,box-shadow .2s,background .2s,transform .2s}
+.nexus-page input:focus,.nexus-page textarea:focus,.nexus-page select:focus {transform:translateY(-1px)}
+.nexus-page img:not([data-no-hover]) {transition:filter .25s,transform .3s cubic-bezier(.2,.8,.2,1)}
+.nexus-page button:hover img {transform:scale(1.035)}
+.nexus-page [class*="grid"] > * {animation:nexus-card-enter .42s cubic-bezier(.2,.8,.2,1) both}
+.nexus-page [class*="grid"] > *:nth-child(2n){animation-delay:35ms}
+.nexus-page [class*="grid"] > *:nth-child(3n){animation-delay:70ms}
+.nexus-page [class*="grid"] > *:nth-child(4n){animation-delay:105ms}
+.nexus-page [class*="divide-y"] > * {animation:nexus-row-in .32s ease both}
+.nexus-page [class*="flex-wrap"] > button,.nexus-page [class*="gap-2"] > button {transition:transform .2s,filter .2s,box-shadow .2s}
+.nexus-page [class*="flex-wrap"] > button:hover {transform:translateY(-2px)}
+.nexus-page .app-interactive:hover {box-shadow:0 7px 24px rgba(132,105,255,.2)}
+.nexus-page .rounded-full[class*="border"] {animation:nexus-chip-in .3s ease both}
+.nexus-page svg {transition:transform .22s ease,filter .22s}
+.nexus-page button:hover > svg,.nexus-page a:hover > svg {transform:scale(1.12);filter:drop-shadow(0 0 5px currentColor)}
+
+/* Page identities: each area gets its own subtle atmosphere. */
+.nexus-page-chat {--page-accent:139,92,246}
+.nexus-page-servers {--page-accent:45,212,191}
+.nexus-page-settings {--page-accent:148,163,184}
+.nexus-page-shop {--page-accent:217,70,239}
+.nexus-page-hangouts {--page-accent:34,211,238}
+.nexus-page-hub {--page-accent:167,139,250}
+.nexus-page-history {--page-accent:56,189,248}
+.nexus-page-arcade {--page-accent:34,211,238}
+.nexus-page-updates {--page-accent:139,92,246}
+.nexus-page-proxy {--page-accent:45,212,191}
+.nexus-page:before {content:"";position:absolute;z-index:-1;pointer-events:none;top:-65px;right:3%;width:min(36vw,380px);height:240px;border-radius:50%;background:radial-gradient(ellipse,rgba(var(--page-accent,139,92,246),.075),transparent 70%);filter:blur(12px);animation:nexus-glow-drift 11s ease-in-out infinite}
+.nexus-page-chat:before {opacity:.35}
+.nexus-page-servers section:hover,.nexus-page-hangouts section:hover {box-shadow:0 12px 32px rgba(45,212,191,.06)}
+.nexus-page-shop section:hover {box-shadow:0 12px 32px rgba(217,70,239,.07)}
+.nexus-page-arcade button[role="gridcell"]:hover {filter:brightness(1.22)}
+.nexus-page-history [class*="grid-cols-12"]:hover {background:rgba(99,102,241,.055)}
+.nexus-page-updates section:hover {border-color:rgba(167,139,250,.32)}
+.nexus-page-proxy .cyber-box {box-shadow:0 15px 45px rgba(0,0,0,.2),inset 0 1px rgba(255,255,255,.025)}
+
+/* Animated feedback and loading primitives. */
+.nexus-page [aria-busy="true"],.nexus-page .animate-pulse {animation:nexus-soft-pulse 1.8s ease-in-out infinite}
+.nexus-page [data-state="open"] {animation:nexus-pop-in .22s cubic-bezier(.2,.8,.2,1)}
+.nexus-page [role="alert"] {animation:nexus-slide-in-right .28s ease both}
+.nexus-page .animate-spin {animation:nexus-ring 1s linear infinite}
+.nexus-page .animate-bounce {animation:nexus-wave .8s ease-in-out infinite}
+.nexus-page .animate-ping {animation:nexus-soft-pulse 1.3s ease-out infinite}
+.nexus-page .nexus-btn--glow:hover,.nexus-page .nexus-btn--mint:hover {filter:saturate(1.2) brightness(1.1)}
+@media(prefers-reduced-motion:reduce){
+ .nexus-page > *, .nexus-page section, .nexus-page [class*="grid"] > *, .nexus-page [class*="divide-y"] > *,
+ .nexus-page .rounded-full[class*="border"],.nexus-page:before {animation:none!important}
+ .nexus-page * {scroll-behavior:auto!important;transition:none!important}
+}
+@media(max-width:640px){
+ .nexus-page section,.nexus-page .app-surface,.nexus-page .discord-card {border-radius:15px}
+ .nexus-page h1 {font-size:clamp(1.55rem,7vw,2.1rem)}
+}
