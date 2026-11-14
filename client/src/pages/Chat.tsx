@@ -337,6 +337,7 @@ const TerminalMessage = ({
     moderator:{label:"MOD",style:"border-violet-400/50 bg-violet-400/10 text-violet-200"},
     "trial-moderator":{label:"TRIAL MOD",style:"border-indigo-400/50 bg-indigo-400/10 text-indigo-200"},
     helper:{label:"HELPER",style:"border-sky-400/50 bg-sky-400/10 text-sky-200"},
+    bot:{label:"NEXUS AI",style:"border-cyan-300/50 bg-cyan-300/10 text-cyan-100"},
     "trial-helper":{label:"TRIAL HELPER",style:"border-cyan-400/50 bg-cyan-400/10 text-cyan-200"},
   };
   const staffBadge = roleBadge[roleName];
@@ -444,7 +445,7 @@ const TerminalMessage = ({
           "chat-message-bubble relative p-3 border text-[13px] font-mono transition-all cursor-help max-w-md",
           isMe
             ? "bg-violet-500/5 border-violet-500/30 rounded-l-lg rounded-tr-lg hover:border-violet-500/60"
-            : "bg-fuchsia-600/5 border-fuchsia-400/30 rounded-r-lg rounded-tl-lg hover:border-fuchsia-400/60"
+            : roleName === "bot" ? "bg-cyan-500/[.06] border-cyan-300/30 rounded-r-lg rounded-tl-lg hover:border-cyan-300/60 shadow-[0_0_22px_rgba(34,211,238,.045)]" : "bg-fuchsia-600/5 border-fuchsia-400/30 rounded-r-lg rounded-tl-lg hover:border-fuchsia-400/60"
         )}
       >
         {/* Forwarded indicator */}
