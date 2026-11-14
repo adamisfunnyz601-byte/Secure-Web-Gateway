@@ -22,7 +22,7 @@ import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
 import ModerationPanel from "@/pages/ModerationPanel";
 import Chat from "@/pages/Chat";
-import UpdatesPage from "@/pages/Updates";
+import UpdatesPage from "@/pages/Updates";\nimport ServersPage from "@/pages/Servers";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -58,7 +58,7 @@ function Router() {
         <ProtectedRoute component={Proxy} />
       </Route>
       <Route path="/chat" component={() => null} />
-      <Route path="/updates"><ProtectedRoute component={UpdatesPage} /></Route>
+      <Route path="/updates"><ProtectedRoute component={UpdatesPage} /></Route>\n      <Route path="/servers"><ProtectedRoute component={ServersPage} /></Route>
       <Route path="/history">
         <ProtectedRoute component={History} />
       </Route>
