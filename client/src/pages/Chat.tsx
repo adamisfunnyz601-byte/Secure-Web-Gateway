@@ -1220,11 +1220,11 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     // In Global Chat and groups, mention @NEXUS_AI to invite it into the conversation.
     const selectedChatUser = selectedRecipientId ? usersMap.get(selectedRecipientId) : null;
     const isNexusAiDm = Boolean(selectedChatUser?.role === "bot" && selectedChatUser?.username === "nexus_ai_system");
-    const aiMention = messageContent.match(/@nexus(?:[ _-]?ai)\\b[:,]?/i);
+    const aiMention = messageContent.match(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i);
     if (!uploadFile && (isNexusAiDm || aiMention)) {
       const aiPrompt = isNexusAiDm
         ? messageContent.trim()
-        : messageContent.replace(/@nexus(?:[ _-]?ai)\\b[:,]?/i, "").trim();
+        : messageContent.replace(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i, "").trim();
       setInputContent("");
       await requestNexusAI(aiPrompt);
       return;
