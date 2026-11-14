@@ -96,7 +96,7 @@ export default function Shop() {
     }
   };
 
-  return <Layout><div className="mx-auto max-w-6xl space-y-7 p-6">
+  return <Layout><div className="nexus-page nexus-page-shop mx-auto max-w-6xl space-y-7 p-6">
     <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="flex items-center gap-3 text-3xl font-black text-primary"><ShoppingBag className="h-8 w-8"/> DIHCOINS SHOP</h1><p className="mt-1 text-sm text-muted-foreground">Profile decorations, animated emotes and creator-made cosmetics.</p></div><div className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3"><Coins className="h-5 w-5 text-amber-300"/><span className="font-bold text-amber-200">{Number(user?.coins||0).toLocaleString()} DihCoins</span></div></div>
     <section className="rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/10 to-cyan-500/5 p-5">
       <div className="mb-4 flex items-center gap-2"><Sparkles className="h-5 w-5 text-violet-300"/><h2 className="text-xl font-bold">Decoration & emote creator</h2></div>
