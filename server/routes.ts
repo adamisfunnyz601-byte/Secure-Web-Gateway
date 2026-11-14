@@ -681,7 +681,7 @@ export async function registerRoutes(
     "nickreset","restrict","unrestrict","unkick"
   ];
   const memberCommandNames = [
-    "help","me","shrug","roll","flip","avatar","profile","serverinfo","userinfo","ping",
+    "help","commands","poll","ai","me","shrug","roll","flip","avatar","profile","serverinfo","userinfo","ping",
     "whoami","rules","invite","coinflip","8ball","choose","quote","uptime"
   ];
   const parseDurationMs = (value: string) => {
