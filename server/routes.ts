@@ -1691,6 +1691,52 @@ export async function registerRoutes(
     return res.json({ success: true, accountCreated: false });
   });
 
+  // === GIPHY GIF SEARCH ===
+  app.get('/api/gifs/search', requireAuth, async (req, res) => {
+    try {
+      const apiKey = process.env.GIPHY_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ message: 'GIPHY is not configured yet. Add GIPHY_API_KEY in Replit Secrets.' });
+      }
+      const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+      if (!query) return res.status(400).json({ message: 'Enter something to search for.' });
+      const parsedLimit = Number(req.query.limit || 24);
+      const limit = Number.isInteger(parsedLimit) ? Math.max(1, Math.min(24, parsedLimit)) : 24;
+      const params = new URLSearchParams({
+        api_key: apiKey, q: query, limit: String(limit), rating: 'g', lang: 'en',
+        bundle: 'messaging_non_clips',
+      });
+      const upstream = await fetch(`https://api.giphy.com/v1/gifs/search?${params.toString()}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!upstream.ok) {
+        console.error('[giphy] Search failed:', upstream.status);
+        return res.status(502).json({ message: 'GIPHY search is temporarily unavailable. Please try again.' });
+      }
+      const payload = await upstream.json() as any;
+      const data = (Array.isArray(payload?.data) ? payload.data : []).map((gif: any) => {
+        const images = gif?.images || {};
+        const original = images.original || images.downsized_large || images.fixed_width;
+        const preview = images.fixed_width || images.preview_gif || original;
+        if (!original?.url || !preview?.url) return null;
+        return {
+          id: String(gif.id || original.url),
+          title: String(gif.title || 'GIPHY GIF').slice(0, 160),
+          url: original.url,
+          previewUrl: preview.url,
+          sourceUrl: String(gif.url || 'https://giphy.com/'),
+          license: 'GIPHY',
+        };
+      }).filter(Boolean);
+      res.set('Cache-Control', 'private, max-age=60');
+      res.json({ data });
+    } catch (error: any) {
+      console.error('[giphy] Search error:', error?.message || error);
+      res.status(502).json({ message: 'Could not connect to GIPHY. Please try again.' });
+    }
+  });
+
   // === CUSTOM EMOJIS ===
   app.get('/api/emojis', requireAuth, async (req, res) => {
     const emojis = await storage.listCustomEmojis();
