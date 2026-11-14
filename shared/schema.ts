@@ -200,6 +200,44 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Persistent per-message reactions and single-choice chat polls.
+export const chatMessageReactions = pgTable("chat_message_reactions", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  emoji: text("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  reactionUnique: uniqueIndex("chat_message_reaction_unique").on(table.messageId, table.userId, table.emoji),
+}));
+
+export const chatPolls = pgTable("chat_polls", {
+  id: serial("id").primaryKey(),
+  messageId: integer("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  pollMessageUnique: uniqueIndex("chat_poll_message_unique").on(table.messageId),
+}));
+
+export const chatPollOptions = pgTable("chat_poll_options", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull().references(() => chatPolls.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  position: integer("position").notNull().default(0),
+});
+
+export const chatPollVotes = pgTable("chat_poll_votes", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull().references(() => chatPolls.id, { onDelete: "cascade" }),
+  optionId: integer("option_id").notNull().references(() => chatPollOptions.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  oneVotePerPoll: uniqueIndex("chat_poll_one_vote_per_user").on(table.pollId, table.userId),
+}));
+
+
 // Persistent moderation actions and audit trail. Role changes and moderation are server-authoritative.
 export const moderationLogs = pgTable("moderation_logs", {
   id: serial("id").primaryKey(),
