@@ -2223,9 +2223,9 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
         {/* ======================================================
             MAIN CHAT AREA
             ====================================================== */}
-        <div className="flex-1 flex flex-col border border-violet-500/10 bg-black/70 overflow-hidden">
+        <div className="chat-main-panel flex-1 flex flex-col border border-violet-500/10 bg-black/70 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/20 bg-black/60 flex-shrink-0">
+          <div className="chat-channel-header flex items-center justify-between px-5 py-3 border-b border-violet-500/20 bg-black/60 flex-shrink-0">
             <div className="flex items-center gap-3">
               {!isSidebarOpen && (
                 <button onClick={() => setIsSidebarOpen(true)} className="p-1 border border-violet-500/20 hover:bg-violet-500/10 text-violet-200">
@@ -2280,7 +2280,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-1 scroll-smooth [scrollbar-gutter:stable]">
+          <div className="chat-message-list flex-1 overflow-y-auto p-5 space-y-1 scroll-smooth [scrollbar-gutter:stable]">
             {unifiedMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full opacity-10">
                 <Bug className="w-12 h-12 mb-4" />
