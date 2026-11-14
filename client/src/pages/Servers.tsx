@@ -49,7 +49,7 @@ export default function ServersPage() {
   const isManager=detail?.member&&["owner","admin"].includes(detail.member.role);
   const copyInvite=async()=>{try{await navigator.clipboard.writeText(detail.server.inviteCode);toast({title:"Invite code copied"});}catch{toast({title:"Copy failed",description:detail.server.inviteCode});}};
   return <Layout>
-    <div className="mx-auto max-w-7xl space-y-5">
+    <div className="nexus-page nexus-page-servers mx-auto max-w-7xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div><div className="text-xs uppercase tracking-[.22em] text-primary font-semibold">Community network</div><h1 className="mt-1 text-3xl font-bold">Servers</h1><p className="mt-1 text-sm text-muted-foreground">Your communities, organised in one place.</p></div>
         <div className="flex gap-2"><button onClick={()=>setCreateOpen(v=>!v)} className="app-interactive inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white"><Plus size={16}/> Create server</button></div>
