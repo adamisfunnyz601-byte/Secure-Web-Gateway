@@ -455,13 +455,13 @@ const TerminalMessage = ({
           </div>
         )}
         {/* Reply quote */}
-        {msg.replyToContent && (
+        {msg.replyToId && (
           <div className={cn("chat-reply-quote mb-2 overflow-hidden rounded-lg border bg-black/25 shadow-inner",isMe?"border-violet-400/25":"border-fuchsia-400/25")}>
             <div className={cn("flex items-center gap-2 border-l-[3px] px-3 py-2",isMe?"border-violet-400 bg-violet-400/10":"border-fuchsia-400 bg-fuchsia-400/10")}>
               <Reply className="h-3.5 w-3.5 shrink-0 text-violet-200"/>
               <div className="min-w-0">
-                <div className="text-[9px] font-bold uppercase tracking-wider text-violet-200">{msg.replyToSenderName || "Reply"}</div>
-                <div className="truncate text-[11px] text-white/65">{String(msg.replyToContent).startsWith("[RELAY] ")?String(msg.replyToContent).slice(8):msg.replyToContent}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-violet-200">{msg.replyToSenderName || "Replying to message"}</div>
+                <div className="truncate text-[11px] text-white/65">{msg.replyToContent ? (String(msg.replyToContent).startsWith("[RELAY] ")?String(msg.replyToContent).slice(8):msg.replyToContent) : "Original message"}</div>
               </div>
             </div>
           </div>
@@ -1082,19 +1082,29 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       toast({ title: "Ask NEXUS AI something", description: "Usage: /ai your question" });
       return;
     }
+    const selectedUser = selectedRecipientId ? usersMap.get(selectedRecipientId) : null;
+    const isNexusDm = Boolean(selectedUser && selectedUser.role === "bot" && selectedUser.username === "nexus_ai_system");
+    if (selectedRecipientId && !isNexusDm) {
+      toast({ title: "NEXUS AI isn't in this DM", description: "Open the NEXUS AI conversation or ask it in Global Chat / a group.", variant: "destructive" });
+      return;
+    }
     try {
       const response = await fetch("/api/chat/ai", {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), recipientId: selectedRecipientId, groupId: selectedGroupId }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          recipientId: isNexusDm ? selectedRecipientId : undefined,
+          groupId: selectedGroupId ?? undefined,
+        }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || "NEXUS AI could not answer.");
       queryClient.invalidateQueries({ queryKey: [api.chat.list.path] });
       queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
-      toast({ title: "NEXUS AI replied", description: "The question and answer were posted in this chat." });
+      toast({ title: "NEXUS AI replied ✨", description: "Your conversation has been updated." });
     } catch (error: any) {
-      toast({ title: "NEXUS AI unavailable", description: error.message || "Start your local Ollama server and check that the model is installed.", variant: "destructive" });
+      toast({ title: "NEXUS AI unavailable", description: error.message || "Check that the local Ollama server and model are running.", variant: "destructive" });
     }
   };
 
@@ -1203,6 +1213,20 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
           return true;
         }).map(command => command.usage).join('  •  '),
       });
+      return;
+    }
+
+    // In a dedicated NEXUS AI DM, ordinary messages are questions for the bot.
+    // In Global Chat and groups, mention @NEXUS_AI to invite it into the conversation.
+    const selectedChatUser = selectedRecipientId ? usersMap.get(selectedRecipientId) : null;
+    const isNexusAiDm = Boolean(selectedChatUser?.role === "bot" && selectedChatUser?.username === "nexus_ai_system");
+    const aiMention = messageContent.match(/@nexus(?:[ _-]?ai)\\b[:,]?/i);
+    if (!uploadFile && (isNexusAiDm || aiMention)) {
+      const aiPrompt = isNexusAiDm
+        ? messageContent.trim()
+        : messageContent.replace(/@nexus(?:[ _-]?ai)\\b[:,]?/i, "").trim();
+      setInputContent("");
+      await requestNexusAI(aiPrompt);
       return;
     }
 
@@ -1853,6 +1877,10 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   const filteredUsers = users?.filter((u: any) => {
     const searchable = `${u.displayName || ""} ${u.nickname || ""} ${u.username}`.toLowerCase();
     return u.id !== currentUser?.id && searchable.includes(searchTerm.toLowerCase());
+  }).sort((a: any, b: any) => {
+    const aIsAi = a.role === "bot" && a.username === "nexus_ai_system";
+    const bIsAi = b.role === "bot" && b.username === "nexus_ai_system";
+    return Number(bIsAi) - Number(aIsAi);
   });
   const filteredGroups = (groups as any[]).filter((g: any) => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const mentionMatch = inputContent.match(/(?:^|\s)@([^\s@]*)$/);
