@@ -172,7 +172,8 @@ export const communityServerChannels = pgTable("community_server_channels", {
   position: integer("position").notNull().default(0),
   isLocked: boolean("is_locked").notNull().default(false),
 });
-\n// OAuth identities are kept separate from usernames and legacy access-key accounts.
+
+// OAuth identities are kept separate from usernames and legacy access-key accounts.
 export const oauthAccounts = pgTable("oauth_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
