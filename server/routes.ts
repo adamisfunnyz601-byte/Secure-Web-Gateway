@@ -1033,7 +1033,7 @@ export async function registerRoutes(
       if (!answer) throw new Error("The model returned an empty reply.");
     } catch (error: any) {
       console.error("[chat-ai] Ollama request failed:", error?.message || error);
-      return res.status(502).json({ message: "Could not reach local Ollama at " + ollamaBaseUrl + ". Start Ollama and make sure the model '" + model + "' is installed. If this app is hosted on Replit, localhost means the Replit server, not your PC. Details: " + (error?.message || "connection failed") });
+      return res.status(502).json({ message: "Could not reach the local Ollama service at " + ollamaBaseUrl + ". Check the Replit startup logs and confirm the Ollama daemon is running and model '" + model + "' is installed. Details: " + (error?.message || "connection failed") });
     }
     try {
       const bot = await getNexusAiBot();
