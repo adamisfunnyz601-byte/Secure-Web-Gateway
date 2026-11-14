@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package.json
 
@@ -39,7 +39,7 @@ jobs:
           node -e "require.resolve('electron'); require.resolve('electron-builder'); require.resolve('debug'); console.log('Electron build dependencies are resolvable.')"
 
       - name: Build Windows installer
-        run: npm run desktop:dist
+        run: npm run desktop:dist -- --publish never
 
       - name: Verify installer was created
         shell: pwsh
