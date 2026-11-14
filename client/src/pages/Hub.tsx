@@ -196,7 +196,7 @@ export default function Hub() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="nexus-page nexus-page-hub mx-auto max-w-7xl space-y-6">
         <section className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-950/80 via-slate-950 to-fuchsia-950/50 p-6 md:p-8">
           <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-violet-500/10 blur-3xl" />
           <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
