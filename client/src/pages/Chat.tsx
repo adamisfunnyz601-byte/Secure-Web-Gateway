@@ -1912,9 +1912,19 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       }
       return;
     }
-    if (showCommandMenu && e.key === 'Enter' && optionsCount > 0 && inputContent === '/') {
+    if (showCommandMenu && e.key === 'Enter' && optionsCount > 0) {
       e.preventDefault();
-      insertCommand(matchingCommands[commandSelection]?.name || 'help');
+      const targetOption = moderationUserOptions[commandSelection];
+      const parameterOption = parameterOptions[commandSelection];
+      const commandOption = matchingCommands[commandSelection];
+      if (moderationUserOptions.length && targetOption) insertModerationTarget(targetOption);
+      else if (parameterOptions.length && parameterOption) insertParameter(parameterOption);
+      else if (commandOption) insertCommand(commandOption.name);
+      return;
+    }
+    if (e.key === "Escape" && showCommandMenu) {
+      e.preventDefault();
+      setInputContent("");
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey) {
