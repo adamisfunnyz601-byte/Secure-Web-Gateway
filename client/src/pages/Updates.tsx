@@ -904,7 +904,7 @@ export default function UpdatesPage() {
 
   return (
     <Layout>
-      <div className="mx-auto w-full max-w-5xl space-y-6 pb-10">
+      <div className="nexus-page nexus-page-updates mx-auto w-full max-w-5xl space-y-6 pb-10">
         <section className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/15 via-card to-card p-6 md:p-8">
           <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
