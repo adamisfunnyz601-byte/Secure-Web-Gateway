@@ -1,7 +1,7 @@
 const { app, BrowserWindow, shell } = require("electron");
 const path = require("node:path");
 
-const APP_URL = "https://secure-web-gateway--c00le5tp3rs0n3v.replit.app/chat";
+const APP_URL = "https://secure-web-gateway--c00le5tp3rs0n3v.replit.app";
 const APP_ORIGIN = new URL(APP_URL).origin;
 
 let mainWindow;
