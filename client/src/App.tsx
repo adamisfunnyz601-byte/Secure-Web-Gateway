@@ -59,7 +59,8 @@ function Router() {
         <ProtectedRoute component={Proxy} />
       </Route>
       <Route path="/chat" component={() => null} />
-      <Route path="/updates"><ProtectedRoute component={UpdatesPage} /></Route>\n      <Route path="/servers"><ProtectedRoute component={ServersPage} /></Route>
+      <Route path="/updates"><ProtectedRoute component={UpdatesPage} /></Route>
+      <Route path="/servers"><ProtectedRoute component={ServersPage} /></Route>
       <Route path="/history">
         <ProtectedRoute component={History} />
       </Route>
