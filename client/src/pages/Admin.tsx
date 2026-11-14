@@ -147,7 +147,7 @@ export default function Admin() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto">
+      <div className="nexus-page nexus-page-admin max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <ShieldAlert className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold text-foreground">Admin Console</h1>
