@@ -41,7 +41,7 @@ export default function Proxy() {
 
   return (
     <Layout>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="nexus-page nexus-page-proxy flex flex-col h-full space-y-4">
         {/* Browser Chrome */}
         <div className="cyber-box p-3">
           <form onSubmit={handleSearch} className="flex gap-3 items-center">
