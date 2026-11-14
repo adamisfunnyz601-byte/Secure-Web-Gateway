@@ -12,17 +12,30 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      NODE_ENV: development
+      npm_config_production: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies
-        run: npm install
+          cache: npm
+
+      - name: Install all dependencies including desktop build tools
+        run: npm install --include=dev --no-audit --no-fund
+
+      - name: Verify Electron build tools are installed
+        run: |
+          npm ls electron electron-builder
+          npx --no-install electron-builder --version
+
       - name: Build Windows installer
-        run: npm run desktop:dist
+        run: npx --no-install electron-builder --win nsis
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
