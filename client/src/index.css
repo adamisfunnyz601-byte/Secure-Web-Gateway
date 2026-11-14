@@ -419,3 +419,32 @@ button:disabled {cursor:not-allowed}
 
 @media(max-width:767px){.nexus-sidebar{top:58px;height:calc(100dvh - 58px);transition:transform .28s cubic-bezier(.2,.8,.2,1)}.nexus-main{min-height:calc(100dvh - 58px)}.nexus-content{padding:14px}}
 @media(prefers-reduced-motion:reduce){.message-motion,.nexus-brand-orb:after,.nexus-nav-link:hover,.nexus-nav-link:hover .nexus-nav-icon{animation:none!important;transition:none!important;transform:none!important}}
+
+/* Reusable button personalities for every screen and future controls. */
+.nexus-btn{position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:.55rem;overflow:hidden;border:1px solid transparent;border-radius:11px;padding:.62rem .95rem;font-size:12px;font-weight:750;letter-spacing:.015em;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,border-color .2s,background .2s,color .2s}
+.nexus-btn:after{content:"";position:absolute;inset:0;z-index:-1;opacity:0;background:linear-gradient(110deg,transparent,rgba(255,255,255,.2),transparent);transform:translateX(-110%);transition:transform .5s,opacity .2s}
+.nexus-btn:hover:after{opacity:1;transform:translateX(110%)}
+.nexus-btn:active{transform:scale(.96)}
+.nexus-btn--glow{color:#fff;background:linear-gradient(110deg,#7658ed,#9b70f7);box-shadow:0 6px 20px rgba(126,91,239,.23)}
+.nexus-btn--glow:hover{box-shadow:0 8px 28px rgba(126,91,239,.42);transform:translateY(-2px)}
+.nexus-btn--glass{color:#e6e2ff;border-color:rgba(174,155,255,.2);background:rgba(140,120,255,.08);backdrop-filter:blur(12px)}
+.nexus-btn--glass:hover{background:rgba(140,120,255,.17);border-color:rgba(174,155,255,.42)}
+.nexus-btn--mint{color:#071b19;background:linear-gradient(110deg,#73e4c7,#45cdb9);box-shadow:0 5px 18px rgba(69,205,185,.18)}
+.nexus-btn--mint:hover{animation:btn-mint-pop .35s ease;box-shadow:0 7px 25px rgba(69,205,185,.32)}
+.nexus-btn--outline{color:rgba(240,238,255,.8);border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.025)}
+.nexus-btn--outline:hover{border-color:rgba(173,151,255,.5);background:rgba(143,117,255,.1);transform:translateY(-1px)}
+.nexus-btn--jelly:hover{animation:btn-jelly .42s ease}
+.nexus-btn--shimmer:hover{background-size:200% 100%;background-image:linear-gradient(110deg,rgba(137,111,255,.16) 20%,rgba(255,255,255,.18) 45%,rgba(137,111,255,.16) 70%);animation:btn-shimmer .8s linear}
+.nexus-btn--danger{color:#ffb8c2;border-color:rgba(255,99,127,.25);background:rgba(255,77,112,.09)}
+.nexus-btn--danger:hover{color:#fff;background:rgba(255,77,112,.22);box-shadow:0 0 20px rgba(255,77,112,.15);animation:btn-danger .32s ease}
+.nexus-btn--icon{width:38px;height:38px;padding:0;border:1px solid rgba(255,255,255,.1);border-radius:12px;color:rgba(230,225,255,.72);background:rgba(255,255,255,.045)}
+.nexus-btn--icon:hover{color:#fff;border-color:rgba(174,155,255,.35);background:rgba(140,120,255,.15);transform:rotate(-5deg) scale(1.04)}
+@keyframes btn-mint-pop{50%{transform:translateY(-3px) scale(1.025)}}
+@keyframes btn-jelly{25%{transform:scale(1.04,.96)}50%{transform:scale(.98,1.03)}75%{transform:scale(1.01,.99)}}
+@keyframes btn-shimmer{to{background-position:200% 0}}
+@keyframes btn-danger{25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{transition:border-color .18s,box-shadow .18s,background .18s}
+input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:focus{outline:none;border-color:hsl(var(--primary)/.65)!important;box-shadow:0 0 0 3px hsl(var(--primary)/.13),0 0 22px hsl(var(--primary)/.08)}
+[role="dialog"],.app-surface,.discord-card,.cyber-box{transition:border-color .2s,box-shadow .2s}
+.app-surface:hover{border-color:hsl(var(--primary)/.23)}
+@media(prefers-reduced-motion:reduce){.nexus-btn,.nexus-btn:after{animation:none!important;transition:none!important}}
