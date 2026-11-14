@@ -50,8 +50,10 @@ export function useChat({ recipientId = null, groupId = null }: ChatChannel = {}
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
-    refetchInterval: 30000,
-    staleTime: 15000,
+    refetchInterval: 10000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const sendMessage = useMutation({
