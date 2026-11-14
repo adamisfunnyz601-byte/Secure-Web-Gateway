@@ -318,9 +318,9 @@ const ChatPollCard = ({ poll, onVote }: { poll: any; onVote: (pollId: number, op
 };
 
 const TerminalMessage = ({
-  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem, shouldAutoplayEmote, reactions = [], poll, onToggleReaction, onVote
+  msg, isMe, currentUserId, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem, shouldAutoplayEmote, reactions = [], poll, onToggleReaction, onVote
 }: {
-  msg: any; isMe: boolean; emoteItem?: any; shouldAutoplayEmote?: boolean; reactions?: any[]; poll?: any; onToggleReaction: (id: number, emoji: string) => void; onVote: (pollId: number, optionId: number) => void;
+  msg: any; isMe: boolean; currentUserId: number; emoteItem?: any; shouldAutoplayEmote?: boolean; reactions?: any[]; poll?: any; onToggleReaction: (id: number, emoji: string) => void; onVote: (pollId: number, optionId: number) => void;
   onReply: (m: any) => void;
   onForward: (m: any) => void;
   onPurge: (id: number) => void;
@@ -470,7 +470,7 @@ const TerminalMessage = ({
         {getMediaSection()}
         {msg.mediaType === "poll" && poll && <ChatPollCard poll={poll} onVote={onVote}/>}
         {Number(msg.id)>0 && <div className="chat-reactions mt-2 flex flex-wrap items-center gap-1.5">
-          {reactions.map((reaction:any)=><button key={reaction.emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),reaction.emoji)} title={reaction.userIds?.length ? `Reacted by ${reaction.userIds.length} member(s)` : "React"} className={cn("rounded-full border px-2 py-1 text-[11px] transition-all hover:-translate-y-0.5",reaction.userIds?.includes?.(msg.currentUserId)?"border-violet-300/50 bg-violet-400/15 text-violet-100":"border-white/10 bg-black/20 text-white/65 hover:border-violet-300/30")}>{reaction.emoji} <span className="ml-1 text-[9px]">{reaction.count}</span></button>)}
+          {reactions.map((reaction:any)=><button key={reaction.emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),reaction.emoji)} title={reaction.userIds?.length ? `Reacted by ${reaction.userIds.length} member(s)` : "React"} className={cn("rounded-full border px-2 py-1 text-[11px] transition-all hover:-translate-y-0.5",reaction.userIds?.includes?.(currentUserId)?"border-violet-300/50 bg-violet-400/15 text-violet-100":"border-white/10 bg-black/20 text-white/65 hover:border-violet-300/30")}>{reaction.emoji} <span className="ml-1 text-[9px]">{reaction.count}</span></button>)}
           {["👍","❤️","😂","🔥","🎉","👀","😭","💀"].map(emoji=><button key={emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),emoji)} aria-label={`React ${emoji}`} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[.07] bg-white/[.025] text-xs opacity-65 transition hover:scale-110 hover:border-violet-300/30 hover:bg-violet-400/10 hover:opacity-100">{emoji}</button>)}
         </div>}
 
@@ -2398,6 +2398,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 key={msg.id}
                 msg={msg as any}
                 isMe={msg.senderId === currentUser?.id}
+                currentUserId={currentUser?.id ?? -1}
                 onReply={setReplyTarget}
                 onForward={m => setForwardState({ message: m, isOpen: true })}
                 onPurge={id => deleteMessageMutation.mutate(id)}
@@ -2543,41 +2544,6 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                       {activeCommand&&commandArgument!==null&&parameterOptions.length===0&&moderationUserOptions.length===0&&<div className="m-1 rounded-lg border border-white/[.06] bg-white/[.025] px-3 py-2 text-[9px] text-white/45">Usage: <span className="text-violet-100/75">{activeCommand.usage}</span></div>}
                       {inputContent==="/"&&<div className="px-2 py-2 text-[9px] text-white/35">Start typing to filter · Try <span className="text-violet-200">/poll</span> or <span className="text-violet-200">/commands</span></div>}
                     </div>
-                  </div>
-                )}
-                {false && (
-                  <div className="chat-command-menu absolute bottom-12 left-0 right-0 z-50 rounded-2xl border border-violet-300/25 bg-[#10091b]/[.97] backdrop-blur-2xl shadow-[0_18px_65px_rgba(0,0,0,.55),0_0_34px_rgba(139,92,246,.17)] overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-violet-400/15">
-                      <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-violet-200/70">{moderationUserOptions.length ? 'Choose a member' : parameterOptions.length ? 'Command parameters' : 'Available commands'}</span>
-                      <span className="text-[8px] font-mono text-violet-200/35">↑ ↓ navigate · TAB complete · ENTER run</span>
-                    </div>
-                    {(moderationUserOptions.length ? moderationUserOptions : parameterOptions.length ? parameterOptions : matchingCommands).map((item: any, index: number) => {
-                      const selected = index === commandSelection;
-                      const isTargetSuggestion = moderationUserOptions.length > 0;
-                      const isDurationSuggestion = !isTargetSuggestion && parameterOptions.length > 0;
-                      const command = isDurationSuggestion ? activeCommand : item;
-                      const targetUser = isTargetSuggestion ? item : null;
-                      return (
-                        <button
-                          key={isTargetSuggestion ? `target-${item.id}` : isDurationSuggestion ? `${command?.name}-${item}` : item.name}
-                          type="button"
-                          onMouseEnter={() => setCommandSelection(index)}
-                          onClick={() => isTargetSuggestion ? insertModerationTarget(targetUser) : isDurationSuggestion ? insertParameter(item) : insertCommand(item.name)}
-                          className={cn('w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors', selected ? 'bg-violet-500/20' : 'hover:bg-violet-500/10')}
-                        >
-                          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/15 text-violet-200"><Command className="w-3.5 h-3.5" /></span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[11px] font-mono text-fuchsia-200">{isTargetSuggestion ? `@${item.username}` : isDurationSuggestion ? item : command?.usage}</span>
-                            <span className="block text-[9px] text-violet-100/45">{isTargetSuggestion ? (item.displayName || item.nickname || 'Chat member') : isDurationSuggestion ? `Duration for /${command?.name}` : command?.description}</span>
-                          </span>
-                          {selected && <span className="text-[8px] font-mono text-violet-200/50">TAB</span>}
-                        </button>
-                      );
-                    })}
-                    {activeCommand && commandArgument !== null && parameterOptions.length === 0 && moderationUserOptions.length === 0 && (
-                      <div className="px-3 py-2 text-[9px] font-mono text-violet-200/45">Usage: {activeCommand.usage}{isModerationCommand ? ' · Type a username to choose a member, then select a duration.' : ('example' in activeCommand && activeCommand.example ? ` · Example: ${activeCommand.example}` : '')}</div>
-                    )}
-                    {inputContent === '/' && <div className="px-3 py-2 text-[9px] font-mono text-violet-200/40">Type a command name or choose /help to see the list.</div>}
                   </div>
                 )}
                 {mentionCandidates.length > 0 && (
