@@ -1128,7 +1128,10 @@ export async function registerRoutes(
       if (!ollamaResponse.ok) throw new Error(payload?.error || `Ollama returned HTTP ${ollamaResponse.status}`);
       answer = String(payload?.message?.content || "").trim();
       if (!answer) throw new Error("The model returned an empty reply.");
-      // Add verified result links ourselves so the small local model cannot
+      if (shouldSearchWeb && !webSources.length) {
+        answer = "I couldn't access live web search results just now, so I can't reliably verify that information. Please try the search again in a moment.";
+      }
+      // Add real result links ourselves so the small local model cannot
       // forget citations or fabricate the URLs it claims to have searched.
       if (webSources.length) {
         const sourceLinks = webSources.slice(0, 3)
