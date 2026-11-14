@@ -174,7 +174,7 @@ export default function ModerationPanel() {
   if (!staff) return <Layout><div className="mx-auto max-w-xl rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center"><Shield className="mx-auto mb-3 h-10 w-10 text-destructive"/><h1 className="text-xl font-bold">Staff access required</h1><p className="mt-2 text-sm text-muted-foreground">This panel is available to authorised staff only.</p></div></Layout>;
 
   return <Layout>
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="nexus-page nexus-page-admin mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><div className="flex items-center gap-2"><Shield className="h-6 w-6 text-primary"/><h1 className="text-2xl font-black">Moderation Panel</h1></div><p className="mt-1 text-sm text-muted-foreground">Staff tools · Actions are checked and logged by the server.</p></div>
         <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase text-primary">{role.replace(/-/g," ")}</span>
