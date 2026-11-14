@@ -7,7 +7,7 @@ import { useChat } from "@/hooks/use-chat";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import {
-  Send, Users, Hash, Phone, Plus, Volume2, Search, Settings,
+  Send, Users, Hash, Phone, Plus, Volume2, Search, Settings, BarChart3,
   ChevronRight, Terminal, Mic, MicOff, Video, VideoOff, X, Pause, Square, Check,
   Download, Cpu, Ghost, Forward, Trash2, Reply, Music,
   Camera, MonitorUp, PhoneOff, Binary, UserPlus, Command,
@@ -80,10 +80,10 @@ const isValidModerationDuration = (value: string) =>
   value === 'null' || /^[1-9]\d*(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks|mo|y)$/i.test(value.trim());
 
 // Slash-command help and autocomplete. The server still validates and executes commands.
-const MEMBER_COMMAND_NAMES = ["help","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
+const MEMBER_COMMAND_NAMES = ["help","commands","poll","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
 const MODERATION_COMMAND_NAMES = ["ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings","softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen","freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset","restrict","unrestrict","unkick"] as const;
 const CHAT_COMMANDS = [
-  ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: `/${name}`, description: "Member utility command." })),
+  ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: name === "poll" ? "/poll [question]" : `/${name}`, description: name === "poll" ? "Create a live poll in this chat." : name === "commands" ? "Browse all available chat commands." : "Member utility command." })),
   ...MODERATION_COMMAND_NAMES.map(name => ({ name, usage: `/${name} <@user> [duration] [reason]`, description: "Staff moderation command.", ownerOnly: true, options: MODERATION_DURATIONS })),
 ] as const;
 
@@ -302,10 +302,25 @@ function LazyMediaAttachment({
 // ============================================================
 // TERMINAL MESSAGE
 // ============================================================
+const ChatPollCard = ({ poll, onVote }: { poll: any; onVote: (pollId: number, optionId: number) => void }) => {
+  const total = Number(poll?.totalVotes || 0);
+  return <div className="chat-poll-card mt-3 rounded-xl border border-violet-300/20 bg-gradient-to-br from-violet-500/[.09] to-fuchsia-500/[.035] p-3">
+    <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[9px] font-bold uppercase tracking-[.18em] text-violet-200">LIVE POLL</span><span className="text-[9px] text-white/40">{total} vote{total===1?"":"s"}</span></div>
+    <div className="space-y-2">{(poll.options||[]).map((option:any)=>{
+      const count=Number(option.count||0),percent=total?Math.round(count/total*100):0,selected=Number(poll.myVote)===Number(option.id);
+      return <button key={option.id} type="button" onClick={()=>onVote(Number(poll.id),Number(option.id))} className={cn("group relative w-full overflow-hidden rounded-lg border px-3 py-2.5 text-left transition-all",selected?"border-violet-300/50 bg-violet-400/10":"border-white/10 bg-black/20 hover:border-violet-300/30 hover:bg-violet-400/[.06]")}>
+        <span className="absolute inset-y-0 left-0 bg-violet-400/10 transition-[width] duration-500" style={{width:percent+"%"}}/>
+        <span className="relative flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2 text-xs text-white/85">{selected?<Check className="h-3.5 w-3.5 shrink-0 text-violet-200"/>:<span className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/25"/>}<span className="truncate">{option.label}</span></span><span className="shrink-0 text-[10px] font-mono text-violet-100/65">{percent}% · {count}</span></span>
+      </button>;
+    })}</div>
+    <div className="mt-2 text-[9px] text-white/35">{poll.myVote?"Your vote is saved · You can change it":"Choose an option to vote"} </div>
+  </div>;
+};
+
 const TerminalMessage = ({
-  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem, shouldAutoplayEmote
+  msg, isMe, onReply, onForward, onPurge, onMediaPreview, onProfileClick, emoteItem, shouldAutoplayEmote, reactions = [], poll, onToggleReaction, onVote
 }: {
-  msg: any; isMe: boolean; emoteItem?: any; shouldAutoplayEmote?: boolean;
+  msg: any; isMe: boolean; emoteItem?: any; shouldAutoplayEmote?: boolean; reactions?: any[]; poll?: any; onToggleReaction: (id: number, emoji: string) => void; onVote: (pollId: number, optionId: number) => void;
   onReply: (m: any) => void;
   onForward: (m: any) => void;
   onPurge: (id: number) => void;
@@ -453,6 +468,11 @@ const TerminalMessage = ({
         {chatEmoteMatch ? <div className="mt-1 flex max-w-[240px] flex-col items-center gap-2 rounded-xl border border-violet-400/25 bg-violet-500/10 p-3">{emoteItem?.imageUrl ? <img src={emoteItem.imageUrl} alt={emoteItem.name || "Chat emote"} className="max-h-36 max-w-full object-contain"/> : <span className="text-xs text-violet-200/60">Loading emote…</span>}<span className="text-[10px] font-bold text-violet-100">{emoteItem?.name || "Emote"}</span></div> : displayContent && <div className="whitespace-pre-wrap leading-relaxed select-text break-words"><MessageContent content={displayContent} /></div>}
         {dihhroGiftMatch && <a href={dihhroGiftMatch[0]} target="_blank" rel="noreferrer" className="mt-3 block max-w-sm rounded-xl border border-fuchsia-400/30 bg-gradient-to-r from-fuchsia-500/15 to-violet-500/10 p-3 no-underline transition hover:border-fuchsia-300/60"><div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-fuchsia-200"><Gift className="h-4 w-4"/> NEXUS DIHHRO GIFT</div><div className="mt-1 text-sm font-bold text-white">Claim Dihhro for 1 month!</div><div className="mt-1 text-[10px] text-fuchsia-100/60">Single-use gift · Open to claim</div></a>}
         {getMediaSection()}
+        {msg.mediaType === "poll" && poll && <ChatPollCard poll={poll} onVote={onVote}/>}
+        {Number(msg.id)>0 && <div className="chat-reactions mt-2 flex flex-wrap items-center gap-1.5">
+          {reactions.map((reaction:any)=><button key={reaction.emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),reaction.emoji)} title={reaction.userIds?.length ? `Reacted by ${reaction.userIds.length} member(s)` : "React"} className={cn("rounded-full border px-2 py-1 text-[11px] transition-all hover:-translate-y-0.5",reaction.userIds?.includes?.(msg.currentUserId)?"border-violet-300/50 bg-violet-400/15 text-violet-100":"border-white/10 bg-black/20 text-white/65 hover:border-violet-300/30")}>{reaction.emoji} <span className="ml-1 text-[9px]">{reaction.count}</span></button>)}
+          {["👍","❤️","😂","🔥","🎉","👀","😭","💀"].map(emoji=><button key={emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),emoji)} aria-label={`React ${emoji}`} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[.07] bg-white/[.025] text-xs opacity-65 transition hover:scale-110 hover:border-violet-300/30 hover:bg-violet-400/10 hover:opacity-100">{emoji}</button>)}
+        </div>}
 
         <AnimatePresence>
           {showActions && (
@@ -503,6 +523,21 @@ export default function Chat() {
     recipientId: selectedRecipientId,
     groupId: selectedGroupId,
   });
+  const chatInteractionsKey = ["/api/chat/interactions", selectedRecipientId ?? null, selectedGroupId ?? null];
+  const { data: chatInteractions = { reactions: {}, polls: {} } } = useQuery<any>({
+    queryKey: chatInteractionsKey,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedRecipientId) params.set("recipientId", String(selectedRecipientId));
+      if (selectedGroupId) params.set("groupId", String(selectedGroupId));
+      const response = await fetch(`/api/chat/interactions${params.toString() ? "?" + params.toString() : ""}`, { credentials: "same-origin" });
+      if (!response.ok) throw new Error("Could not load chat reactions and polls");
+      return response.json();
+    },
+    enabled: Boolean(currentUser),
+    refetchInterval: 1500,
+    staleTime: 500,
+  });
 
   // --- MODAL STATE ---
   const [showEveryoneList, setShowEveryoneList] = useState(false);
@@ -524,6 +559,10 @@ export default function Chat() {
   const [localMuteUntil, setLocalMuteUntil] = useState(0);
   const [replyTarget, setReplyTarget] = useState<any>(null);
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
+  const [showPollComposer, setShowPollComposer] = useState(false);
+  const [showCommandDirectory, setShowCommandDirectory] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
   const [forwardState, setForwardState] = useState<ForwardTarget>({ message: null, isOpen: false });
   const [mediaPreview, setMediaPreview] = useState<MediaPreview | null>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
@@ -984,6 +1023,59 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     toast({ title: "GIF sent", description: "Your GIF was added to the chat." });
   };
 
+  const toggleMessageReaction = async (messageId: number, emoji: string) => {
+    try {
+      const response = await fetch(`/api/chat/messages/${messageId}/reactions`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Reaction failed");
+      queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
+    } catch (error: any) {
+      toast({ title: "Reaction failed", description: error.message || "Could not save reaction.", variant: "destructive" });
+    }
+  };
+
+  const voteInPoll = async (pollId: number, optionId: number) => {
+    try {
+      const response = await fetch(`/api/chat/polls/${pollId}/vote`, {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Vote failed");
+      queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
+    } catch (error: any) {
+      toast({ title: "Vote failed", description: error.message || "Could not save your vote.", variant: "destructive" });
+    }
+  };
+
+  const submitPoll = async () => {
+    const options = pollOptions.map(option => option.trim()).filter(Boolean);
+    if (!pollQuestion.trim() || options.length < 2) {
+      toast({ title: "Poll needs more detail", description: "Add a question and at least two options.", variant: "destructive" });
+      return;
+    }
+    try {
+      const response = await fetch("/api/chat/polls", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: pollQuestion.trim(), options, recipientId: selectedRecipientId, groupId: selectedGroupId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Could not create poll");
+      setShowPollComposer(false); setPollQuestion(""); setPollOptions(["", ""]);
+      queryClient.invalidateQueries({ queryKey: [api.chat.list.path] });
+      queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
+      toast({ title: "Poll posted", description: "Everyone in this chat can vote and change their vote." });
+    } catch (error: any) {
+      toast({ title: "Poll could not be posted", description: error.message || "Try again.", variant: "destructive" });
+    }
+  };
+
   // ============================================================
   // SEND MESSAGE
   // ============================================================
@@ -999,6 +1091,18 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     const commandArgs = (commandParts?.[2] || '').trim();
     if (commandName && MODERATION_COMMAND_NAMES.includes(commandName as any) && !canUseAdminCommand(commandName as keyof typeof ADMIN_COMMANDS_CONFIG.commands)) {
       toast({ title: 'OWNER ONLY', description: 'Only staff members can use this command.', variant: 'destructive' });
+      return;
+    }
+    if (commandName === "poll") {
+      setPollQuestion(commandArgs);
+      setPollOptions(["", ""]);
+      setShowPollComposer(true);
+      setInputContent("");
+      return;
+    }
+    if (commandName === "commands" || commandName === "help") {
+      setShowCommandDirectory(true);
+      setInputContent("");
       return;
     }
     if (commandName === 'capsi') {
@@ -1736,7 +1840,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   const typedCommand = slashParts?.[1]?.toLowerCase() ?? null;
   const commandArgument = slashParts?.[2] ?? null;
   const matchingCommands = typedCommand !== null && commandArgument === null
-    ? CHAT_COMMANDS.filter(command => command.name.startsWith(typedCommand) && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
+    ? CHAT_COMMANDS.filter(command => command.name.includes(typedCommand) && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
     : [];
   const activeCommand = typedCommand !== null
     ? CHAT_COMMANDS.find(command => command.name === typedCommand && (!('ownerOnly' in command) || !command.ownerOnly || canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)))
@@ -1785,6 +1889,8 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     });
     setCommandSelection(0);
   };
+
+  useEffect(() => { setCommandSelection(0); }, [typedCommand, commandArgument]);
 
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const optionsCount = moderationUserOptions.length || parameterOptions.length || matchingCommands.length;
@@ -2297,6 +2403,10 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 onPurge={id => deleteMessageMutation.mutate(id)}
                 onMediaPreview={setMediaPreview}
                 onProfileClick={setProfileUserId}
+                reactions={chatInteractions.reactions?.[String(msg.id)] || []}
+                poll={chatInteractions.polls?.[String(msg.id)]}
+                onToggleReaction={toggleMessageReaction}
+                onVote={voteInPoll}
                 emoteItem={chatEmoteItems.find((item:any) => item.type === "emote" && Number(item.id) === Number(String(msg.content || "").match(/^\[CHAT_EMOTE:(\d+)\]$/)?.[1]))}
                 shouldAutoplayEmote={!isLoadingMessages && (
                   Number(msg.id) < 0 ||
@@ -2400,6 +2510,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                 <Mic className="w-4 h-4" />
               </button>
 
+              <button type="button" onClick={() => { setPollQuestion(""); setPollOptions(["", ""]); setShowPollComposer(true); }} title="Create a poll" aria-label="Create a poll" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-400/[.06] text-violet-200/75 transition hover:border-violet-300/35 hover:bg-violet-400/15 hover:text-white"><BarChart3 className="h-4 w-4"/></button>
               <div className="flex-1 relative">
                 <input
                   value={inputContent}
@@ -2409,6 +2520,32 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                   className="w-full h-10 bg-input/90 border border-border rounded-xl px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground shadow-inner transition-all duration-200 ease-out focus:-translate-y-px focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400/60 focus:shadow-[0_0_22px_rgba(139,92,246,0.12)]"
                 />
                 {showCommandMenu && (
+                  <div className="chat-command-menu absolute bottom-12 left-0 right-0 z-50 max-h-[min(64vh,520px)] overflow-hidden rounded-2xl border border-violet-300/25 bg-[#10091b]/[.98] shadow-[0_18px_65px_rgba(0,0,0,.55),0_0_34px_rgba(139,92,246,.17)] backdrop-blur-2xl">
+                    <div className="flex items-center justify-between gap-3 border-b border-violet-300/15 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/[.04] px-3 py-3">
+                      <div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.2em] text-violet-200">NEXUS COMMAND CENTER</div><div className="mt-1 text-[10px] text-white/40">{moderationUserOptions.length ? "Select a member" : parameterOptions.length ? "Choose a parameter" : matchingCommands.length + " matching commands"}</div></div>
+                      <div className="flex shrink-0 gap-1.5"><kbd className="rounded border border-white/10 bg-black/30 px-1.5 py-1 text-[8px] text-white/45">↑ ↓</kbd><kbd className="rounded border border-white/10 bg-black/30 px-1.5 py-1 text-[8px] text-white/45">TAB</kbd><kbd className="rounded border border-white/10 bg-black/30 px-1.5 py-1 text-[8px] text-white/45">ENTER</kbd></div>
+                    </div>
+                    <div className="max-h-[min(52vh,430px)] overflow-y-auto p-2">
+                      {(moderationUserOptions.length ? moderationUserOptions : parameterOptions.length ? parameterOptions : matchingCommands).map((item: any, index: number) => {
+                        const selected = index === commandSelection;
+                        const isTargetSuggestion = moderationUserOptions.length > 0;
+                        const isDurationSuggestion = !isTargetSuggestion && parameterOptions.length > 0;
+                        const command = isDurationSuggestion ? activeCommand : item;
+                        const targetUser = isTargetSuggestion ? item : null;
+                        const name = isTargetSuggestion ? (item.displayName || item.nickname || item.username) : isDurationSuggestion ? item : command?.name;
+                        const description = isTargetSuggestion ? "Chat member · insert into command" : isDurationSuggestion ? "Suggested moderation duration" : command?.description;
+                        return <button key={isTargetSuggestion ? `target-${item.id}` : isDurationSuggestion ? `${command?.name}-${item}` : item.name} type="button" onMouseEnter={() => setCommandSelection(index)} onClick={() => isTargetSuggestion ? insertModerationTarget(targetUser) : isDurationSuggestion ? insertParameter(item) : insertCommand(item.name)} className={cn("mb-1 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",selected?"border-violet-300/35 bg-violet-400/[.13] shadow-[0_0_20px_rgba(139,92,246,.08)]":"border-transparent hover:border-white/10 hover:bg-white/[.035]")}>
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-400/[.09] text-violet-200"><Command className="h-4 w-4"/></span>
+                          <span className="min-w-0 flex-1"><span className="block truncate text-[11px] font-bold text-fuchsia-100">{isTargetSuggestion ? "@" + item.username : isDurationSuggestion ? item : command?.usage}</span><span className="mt-0.5 block truncate text-[9px] text-violet-100/45">{description}</span></span>
+                          {selected&&<span className="rounded-md border border-violet-300/20 bg-violet-400/10 px-2 py-1 text-[8px] font-bold text-violet-100">SELECTED</span>}
+                        </button>;
+                      })}
+                      {activeCommand&&commandArgument!==null&&parameterOptions.length===0&&moderationUserOptions.length===0&&<div className="m-1 rounded-lg border border-white/[.06] bg-white/[.025] px-3 py-2 text-[9px] text-white/45">Usage: <span className="text-violet-100/75">{activeCommand.usage}</span></div>}
+                      {inputContent==="/"&&<div className="px-2 py-2 text-[9px] text-white/35">Start typing to filter · Try <span className="text-violet-200">/poll</span> or <span className="text-violet-200">/commands</span></div>}
+                    </div>
+                  </div>
+                )}
+                {false && (
                   <div className="chat-command-menu absolute bottom-12 left-0 right-0 z-50 rounded-2xl border border-violet-300/25 bg-[#10091b]/[.97] backdrop-blur-2xl shadow-[0_18px_65px_rgba(0,0,0,.55),0_0_34px_rgba(139,92,246,.17)] overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-violet-400/15">
                       <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-violet-200/70">{moderationUserOptions.length ? 'Choose a member' : parameterOptions.length ? 'Command parameters' : 'Available commands'}</span>
@@ -2601,6 +2738,24 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showPollComposer && <motion.div className="fixed inset-0 z-[980] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onMouseDown={e=>{if(e.target===e.currentTarget)setShowPollComposer(false);}}>
+          <motion.div initial={{opacity:0,y:18,scale:.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:12,scale:.98}} className="w-full max-w-lg rounded-2xl border border-violet-300/25 bg-[#100b1c] p-5 shadow-[0_25px_90px_rgba(0,0,0,.65),0_0_45px_rgba(139,92,246,.12)]">
+            <div className="mb-4 flex items-center justify-between"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-violet-200">Create a poll</div><div className="mt-1 text-xs text-white/40">Everyone in this chat can vote and change their choice</div></div><button type="button" onClick={()=>setShowPollComposer(false)} className="rounded-lg border border-white/10 p-2 text-white/55 hover:bg-white/5"><X className="h-4 w-4"/></button></div>
+            <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-violet-100/65">Question</label><input autoFocus maxLength={180} value={pollQuestion} onChange={e=>setPollQuestion(e.target.value)} placeholder="What should we do next?" className="mb-4 h-11 w-full rounded-xl border border-violet-300/20 bg-black/30 px-3 text-sm text-white outline-none focus:border-violet-300/50"/>
+            <div className="mb-2 flex items-center justify-between"><label className="text-[10px] font-bold uppercase tracking-wider text-violet-100/65">Options</label><span className="text-[9px] text-white/35">{pollOptions.filter(x=>x.trim()).length}/6</span></div>
+            <div className="space-y-2">{pollOptions.map((option,index)=><div key={index} className="flex gap-2"><input maxLength={80} value={option} onChange={e=>setPollOptions(items=>items.map((item,i)=>i===index?e.target.value:item))} placeholder={`Option ${index+1}`} className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white outline-none focus:border-violet-300/40"/>{pollOptions.length>2&&<button type="button" onClick={()=>setPollOptions(items=>items.filter((_,i)=>i!==index))} className="rounded-lg border border-white/10 px-3 text-white/40 hover:text-rose-200"><X className="h-4 w-4"/></button>}</div>)}</div>
+            {pollOptions.length<6&&<button type="button" onClick={()=>setPollOptions(items=>[...items,""])} className="mt-3 text-[10px] font-bold text-violet-200 hover:text-white">+ ADD OPTION</button>}
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={()=>setShowPollComposer(false)} className="rounded-xl border border-white/10 px-4 py-2 text-xs text-white/60 hover:bg-white/5">Cancel</button><button type="button" onClick={submitPoll} className="rounded-xl bg-violet-500 px-5 py-2 text-xs font-black text-white shadow-lg shadow-violet-950/40 hover:bg-violet-400">POST POLL</button></div>
+          </motion.div>
+        </motion.div>}
+        {showCommandDirectory && <motion.div className="fixed inset-0 z-[980] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onMouseDown={e=>{if(e.target===e.currentTarget)setShowCommandDirectory(false);}}>
+          <motion.div initial={{opacity:0,y:18,scale:.97}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:12,scale:.98}} className="flex max-h-[82vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-violet-300/25 bg-[#100b1c] shadow-[0_25px_90px_rgba(0,0,0,.65)]">
+            <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/[.04] p-5"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-violet-200">Command directory</div><div className="mt-1 text-xs text-white/40">Pick a command to insert it into the composer</div></div><button type="button" onClick={()=>setShowCommandDirectory(false)} className="rounded-lg border border-white/10 p-2 text-white/55"><X className="h-4 w-4"/></button></div>
+            <div className="grid gap-4 overflow-y-auto p-4 sm:grid-cols-2"><section><div className="mb-2 text-[9px] font-black uppercase tracking-[.18em] text-emerald-200">Member commands</div>{CHAT_COMMANDS.filter(command=>!("ownerOnly" in command&&command.ownerOnly)).map(command=><button key={command.name} type="button" onClick={()=>{setInputContent(`/${command.name} `);setShowCommandDirectory(false);}} className="mb-1 flex w-full items-center justify-between rounded-lg border border-white/[.06] bg-white/[.02] px-3 py-2 text-left hover:border-violet-300/25 hover:bg-violet-400/[.06]"><span><span className="block text-[10px] font-bold text-violet-100">/{command.name}</span><span className="block text-[9px] text-white/35">{command.description}</span></span><ChevronRight className="h-3 w-3 text-white/25"/></button>)}</section><section><div className="mb-2 text-[9px] font-black uppercase tracking-[.18em] text-rose-200">Staff commands</div>{CHAT_COMMANDS.filter(command=>"ownerOnly" in command&&command.ownerOnly&&canUseAdminCommand(command.name as keyof typeof ADMIN_COMMANDS_CONFIG.commands)).map(command=><button key={command.name} type="button" onClick={()=>{setInputContent(`/${command.name} `);setShowCommandDirectory(false);}} className="mb-1 flex w-full items-center justify-between rounded-lg border border-white/[.06] bg-white/[.02] px-3 py-2 text-left hover:border-rose-300/25 hover:bg-rose-400/[.06]"><span><span className="block text-[10px] font-bold text-rose-100">/{command.name}</span><span className="block text-[9px] text-white/35">{command.description}</span></span><ChevronRight className="h-3 w-3 text-white/25"/></button>)}</section></div>
+          </motion.div>
+        </motion.div>}
       </AnimatePresence>
       <ProfileModal
         userId={profileUserId}
