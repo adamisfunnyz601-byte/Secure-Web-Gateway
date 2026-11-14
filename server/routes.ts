@@ -310,7 +310,7 @@ export async function registerRoutes(
     }
     next();
   };
-  const chatAiRateLimit = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { message: "The chat AI is busy. Please wait a minute before asking again." } });
+  const chatAiRateLimit = rateLimit({ windowMs: 60_000, limit: 5, keyGenerator: (req: Request) => String(req.session.userId || req.ip), standardHeaders: true, legacyHeaders: false, message: { message: "The chat AI is busy. Please wait a minute before asking again." } });
   let nexusAiBotPromise: Promise<any> | null = null;
   const getNexusAiBot = async () => {
     if (!nexusAiBotPromise) {
@@ -1133,10 +1133,9 @@ export async function registerRoutes(
     if (!question || options.length < 2 || options.length > 6 || new Set(options.map((value: string) => value.toLowerCase())).size !== options.length) {
       return res.status(400).json({ message: "A poll needs a question and 2–6 different options." });
     }
+    if (recipientId !== null && (!Number.isInteger(recipientId) || recipientId <= 0 || recipientId === req.session.userId)) return res.status(400).json({ message: "Invalid DM recipient." });
     if (recipientId && groupId) return res.status(400).json({ message: "Choose a DM or group, not both." });
-    if (recipientId) {
-      if (!Number.isInteger(recipientId) || recipientId <= 0 || recipientId === req.session.userId || await blockedEitherWay(req.session.userId!, recipientId)) return res.status(403).json({ message: "You cannot create a poll in this DM." });
-    }
+    if (recipientId && await blockedEitherWay(req.session.userId!, recipientId)) return res.status(403).json({ message: "You cannot create a poll in this DM." });
     if (groupId) {
       if (!Number.isInteger(groupId) || groupId <= 0) return res.status(400).json({ message: "Invalid group." });
       const [membership] = await db.select({ id: groupChatMembers.id }).from(groupChatMembers)
