@@ -202,3 +202,220 @@ body {
     transition-duration: .01ms !important;
   }
 }
+
+/* ───────────────── NEXUS UI POLISH LAYER ───────────────── */
+:root {
+  --nexus-ink: 222 35% 5%;
+  --nexus-panel: 225 26% 9%;
+  --nexus-line: 220 24% 100%;
+  --nexus-glow: hsl(var(--primary) / .32);
+}
+.nexus-shell { background: radial-gradient(ellipse at 50% -20%,hsl(var(--primary)/.13),transparent 50%),hsl(var(--background)); }
+.nexus-sidebar {
+  width:278px; color:#f8f8ff; overflow:hidden;
+  background:linear-gradient(180deg,rgba(17,19,34,.98),rgba(10,12,23,.99));
+  border-right:1px solid rgba(180,170,255,.12);
+  box-shadow:18px 0 55px rgba(0,0,0,.2);
+}
+.nexus-sidebar:before { content:"";position:absolute;inset:0;pointer-events:none;opacity:.2;background:linear-gradient(135deg,transparent 15%,rgba(133,110,255,.09) 48%,transparent 72%); }
+.nexus-brand { position:relative;display:flex;align-items:center;gap:12px;padding:23px 19px 20px;border-bottom:1px solid rgba(255,255,255,.07); }
+.nexus-brand-orb { position:relative;display:grid;place-items:center;width:40px;height:40px;flex:none;border:1px solid rgba(194,174,255,.45);border-radius:14px;color:#fff;background:linear-gradient(145deg,#8865ff,#4a36aa 65%,#1fc7bd);box-shadow:0 0 25px rgba(132,96,255,.35),inset 0 1px rgba(255,255,255,.3); }
+.nexus-brand-orb:after { content:"";position:absolute;inset:-5px;border:1px solid rgba(159,133,255,.17);border-radius:17px;animation:nexus-orbit 8s linear infinite; }
+.nexus-brand-name {font-size:16px;font-weight:900;letter-spacing:.2em;color:#fff}.nexus-brand-name span{margin-left:4px;color:#a99aff;font-size:9px;letter-spacing:.12em}
+.nexus-brand-sub {margin-top:3px;font-size:8px;letter-spacing:.18em;color:rgba(215,210,255,.36)}
+.nexus-version {padding:4px 6px;border:1px solid rgba(255,255,255,.09);border-radius:6px;color:rgba(255,255,255,.35);font:9px ui-monospace,monospace}
+.nexus-workspace-card {position:relative;display:flex;align-items:center;gap:10px;margin:15px 13px 9px;padding:11px;border:1px solid rgba(161,140,255,.17);border-radius:13px;background:linear-gradient(110deg,rgba(127,95,255,.13),rgba(38,193,181,.045));}
+.nexus-workspace-icon {display:grid;place-items:center;width:31px;height:31px;border-radius:10px;background:rgba(147,118,255,.18);color:#c7baff}
+.nexus-live-dot,.nexus-breadcrumb-dot {width:7px;height:7px;border-radius:50%;background:#51e5b4;box-shadow:0 0 10px #51e5b4}
+.nexus-nav {position:relative;scrollbar-width:thin;scrollbar-color:rgba(166,145,255,.2) transparent}
+.nexus-nav-section {margin-top:18px}
+.nexus-section-label {display:flex;align-items:center;gap:9px;padding:0 10px 9px;color:rgba(201,198,226,.38);font-size:9px;font-weight:800;letter-spacing:.19em;text-transform:uppercase}
+.nexus-section-label i {height:1px;flex:1;background:linear-gradient(90deg,rgba(255,255,255,.1),transparent)}
+.nexus-nav-link {position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;min-height:42px;padding:0 11px;border:1px solid transparent;border-radius:11px;color:rgba(217,218,237,.57);font-size:12px;font-weight:600;letter-spacing:.01em;transition:color .2s,background .2s,border-color .2s,transform .2s,box-shadow .2s;overflow:hidden}
+.nexus-nav-link:before {content:"";position:absolute;inset:0;z-index:-1;opacity:0;background:linear-gradient(100deg,rgba(139,111,255,.18),rgba(42,197,185,.055));transition:opacity .22s}
+.nexus-nav-link:hover {color:#fff;transform:translateX(3px);border-color:rgba(183,164,255,.12);box-shadow:0 5px 18px rgba(0,0,0,.12)}
+.nexus-nav-link:hover:before,.nexus-nav-link.is-active:before {opacity:1}
+.nexus-nav-link.is-active {color:#fff;border-color:rgba(164,143,255,.2);background:rgba(133,106,255,.09);box-shadow:inset 0 0 22px rgba(133,106,255,.06),0 4px 18px rgba(0,0,0,.12)}
+.nexus-nav-icon {display:grid;place-items:center;width:27px;height:27px;flex:none;border-radius:8px;color:rgba(197,190,239,.58);background:rgba(255,255,255,.035);transition:transform .25s,color .2s,background .2s,box-shadow .2s}
+.nexus-nav-link:hover .nexus-nav-icon {transform:rotate(-7deg) scale(1.09);color:#c7b8ff;background:rgba(146,119,255,.17);box-shadow:0 0 16px rgba(140,113,255,.13)}
+.nexus-nav-link.is-active .nexus-nav-icon {color:#d0c5ff;background:linear-gradient(145deg,rgba(143,113,255,.28),rgba(48,194,183,.12))}
+.nexus-nav-active-indicator {position:absolute;left:-1px;top:9px;bottom:9px;width:3px;border-radius:0 5px 5px 0;background:linear-gradient(#c2aaff,#6cdbd1);box-shadow:0 0 12px #9a83ff}
+.nexus-nav-signal {width:5px;height:5px;border-radius:50%;background:#66e5c4;box-shadow:0 0 9px #66e5c4}
+.nexus-sidebar-footer {position:relative;padding:13px;border-top:1px solid rgba(255,255,255,.07);background:rgba(4,5,12,.3)}
+.nexus-user-card {display:flex;align-items:center;gap:10px;padding:10px;border:1px solid rgba(255,255,255,.075);border-radius:13px;background:rgba(255,255,255,.035)}
+.nexus-avatar-status {position:absolute;right:-1px;bottom:0;width:10px;height:10px;border:2px solid #101220;border-radius:50%;background:#4fe0a8;box-shadow:0 0 8px #4fe0a8}
+.nexus-icon-button {display:grid;place-items:center;width:29px;height:29px;border:1px solid rgba(255,255,255,.08);border-radius:8px;color:rgba(255,255,255,.45);transition:.2s}
+.nexus-icon-button:hover {color:#ff8f9d;border-color:rgba(255,105,130,.35);background:rgba(255,80,110,.1);transform:rotate(-8deg)}
+.nexus-profile-link {display:flex;align-items:center;gap:9px;margin-top:8px;padding:9px 11px;border-radius:9px;color:rgba(220,218,240,.48);font-size:11px;transition:.2s}
+.nexus-profile-link:hover,.nexus-profile-link.is-active {color:#d0c4ff;background:rgba(142,116,255,.1)}
+.nexus-profile-link span {margin-left:auto;opacity:.4}
+.nexus-footer-meta {display:flex;justify-content:space-between;padding:12px 4px 0;color:rgba(173,177,205,.27);font:8px ui-monospace,monospace;letter-spacing:.08em}
+.nexus-main {min-height:100vh;background:radial-gradient(ellipse at 70% 0%,rgba(91,76,160,.075),transparent 42%),#0c0e18}
+.nexus-topbar {border-bottom:1px solid rgba(255,255,255,.065);background:rgba(13,15,26,.72);backdrop-filter:blur(22px)}
+.nexus-encryption {display:flex;align-items:center;gap:7px;color:rgba(143,222,195,.52);font:9px ui-monospace,monospace;letter-spacing:.12em}
+.nexus-encryption span {width:5px;height:5px;border-radius:50%;background:#56d8ac;box-shadow:0 0 8px #56d8ac}
+.nexus-content {scrollbar-gutter:stable}
+.nexus-mobilebar {position:relative;z-index:70;height:58px;align-items:center;justify-content:space-between;padding:0 15px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(13,15,26,.96);backdrop-filter:blur(20px)}
+.nexus-mobilebar .nexus-brand-mark {display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#d3c7ff;background:rgba(140,115,255,.1)}
+.nexus-mobilebar .nexus-brand-orb {width:29px;height:29px;border-radius:9px}
+.nexus-live-pill {display:flex;align-items:center;gap:6px;color:rgba(113,232,190,.75);font:8px ui-monospace,monospace;letter-spacing:.12em}
+.nexus-live-pill i {width:5px;height:5px;border-radius:50%;background:#5de0ae;box-shadow:0 0 8px #5de0ae}
+.nexus-mobile-scrim {position:fixed;inset:58px 0 0;z-index:55;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+/* Button families: each family has its own hover, press and focus character. */
+button:not([class*="nexus-"]):not([class*="unstyled"]) {transition:transform .18s cubic-bezier(.2,.8,.2,1),filter .18s,box-shadow .18s,border-color .18s}
+button:not(:disabled):hover {filter:brightness(1.12)}
+button:not(:disabled):active {transform:scale(.975)}
+button:disabled {cursor:not-allowed}
+.nexus-nav-link.nav-motion-1:hover {animation:nav-nudge .32s ease}
+.nexus-nav-link.nav-motion-2:hover .nexus-nav-icon {animation:nav-spin .38s ease}
+.nexus-nav-link.nav-motion-3:hover {animation:nav-lift .25s ease}
+.nexus-nav-link.nav-motion-4:hover .nexus-nav-icon {animation:nav-bounce .38s ease}
+.nexus-nav-link.nav-motion-5:hover {box-shadow:inset 0 0 0 1px rgba(110,221,211,.2),0 0 20px rgba(110,221,211,.08)}
+.nexus-nav-link.nav-motion-6:hover .nexus-nav-icon {animation:nav-wiggle .35s ease}
+.nexus-nav-link.nav-motion-7:hover {background:linear-gradient(100deg,rgba(143,112,255,.2),rgba(71,210,194,.1))}
+.nexus-nav-link.nav-motion-8:hover .nexus-nav-icon {animation:nav-pulse .55s ease}
+@keyframes nexus-orbit {to{transform:rotate(360deg)}}
+@keyframes nav-nudge {50%{transform:translateX(5px)}}
+@keyframes nav-spin {to{transform:rotate(360deg)}}
+@keyframes nav-lift {50%{transform:translateY(-2px)}}
+@keyframes nav-bounce {40%{transform:translateY(-4px)}70%{transform:translateY(1px)}}
+@keyframes nav-wiggle {25%{transform:rotate(-12deg)}75%{transform:rotate(10deg)}}
+@keyframes nav-pulse {50%{transform:scale(1.18);filter:drop-shadow(0 0 5px currentColor)}}
+
+/* 120 deterministic message entrance variations: 12 motion signatures × 10 rhythms. */
+.message-motion {animation-duration:var(--msg-duration,.34s);animation-delay:var(--msg-delay,0ms);animation-fill-mode:both;animation-timing-function:cubic-bezier(.2,.8,.2,1);will-change:opacity,transform}
+@keyframes msg-rise{from{opacity:0;transform:translateY(15px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes msg-slide{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+@keyframes msg-soft{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes msg-blur{from{opacity:0;filter:blur(8px);transform:translateY(5px)}to{opacity:1;filter:blur(0);transform:translateY(0)}}
+@keyframes msg-flip{from{opacity:0;transform:perspective(600px) rotateX(-12deg) translateY(8px)}to{opacity:1;transform:perspective(600px) rotateX(0) translateY(0)}}
+@keyframes msg-left{from{opacity:0;transform:translateX(-22px) scale(.99)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes msg-right{from{opacity:0;transform:translateX(22px) scale(.99)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes msg-pop{0%{opacity:0;transform:scale(.82)}75%{opacity:1;transform:scale(1.025)}100%{transform:scale(1)}}
+@keyframes msg-float{from{opacity:0;transform:translateY(9px) rotate(-.7deg)}to{opacity:1;transform:translateY(0) rotate(0)}}
+@keyframes msg-sweep{from{opacity:0;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+@keyframes msg-drift{from{opacity:0;transform:translate3d(0,12px,0) scale(.97);filter:blur(3px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
+@keyframes msg-elastic{0%{opacity:0;transform:translateY(12px) scale(.92)}65%{opacity:1;transform:translateY(-2px) scale(1.01)}100%{transform:translateY(0) scale(1)}}
+.message-motion-0{animation-name:msg-rise;--msg-duration:0.24s;--msg-delay:0ms}
+.message-motion-1{animation-name:msg-slide;--msg-duration:0.24s;--msg-delay:12ms}
+.message-motion-2{animation-name:msg-soft;--msg-duration:0.24s;--msg-delay:24ms}
+.message-motion-3{animation-name:msg-blur;--msg-duration:0.24s;--msg-delay:36ms}
+.message-motion-4{animation-name:msg-flip;--msg-duration:0.24s;--msg-delay:0ms}
+.message-motion-5{animation-name:msg-left;--msg-duration:0.24s;--msg-delay:12ms}
+.message-motion-6{animation-name:msg-right;--msg-duration:0.24s;--msg-delay:24ms}
+.message-motion-7{animation-name:msg-pop;--msg-duration:0.24s;--msg-delay:36ms}
+.message-motion-8{animation-name:msg-float;--msg-duration:0.24s;--msg-delay:0ms}
+.message-motion-9{animation-name:msg-sweep;--msg-duration:0.24s;--msg-delay:12ms}
+.message-motion-10{animation-name:msg-drift;--msg-duration:0.24s;--msg-delay:24ms}
+.message-motion-11{animation-name:msg-elastic;--msg-duration:0.24s;--msg-delay:36ms}
+.message-motion-12{animation-name:msg-rise;--msg-duration:0.28s;--msg-delay:0ms}
+.message-motion-13{animation-name:msg-slide;--msg-duration:0.28s;--msg-delay:12ms}
+.message-motion-14{animation-name:msg-soft;--msg-duration:0.28s;--msg-delay:24ms}
+.message-motion-15{animation-name:msg-blur;--msg-duration:0.28s;--msg-delay:36ms}
+.message-motion-16{animation-name:msg-flip;--msg-duration:0.28s;--msg-delay:0ms}
+.message-motion-17{animation-name:msg-left;--msg-duration:0.28s;--msg-delay:12ms}
+.message-motion-18{animation-name:msg-right;--msg-duration:0.28s;--msg-delay:24ms}
+.message-motion-19{animation-name:msg-pop;--msg-duration:0.28s;--msg-delay:36ms}
+.message-motion-20{animation-name:msg-float;--msg-duration:0.28s;--msg-delay:0ms}
+.message-motion-21{animation-name:msg-sweep;--msg-duration:0.28s;--msg-delay:12ms}
+.message-motion-22{animation-name:msg-drift;--msg-duration:0.28s;--msg-delay:24ms}
+.message-motion-23{animation-name:msg-elastic;--msg-duration:0.28s;--msg-delay:36ms}
+.message-motion-24{animation-name:msg-rise;--msg-duration:0.32s;--msg-delay:0ms}
+.message-motion-25{animation-name:msg-slide;--msg-duration:0.32s;--msg-delay:12ms}
+.message-motion-26{animation-name:msg-soft;--msg-duration:0.32s;--msg-delay:24ms}
+.message-motion-27{animation-name:msg-blur;--msg-duration:0.32s;--msg-delay:36ms}
+.message-motion-28{animation-name:msg-flip;--msg-duration:0.32s;--msg-delay:0ms}
+.message-motion-29{animation-name:msg-left;--msg-duration:0.32s;--msg-delay:12ms}
+.message-motion-30{animation-name:msg-right;--msg-duration:0.32s;--msg-delay:24ms}
+.message-motion-31{animation-name:msg-pop;--msg-duration:0.32s;--msg-delay:36ms}
+.message-motion-32{animation-name:msg-float;--msg-duration:0.32s;--msg-delay:0ms}
+.message-motion-33{animation-name:msg-sweep;--msg-duration:0.32s;--msg-delay:12ms}
+.message-motion-34{animation-name:msg-drift;--msg-duration:0.32s;--msg-delay:24ms}
+.message-motion-35{animation-name:msg-elastic;--msg-duration:0.32s;--msg-delay:36ms}
+.message-motion-36{animation-name:msg-rise;--msg-duration:0.36s;--msg-delay:0ms}
+.message-motion-37{animation-name:msg-slide;--msg-duration:0.36s;--msg-delay:12ms}
+.message-motion-38{animation-name:msg-soft;--msg-duration:0.36s;--msg-delay:24ms}
+.message-motion-39{animation-name:msg-blur;--msg-duration:0.36s;--msg-delay:36ms}
+.message-motion-40{animation-name:msg-flip;--msg-duration:0.36s;--msg-delay:0ms}
+.message-motion-41{animation-name:msg-left;--msg-duration:0.36s;--msg-delay:12ms}
+.message-motion-42{animation-name:msg-right;--msg-duration:0.36s;--msg-delay:24ms}
+.message-motion-43{animation-name:msg-pop;--msg-duration:0.36s;--msg-delay:36ms}
+.message-motion-44{animation-name:msg-float;--msg-duration:0.36s;--msg-delay:0ms}
+.message-motion-45{animation-name:msg-sweep;--msg-duration:0.36s;--msg-delay:12ms}
+.message-motion-46{animation-name:msg-drift;--msg-duration:0.36s;--msg-delay:24ms}
+.message-motion-47{animation-name:msg-elastic;--msg-duration:0.36s;--msg-delay:36ms}
+.message-motion-48{animation-name:msg-rise;--msg-duration:0.4s;--msg-delay:0ms}
+.message-motion-49{animation-name:msg-slide;--msg-duration:0.4s;--msg-delay:12ms}
+.message-motion-50{animation-name:msg-soft;--msg-duration:0.4s;--msg-delay:24ms}
+.message-motion-51{animation-name:msg-blur;--msg-duration:0.4s;--msg-delay:36ms}
+.message-motion-52{animation-name:msg-flip;--msg-duration:0.4s;--msg-delay:0ms}
+.message-motion-53{animation-name:msg-left;--msg-duration:0.4s;--msg-delay:12ms}
+.message-motion-54{animation-name:msg-right;--msg-duration:0.4s;--msg-delay:24ms}
+.message-motion-55{animation-name:msg-pop;--msg-duration:0.4s;--msg-delay:36ms}
+.message-motion-56{animation-name:msg-float;--msg-duration:0.4s;--msg-delay:0ms}
+.message-motion-57{animation-name:msg-sweep;--msg-duration:0.4s;--msg-delay:12ms}
+.message-motion-58{animation-name:msg-drift;--msg-duration:0.4s;--msg-delay:24ms}
+.message-motion-59{animation-name:msg-elastic;--msg-duration:0.4s;--msg-delay:36ms}
+.message-motion-60{animation-name:msg-rise;--msg-duration:0.44s;--msg-delay:0ms}
+.message-motion-61{animation-name:msg-slide;--msg-duration:0.44s;--msg-delay:12ms}
+.message-motion-62{animation-name:msg-soft;--msg-duration:0.44s;--msg-delay:24ms}
+.message-motion-63{animation-name:msg-blur;--msg-duration:0.44s;--msg-delay:36ms}
+.message-motion-64{animation-name:msg-flip;--msg-duration:0.44s;--msg-delay:0ms}
+.message-motion-65{animation-name:msg-left;--msg-duration:0.44s;--msg-delay:12ms}
+.message-motion-66{animation-name:msg-right;--msg-duration:0.44s;--msg-delay:24ms}
+.message-motion-67{animation-name:msg-pop;--msg-duration:0.44s;--msg-delay:36ms}
+.message-motion-68{animation-name:msg-float;--msg-duration:0.44s;--msg-delay:0ms}
+.message-motion-69{animation-name:msg-sweep;--msg-duration:0.44s;--msg-delay:12ms}
+.message-motion-70{animation-name:msg-drift;--msg-duration:0.44s;--msg-delay:24ms}
+.message-motion-71{animation-name:msg-elastic;--msg-duration:0.44s;--msg-delay:36ms}
+.message-motion-72{animation-name:msg-rise;--msg-duration:0.3s;--msg-delay:0ms}
+.message-motion-73{animation-name:msg-slide;--msg-duration:0.3s;--msg-delay:12ms}
+.message-motion-74{animation-name:msg-soft;--msg-duration:0.3s;--msg-delay:24ms}
+.message-motion-75{animation-name:msg-blur;--msg-duration:0.3s;--msg-delay:36ms}
+.message-motion-76{animation-name:msg-flip;--msg-duration:0.3s;--msg-delay:0ms}
+.message-motion-77{animation-name:msg-left;--msg-duration:0.3s;--msg-delay:12ms}
+.message-motion-78{animation-name:msg-right;--msg-duration:0.3s;--msg-delay:24ms}
+.message-motion-79{animation-name:msg-pop;--msg-duration:0.3s;--msg-delay:36ms}
+.message-motion-80{animation-name:msg-float;--msg-duration:0.3s;--msg-delay:0ms}
+.message-motion-81{animation-name:msg-sweep;--msg-duration:0.3s;--msg-delay:12ms}
+.message-motion-82{animation-name:msg-drift;--msg-duration:0.3s;--msg-delay:24ms}
+.message-motion-83{animation-name:msg-elastic;--msg-duration:0.3s;--msg-delay:36ms}
+.message-motion-84{animation-name:msg-rise;--msg-duration:0.34s;--msg-delay:0ms}
+.message-motion-85{animation-name:msg-slide;--msg-duration:0.34s;--msg-delay:12ms}
+.message-motion-86{animation-name:msg-soft;--msg-duration:0.34s;--msg-delay:24ms}
+.message-motion-87{animation-name:msg-blur;--msg-duration:0.34s;--msg-delay:36ms}
+.message-motion-88{animation-name:msg-flip;--msg-duration:0.34s;--msg-delay:0ms}
+.message-motion-89{animation-name:msg-left;--msg-duration:0.34s;--msg-delay:12ms}
+.message-motion-90{animation-name:msg-right;--msg-duration:0.34s;--msg-delay:24ms}
+.message-motion-91{animation-name:msg-pop;--msg-duration:0.34s;--msg-delay:36ms}
+.message-motion-92{animation-name:msg-float;--msg-duration:0.34s;--msg-delay:0ms}
+.message-motion-93{animation-name:msg-sweep;--msg-duration:0.34s;--msg-delay:12ms}
+.message-motion-94{animation-name:msg-drift;--msg-duration:0.34s;--msg-delay:24ms}
+.message-motion-95{animation-name:msg-elastic;--msg-duration:0.34s;--msg-delay:36ms}
+.message-motion-96{animation-name:msg-rise;--msg-duration:0.38s;--msg-delay:0ms}
+.message-motion-97{animation-name:msg-slide;--msg-duration:0.38s;--msg-delay:12ms}
+.message-motion-98{animation-name:msg-soft;--msg-duration:0.38s;--msg-delay:24ms}
+.message-motion-99{animation-name:msg-blur;--msg-duration:0.38s;--msg-delay:36ms}
+.message-motion-100{animation-name:msg-flip;--msg-duration:0.38s;--msg-delay:0ms}
+.message-motion-101{animation-name:msg-left;--msg-duration:0.38s;--msg-delay:12ms}
+.message-motion-102{animation-name:msg-right;--msg-duration:0.38s;--msg-delay:24ms}
+.message-motion-103{animation-name:msg-pop;--msg-duration:0.38s;--msg-delay:36ms}
+.message-motion-104{animation-name:msg-float;--msg-duration:0.38s;--msg-delay:0ms}
+.message-motion-105{animation-name:msg-sweep;--msg-duration:0.38s;--msg-delay:12ms}
+.message-motion-106{animation-name:msg-drift;--msg-duration:0.38s;--msg-delay:24ms}
+.message-motion-107{animation-name:msg-elastic;--msg-duration:0.38s;--msg-delay:36ms}
+.message-motion-108{animation-name:msg-rise;--msg-duration:0.42s;--msg-delay:0ms}
+.message-motion-109{animation-name:msg-slide;--msg-duration:0.42s;--msg-delay:12ms}
+.message-motion-110{animation-name:msg-soft;--msg-duration:0.42s;--msg-delay:24ms}
+.message-motion-111{animation-name:msg-blur;--msg-duration:0.42s;--msg-delay:36ms}
+.message-motion-112{animation-name:msg-flip;--msg-duration:0.42s;--msg-delay:0ms}
+.message-motion-113{animation-name:msg-left;--msg-duration:0.42s;--msg-delay:12ms}
+.message-motion-114{animation-name:msg-right;--msg-duration:0.42s;--msg-delay:24ms}
+.message-motion-115{animation-name:msg-pop;--msg-duration:0.42s;--msg-delay:36ms}
+.message-motion-116{animation-name:msg-float;--msg-duration:0.42s;--msg-delay:0ms}
+.message-motion-117{animation-name:msg-sweep;--msg-duration:0.42s;--msg-delay:12ms}
+.message-motion-118{animation-name:msg-drift;--msg-duration:0.42s;--msg-delay:24ms}
+.message-motion-119{animation-name:msg-elastic;--msg-duration:0.42s;--msg-delay:36ms}
+
+@media(max-width:767px){.nexus-sidebar{top:58px;height:calc(100dvh - 58px);transition:transform .28s cubic-bezier(.2,.8,.2,1)}.nexus-main{min-height:calc(100dvh - 58px)}.nexus-content{padding:14px}}
+@media(prefers-reduced-motion:reduce){.message-motion,.nexus-brand-orb:after,.nexus-nav-link:hover,.nexus-nav-link:hover .nexus-nav-icon{animation:none!important;transition:none!important;transform:none!important}}
