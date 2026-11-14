@@ -31,7 +31,7 @@ export function createMotionPreset(
 ): { variants: Variants; transition: Transition } {
   const offset = distances[direction];
   const distance = Math.max(0, Math.min(2, intensity));
-  const hidden: Record<string, unknown> = { opacity: 0 };
+  const hidden: Record<string, any> = { opacity: 0 };
   const shown: Record<string, unknown> = { opacity: 1 };
 
   if (entry === "rise" || entry === "drop" || entry === "slide") {
