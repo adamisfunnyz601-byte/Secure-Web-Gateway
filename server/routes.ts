@@ -1080,7 +1080,14 @@ export async function registerRoutes(
         }).returning();
         return { promptMessage, replyMessage };
       });
-      res.status(201).json({ ...created, botName: "NEXUS AI", model, requester: user?.username || "Member" });
+      res.status(201).json({
+        ...created,
+        replyToContent: isAiDm ? prompt : `@NEXUS AI ${prompt}`,
+        replyToSenderName: user?.username || "Member",
+        botName: "NEXUS AI",
+        model,
+        requester: user?.username || "Member",
+      });
     } catch (error: any) {
       console.error("[chat-ai] Could not save assistant reply:", error);
       res.status(500).json({ message: "The AI replied, but the chat messages could not be saved." });
@@ -1442,6 +1449,8 @@ export async function registerRoutes(
   });
 
   app.get(api.chat.users.path, requireAuth, async (req, res) => {
+    // Ensure the NEXUS AI bot account exists before the client builds its DM list.
+    await getNexusAiBot();
     const usersList = await storage.getAllUsers();
     res.json(usersList.map(safeUser));
   });
