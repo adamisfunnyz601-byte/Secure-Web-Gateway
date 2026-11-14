@@ -1237,12 +1237,15 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       return;
     }
 
-    // In a dedicated NEXUS AI DM, ordinary messages are questions for the bot.
-    // In Global Chat and groups, mention @NEXUS_AI to invite it into the conversation.
+    // In NEXUS AI DMs, ordinary messages go directly to the bot.
+    // In Global Chat, natural-language questions also invite NEXUS AI automatically.
+    // In group chats, use @NEXUS_AI so it doesn't interrupt every conversation.
     const selectedChatUser = selectedRecipientId ? usersMap.get(selectedRecipientId) : null;
     const isNexusAiDm = Boolean(selectedChatUser?.role === "bot" && selectedChatUser?.username === "nexus_ai_system");
+    const isGlobalChat = !selectedRecipientId && !selectedGroupId;
     const aiMention = messageContent.match(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i);
-    if (!uploadFile && (isNexusAiDm || (!selectedRecipientId && aiMention))) {
+    const looksLikeQuestion = /\?|^(?:who|what|when|where|why|how|is|are|am|can|could|would|will|should|do|does|did|tell me|explain|describe|compare)\b/i.test(messageContent.trim());
+    if (!uploadFile && (isNexusAiDm || (!selectedRecipientId && aiMention) || (isGlobalChat && looksLikeQuestion))) {
       const aiPrompt = isNexusAiDm
         ? messageContent.trim()
         : messageContent.replace(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i, "").trim();
