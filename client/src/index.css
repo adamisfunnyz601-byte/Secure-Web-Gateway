@@ -576,3 +576,29 @@ input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:foc
 .nexus-page-admin [role="tab"][data-state="active"],.nexus-page-settings [role="tab"][data-state="active"] {background:rgba(143,116,255,.16);box-shadow:inset 0 0 0 1px rgba(173,151,255,.15)}
 .nexus-page-profile [role="dialog"] {border-color:rgba(170,147,255,.22);box-shadow:0 28px 80px rgba(0,0,0,.45),0 0 40px rgba(131,103,255,.08)}
 @media(prefers-reduced-motion:reduce){.nexus-auth-screen:before,.nexus-auth-screen:after,.nexus-auth-card{animation:none!important}}
+
+
+/* Chat refresh: a calmer, layered conversation surface with tactile feedback. */
+.nexus-page-chat .chat-message-row{padding:3px 5px;border-radius:15px;transition:background .22s,transform .22s}
+.nexus-page-chat .chat-message-row:hover{background:rgba(167,139,250,.035)}
+.nexus-page-chat .chat-message-bubble{border-radius:15px!important;backdrop-filter:blur(14px);box-shadow:0 7px 22px rgba(0,0,0,.13);transition:transform .22s cubic-bezier(.2,.8,.2,1),border-color .22s,box-shadow .22s}
+.nexus-page-chat .chat-message-row:hover .chat-message-bubble{transform:translateY(-1px);box-shadow:0 12px 30px rgba(0,0,0,.2),0 0 22px rgba(139,92,246,.07)}
+.nexus-page-chat .chat-reply-quote{border-radius:11px!important;background:linear-gradient(110deg,rgba(139,92,246,.1),rgba(217,70,239,.035),rgba(0,0,0,.2))}
+.nexus-page-chat .chat-reply-quote>div{min-height:48px}
+.nexus-page-chat .chat-reply-composer{background:linear-gradient(180deg,rgba(139,92,246,.025),transparent)}
+.nexus-page-chat .chat-composer{background:linear-gradient(180deg,rgba(17,13,31,.98),rgba(10,9,19,.99));box-shadow:0 -12px 35px rgba(0,0,0,.16)}
+.nexus-page-chat .chat-composer form{padding:7px;border:1px solid rgba(167,139,250,.14);border-radius:17px;background:rgba(255,255,255,.025);box-shadow:inset 0 1px rgba(255,255,255,.035),0 8px 28px rgba(0,0,0,.16)}
+.nexus-page-chat .chat-composer form>button,.nexus-page-chat .chat-composer form>div>button{transition:transform .18s,background .18s,border-color .18s,box-shadow .18s}
+.nexus-page-chat .chat-composer form>button:hover{transform:translateY(-2px) scale(1.035);box-shadow:0 5px 18px rgba(139,92,246,.13)}
+.nexus-page-chat .chat-composer input{height:44px!important;border-radius:12px!important;border-color:rgba(167,139,250,.13)!important;background:rgba(0,0,0,.27)!important}
+.nexus-page-chat .chat-command-menu{transform-origin:bottom center;animation:chat-menu-in .2s cubic-bezier(.2,.8,.2,1) both}
+.nexus-page-chat .chat-command-menu button{position:relative;border-bottom:1px solid rgba(255,255,255,.035)}
+.nexus-page-chat .chat-command-menu button:hover,.nexus-page-chat .chat-command-menu button:focus-visible{background:linear-gradient(90deg,rgba(139,92,246,.19),rgba(217,70,239,.07))!important}
+.nexus-page-chat .chat-command-menu button>span:first-child{box-shadow:inset 0 0 0 1px rgba(167,139,250,.12);transition:transform .2s,box-shadow .2s}
+.nexus-page-chat .chat-command-menu button:hover>span:first-child{transform:rotate(-7deg) scale(1.08);box-shadow:0 0 18px rgba(167,139,250,.18)}
+.nexus-page-chat .chat-composer [class*="absolute bottom-12"]{border-radius:15px;overflow:hidden}
+@keyframes chat-menu-in{from{opacity:0;transform:translateY(9px) scale(.985);filter:blur(3px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+@keyframes chat-reply-pulse{0%,100%{box-shadow:0 8px 30px rgba(0,0,0,.22)}50%{box-shadow:0 8px 34px rgba(139,92,246,.18)}}
+.nexus-page-chat .chat-reply-composer>div{animation:chat-reply-pulse 3.4s ease-in-out infinite}
+@media(max-width:767px){.nexus-page-chat{height:calc(100dvh - 76px)!important;min-height:420px}.nexus-page-chat .chat-composer{padding:9px}.nexus-page-chat .chat-composer form{gap:5px}.nexus-page-chat .chat-composer form>button{flex-shrink:0}.nexus-page-chat .chat-message-bubble{max-width:min(84vw,34rem)}}
+@media(prefers-reduced-motion:reduce){.nexus-page-chat .chat-reply-composer>div{animation:none!important}.nexus-page-chat .chat-command-menu{animation:none!important}}
