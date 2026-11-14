@@ -16,6 +16,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      CI: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -39,7 +41,7 @@ jobs:
           node -e "require.resolve('electron'); require.resolve('electron-builder'); require.resolve('debug'); console.log('Electron build dependencies are resolvable.')"
 
       - name: Build Windows installer
-        run: npm run desktop:dist -- --publish never
+        run: npm run desktop:dist -- --publish=never
 
       - name: Verify installer was created
         shell: pwsh
