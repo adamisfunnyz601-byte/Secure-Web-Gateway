@@ -1,7 +1,7 @@
 
 import { db } from "./db";
-import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts, moderationLogs, blockBlastScores, dihhroAwards, communityServers, communityServerMembers, communityServerCategories, communityServerChannels } from "@shared/schema";
-import { eq, desc, and, or, gt, sql } from "drizzle-orm";
+import { users, accessKeys, searchHistory, messages, groupChats, groupChatMembers, customEmojis, friendRequests, blocks, oauthAccounts, moderationLogs, blockBlastScores, dihhroAwards, communityServers, communityServerMembers, communityServerCategories, communityServerChannels, chatMessageReactions, chatPolls, chatPollOptions, chatPollVotes } from "@shared/schema";
+import { eq, desc, and, or, gt, sql, inArray } from "drizzle-orm";
 import type { Express, Request, RequestHandler } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -959,6 +959,128 @@ export async function registerRoutes(
       mediaUrl: null,
       hasMedia: Boolean(message.mediaUrl),
     });
+  });
+
+  // Fetch interaction state for the currently open chat. Message visibility is
+  // inherited from the same storage query used by the message list.
+  app.get("/api/chat/interactions", requireAuth, async (req, res) => {
+    const recipientId = req.query.recipientId ? Number(req.query.recipientId) : undefined;
+    const groupId = req.query.groupId ? Number(req.query.groupId) : undefined;
+    if (recipientId !== undefined && (!Number.isInteger(recipientId) || recipientId <= 0)) return res.status(400).json({ message: "Invalid recipient" });
+    if (groupId !== undefined && (!Number.isInteger(groupId) || groupId <= 0)) return res.status(400).json({ message: "Invalid group" });
+    if (recipientId && groupId) return res.status(400).json({ message: "Choose one chat channel" });
+    const visibleMessages = await storage.getMessages(req.session.userId!, recipientId, groupId);
+    const messageIds = visibleMessages.map((message: any) => Number(message.id)).filter(Number.isInteger);
+    if (!messageIds.length) return res.json({ reactions: {}, polls: {} });
+    const reactionRows = await db.select({ messageId: chatMessageReactions.messageId, userId: chatMessageReactions.userId, emoji: chatMessageReactions.emoji })
+      .from(chatMessageReactions).where(inArray(chatMessageReactions.messageId, messageIds));
+    const pollRows = await db.select().from(chatPolls).where(inArray(chatPolls.messageId, messageIds));
+    const pollIds = pollRows.map(poll => poll.id);
+    const optionRows = pollIds.length ? await db.select().from(chatPollOptions).where(inArray(chatPollOptions.pollId, pollIds)) : [];
+    const voteRows = pollIds.length ? await db.select().from(chatPollVotes).where(inArray(chatPollVotes.pollId, pollIds)) : [];
+    const reactions: Record<string, any[]> = {};
+    for (const row of reactionRows) {
+      const key = String(row.messageId);
+      if (!reactions[key]) reactions[key] = [];
+      const existing = reactions[key].find(item => item.emoji === row.emoji);
+      if (existing) { existing.count += 1; existing.userIds.push(row.userId); }
+      else reactions[key].push({ emoji: row.emoji, count: 1, userIds: [row.userId] });
+    }
+    const polls: Record<string, any> = {};
+    for (const poll of pollRows) {
+      const options = optionRows.filter(option => option.pollId === poll.id).map(option => {
+        const votes = voteRows.filter(vote => vote.optionId === option.id);
+        return { id: option.id, label: option.label, count: votes.length };
+      });
+      const pollVotes = voteRows.filter(vote => vote.pollId === poll.id);
+      polls[String(poll.messageId)] = {
+        id: poll.id,
+        question: poll.question,
+        options,
+        totalVotes: pollVotes.length,
+        myVote: pollVotes.find(vote => vote.userId === req.session.userId)?.optionId ?? null,
+      };
+    }
+    res.json({ reactions, polls });
+  });
+
+  app.post("/api/chat/messages/:id/reactions", requireAuth, async (req, res) => {
+    const messageId = Number(req.params.id);
+    const emoji = typeof req.body?.emoji === "string" ? req.body.emoji : "";
+    const allowedEmojis = ["👍", "❤️", "😂", "🔥", "🎉", "👀", "😭", "💀"];
+    if (!Number.isInteger(messageId) || messageId <= 0 || !allowedEmojis.includes(emoji)) return res.status(400).json({ message: "Choose a valid reaction." });
+    const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+    if (!message) return res.status(404).json({ message: "Message not found." });
+    const otherUserId = message.recipientId ? (message.senderId === req.session.userId ? message.recipientId : message.senderId) : undefined;
+    const visible = await storage.getMessages(req.session.userId!, otherUserId, message.groupId ?? undefined);
+    if (!visible.some((item: any) => Number(item.id) === messageId)) return res.status(403).json({ message: "You cannot react to this message." });
+    const [existing] = await db.select().from(chatMessageReactions).where(and(
+      eq(chatMessageReactions.messageId, messageId),
+      eq(chatMessageReactions.userId, req.session.userId!),
+      eq(chatMessageReactions.emoji, emoji),
+    )).limit(1);
+    if (existing) await db.delete(chatMessageReactions).where(eq(chatMessageReactions.id, existing.id));
+    else await db.insert(chatMessageReactions).values({ messageId, userId: req.session.userId!, emoji });
+    res.json({ success: true, active: !existing });
+  });
+
+  app.post("/api/chat/polls", requireAuth, async (req, res) => {
+    const question = typeof req.body?.question === "string" ? req.body.question.trim().slice(0, 180) : "";
+    const options = Array.isArray(req.body?.options) ? req.body.options.map((value: any) => String(value).trim().slice(0, 80)).filter(Boolean) : [];
+    const recipientId = req.body?.recipientId == null ? null : Number(req.body.recipientId);
+    const groupId = req.body?.groupId == null ? null : Number(req.body.groupId);
+    if (!question || options.length < 2 || options.length > 6 || new Set(options.map((value: string) => value.toLowerCase())).size !== options.length) {
+      return res.status(400).json({ message: "A poll needs a question and 2–6 different options." });
+    }
+    if (recipientId && groupId) return res.status(400).json({ message: "Choose a DM or group, not both." });
+    if (recipientId) {
+      if (!Number.isInteger(recipientId) || recipientId <= 0 || recipientId === req.session.userId || await blockedEitherWay(req.session.userId!, recipientId)) return res.status(403).json({ message: "You cannot create a poll in this DM." });
+    }
+    if (groupId) {
+      if (!Number.isInteger(groupId) || groupId <= 0) return res.status(400).json({ message: "Invalid group." });
+      const [membership] = await db.select({ id: groupChatMembers.id }).from(groupChatMembers)
+        .where(and(eq(groupChatMembers.groupId, groupId), eq(groupChatMembers.userId, req.session.userId!))).limit(1);
+      if (!membership) return res.status(403).json({ message: "You are not a member of this group." });
+    }
+    const [activeMute] = await db.select().from(moderationLogs)
+      .where(and(eq(moderationLogs.targetId, req.session.userId!), sql`${moderationLogs.action} IN ('mute','timeout','jail','restrict','unmute','untimeout','unjail','unrestrict')`))
+      .orderBy(desc(moderationLogs.createdAt)).limit(1);
+    if (activeMute && !["unmute","untimeout","unjail","unrestrict"].includes(activeMute.action) && (!activeMute.expiresAt || activeMute.expiresAt > new Date())) {
+      return res.status(403).json({ message: "You are currently muted or restricted." });
+    }
+    const created = await db.transaction(async tx => {
+      const [message] = await tx.insert(messages).values({
+        senderId: req.session.userId!,
+        recipientId,
+        groupId,
+        content: question,
+        mediaType: "poll",
+      }).returning();
+      const [poll] = await tx.insert(chatPolls).values({ messageId: message.id, question }).returning();
+      await tx.insert(chatPollOptions).values(options.map((label: string, position: number) => ({ pollId: poll.id, label, position })));
+      return message;
+    });
+    res.status(201).json(created);
+  });
+
+  app.post("/api/chat/polls/:id/vote", requireAuth, async (req, res) => {
+    const pollId = Number(req.params.id);
+    const optionId = Number(req.body?.optionId);
+    if (!Number.isInteger(pollId) || !Number.isInteger(optionId)) return res.status(400).json({ message: "Invalid poll vote." });
+    const [poll] = await db.select().from(chatPolls).where(eq(chatPolls.id, pollId)).limit(1);
+    if (!poll) return res.status(404).json({ message: "Poll not found." });
+    const [message] = await db.select().from(messages).where(eq(messages.id, poll.messageId)).limit(1);
+    if (!message) return res.status(404).json({ message: "Poll message not found." });
+    const otherUserId = message.recipientId ? (message.senderId === req.session.userId ? message.recipientId : message.senderId) : undefined;
+    const visible = await storage.getMessages(req.session.userId!, otherUserId, message.groupId ?? undefined);
+    if (!visible.some((item: any) => Number(item.id) === message.id)) return res.status(403).json({ message: "You cannot vote in this poll." });
+    const [option] = await db.select().from(chatPollOptions).where(and(eq(chatPollOptions.id, optionId), eq(chatPollOptions.pollId, pollId))).limit(1);
+    if (!option) return res.status(400).json({ message: "That option does not belong to this poll." });
+    await db.transaction(async tx => {
+      await tx.delete(chatPollVotes).where(and(eq(chatPollVotes.pollId, pollId), eq(chatPollVotes.userId, req.session.userId!)));
+      await tx.insert(chatPollVotes).values({ pollId, optionId, userId: req.session.userId! });
+    });
+    res.json({ success: true });
   });
 
   app.get('/api/chat/messages/:id/media', requireAuth, async (req, res) => {
