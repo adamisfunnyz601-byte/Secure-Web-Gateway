@@ -1069,7 +1069,7 @@ export async function registerRoutes(
           senderId: req.session.userId!,
           recipientId: isAiDm ? bot.id : null,
           groupId: groupId ?? null,
-          content: prompt,
+          content: isAiDm ? prompt : \`@NEXUS AI \${prompt}\`,
         }).returning();
         const [replyMessage] = await tx.insert(messages).values({
           senderId: bot.id,
