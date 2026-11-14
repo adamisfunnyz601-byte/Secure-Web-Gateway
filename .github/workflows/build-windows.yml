@@ -12,9 +12,6 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    env:
-      NODE_ENV: development
-      npm_config_production: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -31,10 +28,10 @@ jobs:
       - name: Verify Electron build tools are installed
         run: |
           npm ls electron electron-builder
-          npx --no-install electron-builder --version
+          node ./node_modules/electron-builder/cli.js --version
 
       - name: Build Windows installer
-        run: npx --no-install electron-builder --win nsis
+        run: node ./node_modules/electron-builder/cli.js --win nsis
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
