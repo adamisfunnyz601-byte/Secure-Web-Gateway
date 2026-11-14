@@ -1245,7 +1245,8 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     const isGlobalChat = !selectedRecipientId && !selectedGroupId;
     const aiMention = messageContent.match(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i);
     const looksLikeQuestion = /\?|^(?:who|what|when|where|why|how|is|are|am|can|could|would|will|should|do|does|did|tell me|explain|describe|compare)\b/i.test(messageContent.trim());
-    if (!uploadFile && (isNexusAiDm || (!selectedRecipientId && aiMention) || (isGlobalChat && looksLikeQuestion))) {
+    const wantsWebSearch = /^(?:!search|\/search|search the web for|look up)\s+/i.test(messageContent.trim());
+    if (!uploadFile && (isNexusAiDm || (!selectedRecipientId && aiMention) || (isGlobalChat && (looksLikeQuestion || wantsWebSearch)))) {
       const aiPrompt = isNexusAiDm
         ? messageContent.trim()
         : messageContent.replace(/@nexus(?:[ _-]?ai(?:[_-]?system)?)(?=$|[\s,:!?])/i, "").trim();
