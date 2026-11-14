@@ -80,10 +80,10 @@ const isValidModerationDuration = (value: string) =>
   value === 'null' || /^[1-9]\d*(m|min|mins|h|hr|hrs|d|day|days|w|wk|wks|mo|y)$/i.test(value.trim());
 
 // Slash-command help and autocomplete. The server still validates and executes commands.
-const MEMBER_COMMAND_NAMES = ["help","commands","poll","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
+const MEMBER_COMMAND_NAMES = ["help","commands","poll","ai","me","shrug","roll","flip","nick","sfx","capsI","avatar","profile","serverinfo","userinfo","ping","whoami","rules","invite","coinflip","8ball","choose","quote","uptime"] as const;
 const MODERATION_COMMAND_NAMES = ["ban","unban","kick","mute","unmute","timeout","untimeout","warn","warnings","clearwarnings","softban","tempban","permban","shadowban","unshadowban","jail","unjail","deafen","undeafen","freeze","unfreeze","slowmode","slowmodeoff","lock","unlock","lockdown","unlockdown","purge","purgeuser","purgebots","clear","slowchat","unslowchat","note","notes","clearnotes","strike","strikes","clearstrikes","report","reports","resolve","role","promote","demote","nickreset","restrict","unrestrict","unkick"] as const;
 const CHAT_COMMANDS = [
-  ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: name === "poll" ? "/poll [question]" : `/${name}`, description: name === "poll" ? "Create a live poll in this chat." : name === "commands" ? "Browse all available chat commands." : "Member utility command." })),
+  ...MEMBER_COMMAND_NAMES.map(name => ({ name, usage: name === "poll" ? "/poll [question]" : `/${name}`, description: name === "poll" ? "Create a live poll in this chat." : name === "ai" ? "Ask the shared Ollama-powered NEXUS AI." : name === "commands" ? "Browse all available chat commands." : "Member utility command." })),
   ...MODERATION_COMMAND_NAMES.map(name => ({ name, usage: `/${name} <@user> [duration] [reason]`, description: "Staff moderation command.", ownerOnly: true, options: MODERATION_DURATIONS })),
 ] as const;
 
@@ -1076,6 +1076,27 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     }
   };
 
+  const requestNexusAI = async (prompt: string) => {
+    if (!prompt.trim()) {
+      toast({ title: "Ask NEXUS AI something", description: "Usage: /ai your question" });
+      return;
+    }
+    try {
+      const response = await fetch("/api/chat/ai", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim(), recipientId: selectedRecipientId, groupId: selectedGroupId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "NEXUS AI could not answer.");
+      queryClient.invalidateQueries({ queryKey: [api.chat.list.path] });
+      queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
+      toast({ title: "NEXUS AI replied", description: "The question and answer were posted in this chat." });
+    } catch (error: any) {
+      toast({ title: "NEXUS AI unavailable", description: error.message || "Check the Ollama API key and try again.", variant: "destructive" });
+    }
+  };
+
   // ============================================================
   // SEND MESSAGE
   // ============================================================
@@ -1091,6 +1112,11 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
     const commandArgs = (commandParts?.[2] || '').trim();
     if (commandName && MODERATION_COMMAND_NAMES.includes(commandName as any) && !canUseAdminCommand(commandName as keyof typeof ADMIN_COMMANDS_CONFIG.commands)) {
       toast({ title: 'OWNER ONLY', description: 'Only staff members can use this command.', variant: 'destructive' });
+      return;
+    }
+    if (commandName === "ai") {
+      setInputContent("");
+      await requestNexusAI(commandArgs);
       return;
     }
     if (commandName === "poll") {
