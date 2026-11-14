@@ -1010,7 +1010,7 @@ export async function registerRoutes(
       role: message.senderRole === "bot" ? "assistant" : "user",
       content: `${message.senderName || "Member"}: ${String(message.content || "").slice(0, 1200)}`,
     }));
-    const model = String(process.env.OLLAMA_MODEL || "qwen2.5:3b").trim().slice(0, 100);
+    const model = String(process.env.OLLAMA_MODEL || "qwen2.5:0.5b").trim().slice(0, 100);
     let answer = "";
     try {
       const ollamaResponse = await fetch(`${ollamaBaseUrl}/api/chat`, {
