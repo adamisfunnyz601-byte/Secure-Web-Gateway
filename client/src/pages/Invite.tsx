@@ -68,7 +68,7 @@ export default function Invite({ code }: { code: string }) {
 
   const isGroup = info?.type === "group";
   return (
-    <main className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden"
+    <main className="nexus-auth-screen min-h-screen flex items-center justify-center p-5 relative overflow-hidden"
       style={{ background: "radial-gradient(ellipse at 50% 15%, hsl(261 42% 23% / .55), transparent 55%), linear-gradient(135deg,hsl(228 10% 9%),hsl(250 20% 11%),hsl(228 10% 8%))" }}>
       <div className="absolute inset-0 opacity-[.12] pointer-events-none" style={{ backgroundImage: "linear-gradient(hsl(255 255 255 / .12) 1px,transparent 1px),linear-gradient(90deg,hsl(255 255 255 / .12) 1px,transparent 1px)", backgroundSize: "36px 36px" }} />
       <section className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[hsl(225_9%_14%/0.92)] shadow-2xl backdrop-blur-xl p-7 sm:p-9">
