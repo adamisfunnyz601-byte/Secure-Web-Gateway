@@ -9,7 +9,7 @@ export default function History() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="nexus-page nexus-page-history space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-display text-primary tracking-widest mb-1">ACCESS_LOGS</h2>
