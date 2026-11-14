@@ -1094,7 +1094,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
       queryClient.invalidateQueries({ queryKey: chatInteractionsKey });
       toast({ title: "NEXUS AI replied", description: "The question and answer were posted in this chat." });
     } catch (error: any) {
-      toast({ title: "NEXUS AI unavailable", description: error.message || "Check the Ollama API key and try again.", variant: "destructive" });
+      toast({ title: "NEXUS AI unavailable", description: error.message || "Start your local Ollama server and check that the model is installed.", variant: "destructive" });
     }
   };
 
