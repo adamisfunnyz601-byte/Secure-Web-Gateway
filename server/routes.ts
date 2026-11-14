@@ -1069,21 +1069,20 @@ export async function registerRoutes(
             .replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
             .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number(code)))
             .replace(/\s+/g, " ").trim();
-          const resultBlocks = html.match(/<div class="result[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>/gi) || [];
-          for (const block of resultBlocks) {
+          const linkRegex = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+          for (const linkMatch of html.matchAll(linkRegex)) {
             if (webSources.length >= 5) break;
-            const linkMatch = block.match(/<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-            const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i)
-              || block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/i);
-            if (!linkMatch) continue;
-            let resultUrl = linkMatch[1].replace(/&amp;/g, "&");
+            const nearbyHtml = html.slice((linkMatch.index || 0), (linkMatch.index || 0) + 2600);
+            const snippetMatch = nearbyHtml.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/i)
+              || nearbyHtml.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/i);
+            let resultUrl = String(linkMatch[1] || "").replace(/&amp;/g, "&");
             try {
               const parsedUrl = new URL(resultUrl, "https://duckduckgo.com");
               const redirected = parsedUrl.searchParams.get("uddg");
               resultUrl = redirected ? decodeURIComponent(redirected) : parsedUrl.toString();
               if (!/^https?:\/\//i.test(resultUrl)) continue;
             } catch { continue; }
-            const title = decodeHtml(linkMatch[2]).slice(0, 180);
+            const title = decodeHtml(String(linkMatch[2] || "")).slice(0, 180);
             const snippet = decodeHtml(snippetMatch?.[1] || "").slice(0, 500);
             if (title && !webSources.some(source => source.url === resultUrl)) {
               webSources.push({ title, url: resultUrl, snippet });
