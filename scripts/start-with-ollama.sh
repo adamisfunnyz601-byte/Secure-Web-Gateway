@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 MODE="${1:-development}"
-MODEL="${OLLAMA_MODEL:-qwen2.5:0.5b}"
+MODEL="${OLLAMA_MODEL:-tinyllama:1.1b-chat}"
 export OLLAMA_MODEL="$MODEL"
 export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 OLLAMA_URL="http://${OLLAMA_HOST}"
