@@ -391,7 +391,7 @@ const TerminalMessage = ({
   const dihhroGiftMatch = typeof displayContent === "string" ? displayContent.match(/https?:\/\/[^\s]+\/gift\/([A-Za-z0-9-]+)/) : null;
 
   return (
-    <div className={cn("flex mb-5 group gap-2 message-motion", `message-motion-${Math.abs(Number(msg.id) || 0) % 120}`, isMe ? "flex-row-reverse" : "flex-row")}>
+    <div className={cn("chat-message-row flex mb-5 group gap-2 message-motion", `message-motion-${Math.abs(Number(msg.id) || 0) % 120}`, isMe ? "flex-row-reverse" : "flex-row")}>
       <Avatar
         url={msg.senderAvatarUrl}
         name={msg.senderName}
@@ -426,7 +426,7 @@ const TerminalMessage = ({
         onDoubleClick={() => setShowActions(true)}
         onContextMenu={e => { e.preventDefault(); setShowActions(true); }}
         className={cn(
-          "relative p-3 border text-[13px] font-mono transition-all cursor-help max-w-md",
+          "chat-message-bubble relative p-3 border text-[13px] font-mono transition-all cursor-help max-w-md",
           isMe
             ? "bg-violet-500/5 border-violet-500/30 rounded-l-lg rounded-tr-lg hover:border-violet-500/60"
             : "bg-fuchsia-600/5 border-fuchsia-400/30 rounded-r-lg rounded-tl-lg hover:border-fuchsia-400/60"
@@ -440,7 +440,7 @@ const TerminalMessage = ({
         )}
         {/* Reply quote */}
         {msg.replyToContent && (
-          <div className={cn("mb-2 overflow-hidden rounded-lg border bg-black/25 shadow-inner",isMe?"border-violet-400/25":"border-fuchsia-400/25")}>
+          <div className={cn("chat-reply-quote mb-2 overflow-hidden rounded-lg border bg-black/25 shadow-inner",isMe?"border-violet-400/25":"border-fuchsia-400/25")}>
             <div className={cn("flex items-center gap-2 border-l-[3px] px-3 py-2",isMe?"border-violet-400 bg-violet-400/10":"border-fuchsia-400 bg-fuchsia-400/10")}>
               <Reply className="h-3.5 w-3.5 shrink-0 text-violet-200"/>
               <div className="min-w-0">
@@ -2310,10 +2310,18 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
           {/* Reply banner */}
           <AnimatePresence>
             {replyTarget && (
-              <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-                className="border-t border-violet-500/20 px-5 py-2 bg-violet-500/5 flex items-center justify-between overflow-hidden flex-shrink-0">
-                <span className="text-[9px] font-mono text-violet-200/60">Replying to <strong>{replyTarget.senderName}</strong>: {replyTarget.content?.slice(0, 50)}</span>
-                <button onClick={() => setReplyTarget(null)}><X className="w-3.5 h-3.5 text-violet-200/40 hover:text-violet-200" /></button>
+              <motion.div initial={{ opacity: 0, height: 0, y: 10 }} animate={{ opacity: 1, height: "auto", y: 0 }} exit={{ opacity: 0, height: 0, y: 8 }} transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                className="chat-reply-composer flex-shrink-0 overflow-hidden px-3 pt-2">
+                <div className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-violet-300/20 bg-[linear-gradient(110deg,rgba(139,92,246,.16),rgba(217,70,239,.07),rgba(15,12,27,.94))] px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,.22)]">
+                  <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-violet-300 via-fuchsia-400 to-violet-500" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-violet-300/20 bg-violet-400/10 text-violet-100"><Reply className="h-4 w-4"/></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.14em] text-violet-200"><span>Replying to</span><span className="max-w-[180px] truncate text-white">{replyTarget.senderDisplayName || replyTarget.senderNickname || replyTarget.senderName || "message"}</span></div>
+                    <div className="mt-0.5 truncate text-xs text-violet-100/60">{replyTarget.content || (replyTarget.mediaType ? "📎 " + replyTarget.mediaType + " attachment" : "Message")}</div>
+                  </div>
+                  <span className="hidden rounded-md border border-violet-300/15 bg-black/20 px-2 py-1 text-[8px] font-mono tracking-wider text-violet-200/50 sm:inline">ESC TO CANCEL</span>
+                  <button type="button" aria-label="Cancel reply" onClick={() => setReplyTarget(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 text-violet-200/60 transition hover:border-rose-300/30 hover:bg-rose-400/10 hover:text-rose-200"><X className="h-4 w-4"/></button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -2376,7 +2384,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
           </AnimatePresence>
 
           {/* Input */}
-          <div className="relative border-t border-border/60 p-3 flex-shrink-0" style={{ background: "hsl(228 7% 20%)" }}>
+          <div className="chat-composer relative flex-shrink-0 border-t border-violet-300/10 p-3">
             <form onSubmit={handleTransmit} className="flex items-center gap-2">
               <button type="button" onClick={() => fileInputRef.current?.click()}
                 className={cn("w-10 h-10 rounded flex items-center justify-center transition-all flex-shrink-0",
@@ -2401,7 +2409,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                   className="w-full h-10 bg-input/90 border border-border rounded-xl px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground shadow-inner transition-all duration-200 ease-out focus:-translate-y-px focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400/60 focus:shadow-[0_0_22px_rgba(139,92,246,0.12)]"
                 />
                 {showCommandMenu && (
-                  <div className="absolute bottom-12 left-0 right-0 z-50 rounded-xl border border-violet-400/30 bg-[#10091b]/95 backdrop-blur-xl shadow-[0_0_30px_rgba(139,92,246,0.2)] overflow-hidden">
+                  <div className="chat-command-menu absolute bottom-12 left-0 right-0 z-50 rounded-2xl border border-violet-300/25 bg-[#10091b]/[.97] backdrop-blur-2xl shadow-[0_18px_65px_rgba(0,0,0,.55),0_0_34px_rgba(139,92,246,.17)] overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-violet-400/15">
                       <span className="text-[9px] uppercase tracking-[0.2em] font-mono text-violet-200/70">{moderationUserOptions.length ? 'Choose a member' : parameterOptions.length ? 'Command parameters' : 'Available commands'}</span>
                       <span className="text-[8px] font-mono text-violet-200/35">↑ ↓ navigate · TAB complete · ENTER run</span>
