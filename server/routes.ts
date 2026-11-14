@@ -1128,6 +1128,14 @@ export async function registerRoutes(
       if (!ollamaResponse.ok) throw new Error(payload?.error || `Ollama returned HTTP ${ollamaResponse.status}`);
       answer = String(payload?.message?.content || "").trim();
       if (!answer) throw new Error("The model returned an empty reply.");
+      // Add verified result links ourselves so the small local model cannot
+      // forget citations or fabricate the URLs it claims to have searched.
+      if (webSources.length) {
+        const sourceLinks = webSources.slice(0, 3)
+          .map((source, index) => `[${index + 1}] [${source.title.replace(/[\[\]]/g, "")}](${source.url})`)
+          .join(" · ");
+        answer += `\n\n**Sources:** ${sourceLinks}`;
+      }
     } catch (error: any) {
       console.error("[chat-ai] Ollama request failed:", error?.message || error);
       return res.status(502).json({ message: "NEXUS AI could not reach local Ollama at " + ollamaBaseUrl + ". Check the Replit startup logs and confirm model '" + model + "' is installed. Details: " + (error?.message || "connection failed") });
