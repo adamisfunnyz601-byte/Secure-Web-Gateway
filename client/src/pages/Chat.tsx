@@ -29,8 +29,9 @@ import { EmojiButton } from "@/components/EmojiPicker";
 // ============================================================
 const SESSION_CRYPT = "X-256-CHA-CHA-POLY";
 
-// GifSnap public GIF catalogue. No API key, account, or secret required.
-const GIF_API_BASE = "https://gifcities.archive.org/api/v1/gifsearch";
+// Wikimedia Commons public media search. No API key required; GIFs are served
+// from Commons file URLs rather than the previous GifCities endpoint.
+const GIF_API_BASE = "https://commons.wikimedia.org/w/api.php";
 
 const DEFAULT_SOUNDS = [
   { id: 'S1', name: 'Neural ping', url: 'https://www.soundjay.com/buttons/sounds/button-20.mp3' },
@@ -533,6 +534,7 @@ export default function Chat() {
   const [gifResults, setGifResults] = useState<any[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
   const [gifError, setGifError] = useState("");
+  const gifSearchAbortRef = useRef<AbortController | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
 
@@ -928,41 +930,67 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
   };
 
   // ============================================================
-  // GIF PICKER (GifSnap public catalogue - no API key)
-  // Supports trending GIFs and keyword searches, including gaming reactions.
+  // GIF PICKER (Wikimedia Commons public media API)
+  // Searches openly licensed/publicly hosted GIF files without an API key.
   // ============================================================
   const searchGifs = async (query = gifSearch) => {
+    const term = query.trim() || "reaction";
+    gifSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    gifSearchAbortRef.current = controller;
     setGifLoading(true);
     setGifError("");
+    setGifResults([]);
     try {
-      // Internet Archive GifCities is keyless and hosted separately from the old provider.
-      const term = query.trim() || "funny";
-      const response = await fetch(`${GIF_API_BASE}?q=${encodeURIComponent(term)}`, { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`GIF search failed (${response.status}). Try another search in a moment.`);
+      const params = new URLSearchParams({
+        action: "query",
+        format: "json",
+        origin: "*",
+        generator: "search",
+        gsrnamespace: "6",
+        gsrlimit: "30",
+        gsrsearch: `${term} filemime:image/gif`,
+        prop: "imageinfo",
+        iiprop: "url|mime",
+        iiurlwidth: "480",
+      });
+      const response = await fetch(`${GIF_API_BASE}?${params.toString()}`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`GIF search failed (HTTP ${response.status}). Please try again.`);
       const payload = await response.json();
-      const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.data) ? payload.data : [];
-      const results = rows.map((item: any, index: number) => {
-        const candidate = item.url || item.gif_url || item.image_url || item.url_text;
-        const url = typeof candidate === "string" && /^https?:\/\//i.test(candidate)
-          ? candidate
-          : (typeof item.archive_url === "string" ? item.archive_url : "");
+      if (payload?.error) throw new Error(payload.error.info || "The GIF provider returned an error.");
+      const pages = Object.values(payload?.query?.pages || {}) as any[];
+      const results = pages.map((page: any) => {
+        const info = page?.imageinfo?.[0];
+        const url = info?.url;
+        if (!url || info?.mime !== "image/gif" || !/^https:\/\//i.test(url)) return null;
         return {
-          id: String(item.id || item.digest || url || index),
-          title: item.title || item.url_text || "Internet Archive GIF",
+          id: String(page.pageid || url),
+          title: String(page.title || "Wikimedia Commons GIF").replace(/^File:/, ""),
           url,
-          previewUrl: item.thumbnail || item.preview_url || url,
-          sourceUrl: "https://gifcities.org/",
-          license: "Internet Archive · archived GeoCities"
+          previewUrl: info.thumburl || url,
+          sourceUrl: page.descriptionurl || "https://commons.wikimedia.org/",
+          license: "Wikimedia Commons · check file licence",
         };
-      }).filter((gif: any) => gif.url && /^https?:\/\//i.test(gif.url));
+      }).filter(Boolean);
       setGifResults(results);
-      if (!results.length) setGifError("No GIFs found for that search. Try a simpler word such as funny, cat, dance or reaction.");
+      if (!results.length) setGifError("No matching GIFs found. Try a shorter search such as cat, dance, reaction or funny.");
     } catch (error: any) {
-      setGifError(error?.message || "Couldn't reach the Internet Archive GIF search. Try again shortly.");
+      if (error?.name !== "AbortError") {
+        setGifError(error?.message || "Couldn't reach Wikimedia Commons. Try again shortly.");
+      }
     } finally {
-      setGifLoading(false);
+      if (gifSearchAbortRef.current === controller) {
+        gifSearchAbortRef.current = null;
+        setGifLoading(false);
+      }
     }
   };
+
+  useEffect(() => () => gifSearchAbortRef.current?.abort(), []);
 
   const sendGif = (gif: any) => {
     const url = gif?.url;
@@ -2466,7 +2494,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
               <button type="button" onClick={() => setShowChatEmotePicker(v => !v)} title="Send an owned emote" className={cn("h-10 px-3 rounded-lg flex items-center justify-center gap-1.5 flex-shrink-0 border transition-all", showChatEmotePicker ? "border-fuchsia-400/50 bg-fuchsia-500/20 text-fuchsia-200" : "border-violet-400/20 bg-violet-500/5 text-violet-200 hover:bg-fuchsia-500/15 hover:border-fuchsia-400/40")}><Sparkles className="h-4 w-4"/><span className="text-[10px] font-bold tracking-wider">EMOTE</span></button>
               <button
                 type="button"
-                onClick={() => { setShowGifPicker(true); if (!gifResults.length) searchGifs(""); }}
+                onClick={() => { setShowGifPicker(true); if (!gifResults.length) searchGifs("reaction"); }}
                 title="Send a GIF"
                 className="h-10 px-3 rounded-lg flex items-center justify-center gap-1.5 flex-shrink-0 border border-violet-400/20 bg-violet-500/5 text-violet-200 hover:bg-fuchsia-500/15 hover:border-fuchsia-400/40 hover:text-fuchsia-200 transition-all duration-200"
               >
@@ -2549,7 +2577,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
               className="w-full max-w-2xl max-h-[82vh] overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[#10091b]/95 shadow-[0_20px_80px_rgba(0,0,0,0.6),0_0_35px_rgba(168,85,247,0.12)] flex flex-col"
             >
               <div className="flex items-center justify-between border-b border-violet-400/15 px-5 py-4">
-                <div className="flex items-center gap-2"><Film className="w-5 h-5 text-fuchsia-300" /><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">GIF LIBRARY</div><div className="mt-1 text-[10px] text-violet-100/45">Browse trending GIFs or search gaming, memes and reactions.</div></div></div>
+                <div className="flex items-center gap-2"><Film className="w-5 h-5 text-fuchsia-300" /><div><div className="text-xs font-bold tracking-[0.25em] text-fuchsia-200">GIF LIBRARY</div><div className="mt-1 text-[10px] text-violet-100/45">Search public GIF files from Wikimedia Commons.</div></div></div>
                 <button onClick={() => setShowGifPicker(false)} className="rounded-lg p-2 text-violet-200/60 transition hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
               </div>
               <form onSubmit={e => { e.preventDefault(); searchGifs(); }} className="flex gap-2 p-4 border-b border-violet-400/10">
@@ -2573,7 +2601,7 @@ const openGroupInvitePicker=async()=>{setShowGroupCallInvites(v=>!v);const invit
                   </div>
                 </div>
               )}
-              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by Internet Archive GifCities · No API key required.</div>
+              <div className="border-t border-violet-400/10 px-4 py-2 text-[9px] text-violet-100/30">GIF search powered by Wikimedia Commons · Public media API, no API key required.</div>
             </motion.div>
           </motion.div>
         )}
