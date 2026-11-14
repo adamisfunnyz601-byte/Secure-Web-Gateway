@@ -328,6 +328,7 @@ const TerminalMessage = ({
   onProfileClick: (id: number) => void;
 }) => {
   const [showActions, setShowActions] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
   const displayName = msg.senderDisplayName || msg.senderNickname || msg.senderName;
   const roleName = String(msg.senderRole || "").toLowerCase().replace(/_/g,"-");
   const roleBadge: Record<string,{label:string;style:string}> = {
@@ -472,7 +473,6 @@ const TerminalMessage = ({
         {msg.mediaType === "poll" && poll && <ChatPollCard poll={poll} onVote={onVote}/>}
         {Number(msg.id)>0 && <div className="chat-reactions mt-2 flex flex-wrap items-center gap-1.5">
           {reactions.map((reaction:any)=><button key={reaction.emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),reaction.emoji)} title={reaction.userIds?.length ? `Reacted by ${reaction.userIds.length} member(s)` : "React"} className={cn("rounded-full border px-2 py-1 text-[11px] transition-all hover:-translate-y-0.5",reaction.userIds?.includes?.(currentUserId)?"border-violet-300/50 bg-violet-400/15 text-violet-100":"border-white/10 bg-black/20 text-white/65 hover:border-violet-300/30")}>{reaction.emoji} <span className="ml-1 text-[9px]">{reaction.count}</span></button>)}
-          {["👍","❤️","😂","🔥","🎉","👀","😭","💀"].map(emoji=><button key={emoji} type="button" onClick={()=>onToggleReaction(Number(msg.id),emoji)} aria-label={`React ${emoji}`} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[.07] bg-white/[.025] text-xs opacity-65 transition hover:scale-110 hover:border-violet-300/30 hover:bg-violet-400/10 hover:opacity-100">{emoji}</button>)}
         </div>}
 
         <AnimatePresence>
@@ -486,11 +486,22 @@ const TerminalMessage = ({
                   isMe ? "right-0" : "left-0"
                 )}
               >
-                <button onClick={() => { onReply(msg); setShowActions(false); }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-violet-200 hover:bg-violet-500/20 font-bold uppercase">
+                <button onClick={() => { setShowReactionPicker(value => !value); }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] text-amber-200 hover:bg-amber-500/15 font-bold uppercase">
+                  <span className="text-sm">😊</span> Reactions <span className="ml-auto text-[9px] opacity-60">{showReactionPicker ? "▴" : "▾"}</span>
+                </button>
+                {showReactionPicker && (
+                  <div className="grid grid-cols-4 gap-1 border-y border-white/10 bg-white/[.035] p-2">
+                    {["👍","❤️","😂","🔥","🎉","👀","😭","💀","😍","🥳","🤔","👏","😮","😢","💯","🙏"].map(emoji => (
+                      <button key={emoji} type="button" onClick={() => { onToggleReaction(Number(msg.id), emoji); setShowReactionPicker(false); setShowActions(false); }} aria-label={`React ${emoji}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-base transition hover:scale-110 hover:bg-violet-400/20">{emoji}</button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => { onReply(msg); setShowActions(false); setShowReactionPicker(false); }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-violet-200 hover:bg-violet-500/20 font-bold uppercase border-t border-white/5">
                   <Reply className="w-3 h-3" /> Reply
                 </button>
-                <button onClick={() => { onForward(msg); setShowActions(false); }}
+                <button onClick={() => { onForward(msg); setShowActions(false); setShowReactionPicker(false); }}
                   className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-fuchsia-300 hover:bg-fuchsia-600/20 font-bold uppercase border-t border-white/5">
                   <Forward className="w-3 h-3" /> Relay
                 </button>
