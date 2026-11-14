@@ -22,7 +22,8 @@ import DihhroGift from "@/pages/DihhroGift";
 import MyProfile from "@/pages/MyProfile";
 import ModerationPanel from "@/pages/ModerationPanel";
 import Chat from "@/pages/Chat";
-import UpdatesPage from "@/pages/Updates";\nimport ServersPage from "@/pages/Servers";
+import UpdatesPage from "@/pages/Updates";
+import ServersPage from "@/pages/Servers";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
